@@ -1,0 +1,63 @@
+name: StarCatch
+options:
+  bundleIdPrefix: com.starcatch
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  SatelliteKit:
+    url: https://github.com/gavineadie/SatelliteKit.git
+    from: "2.1.0"
+
+targets:
+  StarCatch:
+    type: application
+    platform: iOS
+    sources:
+      - StarCatch
+    dependencies:
+      - package: SatelliteKit
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1"
+        PRODUCT_BUNDLE_IDENTIFIER: com.starcatch.StarCatch
+        SWIFT_VERSION: "5.10"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: StarCatch/Info.plist
+      properties:
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        CFBundleDisplayName: StarCatch
+        ITSAppUsesNonExemptEncryption: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSLocationWhenInUseUsageDescription: 用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。
+        NSMotionUsageDescription: 用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
+        UIViewControllerBasedStatusBarAppearance: false
+
+  StarCatchTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - StarCatchTests
+    dependencies:
+      - target: StarCatch
+      - package: SatelliteKit
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/StarCatch.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StarCatch
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  StarCatch:
+    build:
+      targets:
+        StarCatch: all
+    test:
+      targets:
+        - StarCatchTests

@@ -1,0 +1,33 @@
+StarCatch third-party notices
+================================
+
+StarCatch
+Copyright (c) 2026 XinyuZhang
+
+The MIT License in LICENSE applies to StarCatch's original source code and
+project materials. Third-party software and data remain subject to their
+respective terms.
+
+SatelliteKit
+------------
+
+StarCatch uses SatelliteKit for local SGP4 orbit propagation.
+
+Source: https://github.com/gavineadie/SatelliteKit
+License: MIT
+
+CelesTrak GP/OMM data
+---------------------
+
+The bundled orbital catalog in StarCatch/Resources/catalog.json is generated
+from CelesTrak GP/OMM data. StarCatch does not claim authorship of the source
+orbital records.
+
+Source: https://celestrak.org/
+Usage policy: https://celestrak.org/usage-policy.php
+GP data documentation:
+https://celestrak.org/NORAD/documentation/gp-data-formats.php
+
+The catalog update script is intended for release-time use only. Consumers
+that refresh the data should follow CelesTrak's current query documentation,
+download-frequency guidance, and other applicable source terms.
