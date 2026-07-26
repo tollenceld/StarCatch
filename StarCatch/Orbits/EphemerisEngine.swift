@@ -97,8 +97,18 @@ final class EphemerisEngine: ObservableObject {
 
     /// 筛选不仅减少绘制，也缩小后续后台传播帧；单颗精算仍可读取完整目录。
     func setPropagationObjects(_ objects: [CatalogObject]) {
+        // 过滤器可能在旧的 16k 传播任务尚未结束时切换。取消旧任务并立即按新集合
+        // 重建，避免上一帧在数秒后反向覆盖新筛选结果。
+        liveTask?.cancel()
+        liveTask = nil
+        warmupTask?.cancel()
+        warmupTask = nil
+        frozenTask?.cancel()
+        frozenTask = nil
+        pendingFrozenDate = nil
         propagationObjectIDs = objects.map(\.id)
         frozenSnapshotTime = nil
+        frozenSnapshot.removeAll(keepingCapacity: true)
         preciseCache.removeAll(keepingCapacity: true)
         requestLiveFrame()
     }
@@ -217,8 +227,11 @@ final class EphemerisEngine: ObservableObject {
                     return
                 }
                 let needsWarmup = frame.keys.contains { self.samples[$0] == nil }
-                var next: [String: Sample] = [:]
-                next.reserveCapacity(frame.count)
+                // 镜片切换只改变下一轮需要更新的对象，不销毁此前完整目录的缓存。
+                // 因此从一个小集合切到另一个集合时，真实旧位置可以立即出现，
+                // 并在本轮传播完成后平滑更新，而不是先给用户一片空天空。
+                var next = self.samples
+                next.reserveCapacity(max(next.count, frame.count))
                 for (objectId, ephemeris) in frame {
                     let previous = self.samples[objectId]
                     next[objectId] = Sample(

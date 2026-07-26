@@ -2,24 +2,24 @@ import Foundation
 import SatelliteKit
 
 private struct CatalogDocument: Decodable {
-    let schemaVersion: Int?
+    let schemaVersion: Int
     let snapshotEpoch: Date
-    let generatedAt: Date?
+    let generatedAt: Date
     let source: String
     let objects: [CatalogRecord]
 }
 
-/// 同时兼容旧的 27 条 TLE 文档和生成器输出的扁平 OMM 文档。
+/// `Scripts/update_catalog.py` 生成的 schema v2 记录。绝大多数对象是扁平 OMM；
+/// 不在 active GP 分组中的少量历史目标以策展 TLE 记录保留。这里支持的是当前
+/// 发布格式中的两种明确载荷，不再兼容旧版整份目录文档。
 private struct CatalogRecord: Decodable {
     let object: CatalogObject
     let elements: Elements
 
     private enum CodingKeys: String, CodingKey {
-        // OMM fields
         case objectName = "OBJECT_NAME"
         case epoch = "EPOCH"
 
-        // Generated StarCatch metadata
         case generatedID = "STARCATCH_ID"
         case generatedCategory = "STARCATCH_CATEGORY"
         case generatedKind = "STARCATCH_KIND"
@@ -30,83 +30,83 @@ private struct CatalogRecord: Decodable {
         case generatedFamily = "STARCATCH_FAMILY"
         case generatedCurated = "STARCATCH_CURATED"
 
-        // Legacy authored catalog fields
-        case legacyID = "id"
-        case legacyName = "name"
-        case legacyNoradID = "noradId"
-        case legacyCosparID = "cosparId"
+        // Curated TLE fallback fields emitted inside the schema v2 document.
+        case authoredID = "id"
+        case authoredName = "name"
+        case authoredNORADID = "noradId"
+        case authoredCosparID = "cosparId"
         case tle1
         case tle2
-        case legacyOrbitClass = "orbitClass"
-        case legacyLaunched = "launched"
-        case legacyStatus = "status"
-        case legacyKind = "kind"
-        case legacyPoetic = "poetic"
-        case legacyCategory = "category"
+        case authoredOrbitClass = "orbitClass"
+        case authoredLaunched = "launched"
+        case authoredStatus = "status"
+        case authoredKind = "kind"
+        case authoredPoetic = "poetic"
+        case authoredCategory = "category"
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let isOMM = container.contains(.objectName)
-
-        if isOMM {
-            elements = try Elements(from: decoder)
-        } else {
-            let name = try container.decode(String.self, forKey: .legacyName)
+        let isAuthoredTLE = container.contains(.tle1)
+        if isAuthoredTLE {
+            let name = try container.decode(String.self, forKey: .authoredName)
             let line1 = try container.decode(String.self, forKey: .tle1)
             let line2 = try container.decode(String.self, forKey: .tle2)
             elements = try Elements(name, line1, line2)
+        } else {
+            _ = try container.decode(String.self, forKey: .objectName)
+            elements = try Elements(from: decoder)
         }
 
         let status = try container.decodeIfPresent(
             CatalogObject.Status.self,
-            forKey: isOMM ? .generatedStatus : .legacyStatus
+            forKey: isAuthoredTLE ? .authoredStatus : .generatedStatus
         ) ?? .active
         let kind = try container.decodeIfPresent(
             String.self,
-            forKey: isOMM ? .generatedKind : .legacyKind
+            forKey: isAuthoredTLE ? .authoredKind : .generatedKind
         ) ?? "science"
         let category = try container.decodeIfPresent(
             CatalogCategory.self,
-            forKey: isOMM ? .generatedCategory : .legacyCategory
+            forKey: isAuthoredTLE ? .authoredCategory : .generatedCategory
         ) ?? Self.fallbackCategory(status: status, kind: kind)
 
-        let name = try container.decodeIfPresent(String.self, forKey: .legacyName)
+        let name = try container.decodeIfPresent(String.self, forKey: .authoredName)
             ?? elements.commonName
         let identifier = Int(elements.noradIndex)
         object = CatalogObject(
             id: try container.decodeIfPresent(
                 String.self,
-                forKey: isOMM ? .generatedID : .legacyID
+                forKey: isAuthoredTLE ? .authoredID : .generatedID
             ) ?? "norad-\(identifier)",
             name: name,
-            noradId: try container.decodeIfPresent(Int.self, forKey: .legacyNoradID)
+            noradId: try container.decodeIfPresent(Int.self, forKey: .authoredNORADID)
                 ?? identifier,
-            cosparId: try container.decodeIfPresent(String.self, forKey: .legacyCosparID)
+            cosparId: try container.decodeIfPresent(String.self, forKey: .authoredCosparID)
                 ?? elements.launchName,
             orbitClass: try container.decodeIfPresent(
                 String.self,
-                forKey: isOMM ? .generatedOrbitClass : .legacyOrbitClass
+                forKey: isAuthoredTLE ? .authoredOrbitClass : .generatedOrbitClass
             ) ?? "—",
             launched: try container.decodeIfPresent(
                 String.self,
-                forKey: isOMM ? .generatedLaunched : .legacyLaunched
+                forKey: isAuthoredTLE ? .authoredLaunched : .generatedLaunched
             ) ?? "—",
             status: status,
             kind: kind,
             poetic: try container.decodeIfPresent(
                 String.self,
-                forKey: isOMM ? .generatedPoetic : .legacyPoetic
+                forKey: isAuthoredTLE ? .authoredPoetic : .generatedPoetic
             ) ?? "它仍在轨道上，以自己的速度穿过观察者此刻的天空。",
             category: category,
             family: try container.decodeIfPresent(
                 CatalogFamily.self,
                 forKey: .generatedFamily
-            ) ?? (name.uppercased().hasPrefix("STARLINK") ? .starlink : nil),
+            ) ?? CatalogFamily.infer(from: name),
             elementEpoch: try container.decodeIfPresent(Date.self, forKey: .epoch)
                 ?? .distantPast,
             isCurated: try container.decodeIfPresent(Bool.self, forKey: .generatedCurated)
-                ?? !isOMM
+                ?? isAuthoredTLE
         )
     }
 
@@ -128,50 +128,34 @@ final class CatalogStore: @unchecked Sendable {
     let objects: [CatalogObject]
     let objectsByID: [String: CatalogObject]
     let objectsByCategory: [CatalogCategory: [CatalogObject]]
+    let objectsByFamily: [CatalogFamily: [CatalogObject]]
     let satellites: [String: Satellite]
     let snapshotEpoch: Date
     let generatedAt: Date?
     let source: String
     let categoryCounts: [CatalogCategory: Int]
+    let familyCounts: [CatalogFamily: Int]
+    let filterCounts: [CatalogFilter: Int]
+    let filterReadableCounts: [CatalogFilter: Int]
 
     init() {
-        guard let url = Bundle.main.url(forResource: "catalog", withExtension: "json"),
-              let data = try? Data(contentsOf: url)
-        else {
+        let catalog: CatalogDocument
+        do {
+            catalog = try Self.loadCatalog()
+        } catch {
             objects = []
             objectsByID = [:]
             objectsByCategory = [:]
+            objectsByFamily = [:]
             satellites = [:]
             snapshotEpoch = .distantPast
             generatedAt = nil
             source = "—"
             categoryCounts = [:]
-            assertionFailure("catalog.json 缺失")
-            return
-        }
-
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let value = try decoder.singleValueContainer().decode(String.self)
-            guard let date = Self.parseISO8601(value) else {
-                throw DecodingError.dataCorruptedError(
-                    in: try decoder.singleValueContainer(),
-                    debugDescription: "无效 ISO-8601 日期：\(value)"
-                )
-            }
-            return date
-        }
-
-        guard let catalog = try? decoder.decode(CatalogDocument.self, from: data) else {
-            objects = []
-            objectsByID = [:]
-            objectsByCategory = [:]
-            satellites = [:]
-            snapshotEpoch = .distantPast
-            generatedAt = nil
-            source = "—"
-            categoryCounts = [:]
-            assertionFailure("catalog.json 无法解析")
+            familyCounts = [:]
+            filterCounts = [:]
+            filterReadableCounts = [:]
+            assertionFailure("catalog.json 加载失败：\(Self.describe(error))")
             return
         }
 
@@ -187,29 +171,113 @@ final class CatalogStore: @unchecked Sendable {
         objects = valid
         objectsByID = Dictionary(uniqueKeysWithValues: valid.map { ($0.id, $0) })
         objectsByCategory = Dictionary(grouping: valid, by: \CatalogObject.category)
+        objectsByFamily = Dictionary(grouping: valid.compactMap { object in
+            object.family.map { ($0, object) }
+        }, by: \.0).mapValues { pairs in pairs.map(\.1) }
         satellites = sats
         snapshotEpoch = catalog.snapshotEpoch
         generatedAt = catalog.generatedAt
         source = catalog.source
-        categoryCounts = Dictionary(grouping: valid, by: \CatalogObject.category)
-            .mapValues(\.count)
+        categoryCounts = objectsByCategory.mapValues(\.count)
+        familyCounts = objectsByFamily.mapValues(\.count)
+        filterCounts = Dictionary(
+            uniqueKeysWithValues: CatalogFilter.allCases.map { filter in
+                (filter, valid.lazy.filter(filter.includes).count)
+            }
+        )
+        filterReadableCounts = Dictionary(
+            uniqueKeysWithValues: CatalogFilter.allCases.map { filter in
+                (
+                    filter,
+                    valid.lazy.filter { filter.includes($0) && $0.hasMeaningfulProfile }.count
+                )
+            }
+        )
+    }
+
+    private enum LoadError: LocalizedError {
+        case missingResource
+        case unsupportedSchema(Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .missingResource:
+                "App 包内缺少 catalog.json"
+            case .unsupportedSchema(let version):
+                "catalog.json schemaVersion \(version) 不受支持"
+            }
+        }
+    }
+
+    private static func loadCatalog() throws -> CatalogDocument {
+        guard let url = Bundle.main.url(forResource: "catalog", withExtension: "json") else {
+            throw LoadError.missingResource
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+            guard let date = Self.parseISO8601(value) else {
+                throw DecodingError.dataCorruptedError(
+                    in: container,
+                    debugDescription: "无效 ISO-8601 日期：\(value)"
+                )
+            }
+            return date
+        }
+        let data = try Data(contentsOf: url, options: .mappedIfSafe)
+        let document = try decoder.decode(CatalogDocument.self, from: data)
+        guard document.schemaVersion == 2 else {
+            throw LoadError.unsupportedSchema(document.schemaVersion)
+        }
+        return document
+    }
+
+    private static func describe(_ error: Error) -> String {
+        guard let decodingError = error as? DecodingError else {
+            return error.localizedDescription
+        }
+        let context: DecodingError.Context
+        switch decodingError {
+        case .keyNotFound(let key, let value):
+            return "缺少 \(value.codingPath.map(\.stringValue).joined(separator: "."))"
+                + "\(value.codingPath.isEmpty ? "" : ".")\(key.stringValue)：\(value.debugDescription)"
+        case .typeMismatch(_, let value),
+             .valueNotFound(_, let value),
+             .dataCorrupted(let value):
+            context = value
+        default:
+            return error.localizedDescription
+        }
+        let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+        return "\(path.isEmpty ? "根节点" : path)：\(context.debugDescription)"
     }
 
     func objects(matching filter: CatalogFilter) -> [CatalogObject] {
-        guard let category = filter.category else { return objects }
-        return objectsByCategory[category] ?? []
+        guard filter != .all else { return objects }
+        return objects.filter(filter.includes)
     }
 
     private static func parseISO8601(_ rawValue: String) -> Date? {
         var value = rawValue
         if !value.hasSuffix("Z"), !value.contains("+") { value += "Z" }
 
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = fractional.date(from: value) { return date }
+        if let date = fractionalISO8601.date(from: value) { return date }
 
-        let standard = ISO8601DateFormatter()
-        standard.formatOptions = [.withInternetDateTime]
-        return standard.date(from: value)
+        return standardISO8601.date(from: value)
     }
+
+    /// 目录含一万六千余个历元；格式器必须复用，不能为每条记录各创建两次。
+    private static let fractionalISO8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let standardISO8601: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 }

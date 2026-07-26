@@ -8,6 +8,7 @@ import UIKit
 struct InstrumentPanel: View {
     private enum Page: Equatable {
         case settings
+        case systemStatus
         case observations
         case observationDetail(String)
     }
@@ -18,12 +19,14 @@ struct InstrumentPanel: View {
     @ObservedObject private var log: ObservationLog
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.openURL) private var openURL
 
     let onOpenManual: () -> Void
     let onOpenPrivacy: () -> Void
 
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
+    @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
 
     @State private var revealed = false
     @State private var dismissRequested = false
@@ -31,10 +34,6 @@ struct InstrumentPanel: View {
     @State private var page: Page = .settings
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
-    private var transitionDuration: Double {
-        suppressMotion ? 0.16 : Motion.interfaceExpandDuration
-    }
-
     private var navigationAnimation: Animation {
         suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceExpand
     }
@@ -77,6 +76,10 @@ struct InstrumentPanel: View {
                     .scrollBounceBehavior(.basedOnSize)
                     .transition(.opacity)
 
+                case .systemStatus:
+                    systemStatus
+                        .transition(.opacity)
+
                 case .observations:
                     observationHistory
                         .transition(.opacity)
@@ -96,6 +99,8 @@ struct InstrumentPanel: View {
             let args = ProcessInfo.processInfo.arguments
             if args.contains("--openObservationDetail"), let first = log.entries.first {
                 page = .observationDetail(first.objectId)
+            } else if args.contains("--openStatus") {
+                page = .systemStatus
             } else if args.contains("--openObservations") {
                 page = .observations
             }
@@ -137,6 +142,12 @@ struct InstrumentPanel: View {
                 .padding(.top, 24)
                 .padding(.bottom, 6)
             actionRow(
+                eyebrow: "STATUS & DATA",
+                title: "仪器状态与轨道数据"
+            ) {
+                withAnimation(navigationAnimation) { page = .systemStatus }
+            }
+            actionRow(
                 eyebrow: "FIELD MANUAL",
                 title: "重新查看观测手册",
                 action: onOpenManual
@@ -165,7 +176,7 @@ struct InstrumentPanel: View {
                     .fill(Palette.inkFaint.opacity(0.44))
                     .frame(height: 0.5)
             }
-            Text("显示、记录与帮助")
+            Text("显示、交互、记录与帮助")
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
@@ -186,6 +197,13 @@ struct InstrumentPanel: View {
                 title: "抑制动效",
                 caption: "冻结漂移与呼吸，缩短转场。",
                 isOn: $reducedMotion
+            )
+            hairline
+            toggleRow(
+                eyebrow: "CAPTURE CONFIRMATION",
+                title: "确认捕获",
+                caption: "在主视野底部显示确认、切换与取消捕获。",
+                isOn: $captureConfirmationEnabled
             )
         }
         .overlay(alignment: .top) { hairline }
@@ -243,6 +261,174 @@ struct InstrumentPanel: View {
             "已识别 \(log.totalObjects) 个天体，最近观测 \(log.entries.first?.objectName ?? "尚无记录")"
         )
         .accessibilityHint("打开完整观测记录")
+    }
+
+    // MARK: - 仪器状态与数据
+
+    private var systemStatus: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                statusHeader
+                    .padding(.bottom, 26)
+
+                sectionLabel("设备")
+                    .padding(.bottom, 8)
+                statusField("观察者", observerDescription)
+                statusField("定位权限", authorizationDescription)
+                statusField("指向", pointingDescription)
+                statusField("姿态服务", availabilityDescription)
+
+                if observer.isDeniedOrRestricted {
+                    openSettingsButton
+                }
+
+                sectionLabel("轨道目录")
+                    .padding(.top, 26)
+                    .padding(.bottom, 8)
+                statusField("对象", "\(session.catalog.objects.count) OBJECTS")
+                statusField("快照", snapshotDescription)
+                statusField("龄期", catalogAgeDescription)
+                statusField("运行", "OFFLINE · ON DEVICE")
+
+                Text("目录来自 CelesTrak GP/OMM 快照；SatelliteKit 在设备上执行 SGP4 传播。轨道数据不会在运行时联网刷新。")
+                    .font(Typography.archivePoetic)
+                    .tracking(Typography.archivePoeticTracking)
+                    .lineSpacing(Typography.archivePoeticLineSpacing)
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
+
+                sectionLabel("支持与归属")
+                    .padding(.top, 28)
+                    .padding(.bottom, 6)
+                externalActionRow(
+                    eyebrow: "GITHUB ISSUES",
+                    title: "反馈问题与获取支持",
+                    url: AppLinks.support
+                )
+                externalActionRow(
+                    eyebrow: "SOURCE & LICENSE",
+                    title: "项目源码与开源许可",
+                    url: AppLinks.project
+                )
+
+                Text("StarCatch 与 SatelliteKit 依据 MIT License 发布。轨道目录归属 CelesTrak；完整声明随项目公开发布。")
+                    .font(Typography.statusTag)
+                    .tracking(0.45)
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 14)
+            }
+            .padding(.horizontal, 34)
+            .padding(.top, 22)
+            .padding(.bottom, 30)
+        }
+    }
+
+    private var statusHeader: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("INSTRUMENT STATUS")
+                    .font(Typography.fieldLabel)
+                    .tracking(Typography.fieldLabelTracking + 1.0)
+                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                Rectangle()
+                    .fill(Palette.inkFaint.opacity(0.44))
+                    .frame(height: 0.5)
+            }
+            Text("真机状态、离线目录与支持")
+                .font(Typography.guide)
+                .tracking(Typography.guideTracking)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+        }
+    }
+
+    private var observerDescription: String {
+        let coordinates = observer.coordinates
+        if coordinates.assumed { return "BEIJING · ASSUMED" }
+        let latitude = String(
+            format: "%.2f°%@",
+            abs(coordinates.latitude),
+            coordinates.latitude >= 0 ? "N" : "S"
+        )
+        let longitude = String(
+            format: "%.2f°%@",
+            abs(coordinates.longitude),
+            coordinates.longitude >= 0 ? "E" : "W"
+        )
+        return "\(latitude)  \(longitude)"
+    }
+
+    private var authorizationDescription: String {
+        switch observer.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse: "ALLOWED"
+        case .denied: "DENIED · USING ASSUMED"
+        case .restricted: "RESTRICTED · USING ASSUMED"
+        case .notDetermined: "NOT REQUESTED"
+        @unknown default: "UNKNOWN"
+        }
+    }
+
+    private var pointingDescription: String {
+        switch session.confidence {
+        case .trueNorth: "TRUE NORTH"
+        case .uncalibrated: "UNCALIBRATED · 请缓慢转动设备"
+        case .manual: "MANUAL · SIMULATION"
+        }
+    }
+
+    private var availabilityDescription: String {
+        switch session.pointingAvailability {
+        case .idle: "IDLE"
+        case .starting: "STARTING"
+        case .tracking: "TRACKING"
+        case .manual: "MANUAL"
+        case .unavailable: "UNAVAILABLE"
+        }
+    }
+
+    private var snapshotDescription: String {
+        guard session.catalog.snapshotEpoch != .distantPast else { return "UNAVAILABLE" }
+        return Self.snapshotDateFormatter.string(from: session.catalog.snapshotEpoch)
+    }
+
+    private var catalogAgeDescription: String {
+        let age = session.tleAgeDays
+        if age <= 14 { return "\(age)D · CURRENT" }
+        return "\(age)D · UPDATE APP"
+    }
+
+    private static let snapshotDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm'Z'"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    private func statusField(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
+            Text(label)
+                .font(Typography.statusTag)
+                .tracking(Typography.statusTagTracking)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .frame(width: 72, alignment: .leading)
+            Text(value)
+                .font(Typography.archiveDataValue)
+                .tracking(Typography.dataValueTracking)
+                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+            Spacer(minLength: 0)
+        }
+        .frame(minHeight: 34)
+        .overlay(alignment: .bottom) { hairline }
+    }
+
+    private func externalActionRow(eyebrow: String, title: String, url: URL) -> some View {
+        actionRow(eyebrow: eyebrow, title: title, icon: "arrow.up.right") {
+            openURL(url)
+        }
     }
 
     // MARK: - 观测记录二级页
@@ -375,7 +561,7 @@ struct InstrumentPanel: View {
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-            Text("将准星停留在人造天体上，完成锁定后会自动记录。")
+            Text("将准星对准人造天体可即时阅读档案；开启“确认捕获”并确认目标后，观测会保存在这台设备上。")
                 .font(Typography.statusTag)
                 .tracking(0.45)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
@@ -556,7 +742,9 @@ struct InstrumentPanel: View {
     }
 
     private func roleTitle(for object: CatalogObject) -> String {
-        if object.isStarlink { return "STARLINK CONSTELLATION · 星座节点" }
+        if let family = object.family {
+            return "\(family.title) CONSTELLATION · 星座节点"
+        }
         return switch object.kind {
         case "station": "ORBITAL HABITAT · 载人设施"
         case "telescope": "SPACE OBSERVATORY · 空间望远镜"
@@ -711,6 +899,12 @@ struct InstrumentPanel: View {
                 backTitle: "天空",
                 trailingTitle: "STARCATCH · \(versionText)",
                 onBack: dismiss
+            )
+        case .systemStatus:
+            ArchiveTopBar(
+                backTitle: "设置",
+                trailingTitle: "STATUS & DATA",
+                onBack: returnToSettings
             )
         case .observations:
             if !log.entries.isEmpty {

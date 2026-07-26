@@ -11,6 +11,7 @@ import simd
 final class MotionPointingProvider: PointingProvider {
     @Published private(set) var pointing: Pointing = .initial
     @Published private(set) var confidence: HeadingConfidence = .uncalibrated
+    @Published private(set) var availability: PointingAvailability = .idle
 
     private let manager = CMMotionManager()
     private var smoothed = simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
@@ -18,26 +19,43 @@ final class MotionPointingProvider: PointingProvider {
     private var usingTrueNorth = false
 
     func start() {
-        guard manager.isDeviceMotionAvailable else { return }
+        start(prefersTrueNorth: true)
+    }
+
+    /// 定位尚未授权时先使用磁北参考系；授权变化后由会话重新选择真北。
+    /// 这样首次进入不会在任意参考系中假装给出可用于观测的绝对方位。
+    func start(prefersTrueNorth: Bool) {
+        guard manager.isDeviceMotionAvailable else {
+            availability = .unavailable
+            confidence = .uncalibrated
+            return
+        }
+        manager.stopDeviceMotionUpdates()
         hasSample = false
         manager.deviceMotionUpdateInterval = 1.0 / 60.0
         // 让系统在磁场需要校准时显示标准的设备转动提示，而不是继续假装高精度。
         manager.showsDeviceMovementDisplay = true
 
         let frame: CMAttitudeReferenceFrame
-        if CMMotionManager.availableAttitudeReferenceFrames().contains(.xTrueNorthZVertical) {
+        let availableFrames = CMMotionManager.availableAttitudeReferenceFrames()
+        if prefersTrueNorth, availableFrames.contains(.xTrueNorthZVertical) {
             frame = .xTrueNorthZVertical
             usingTrueNorth = true
+        } else if availableFrames.contains(.xMagneticNorthZVertical) {
+            frame = .xMagneticNorthZVertical
+            usingTrueNorth = false
         } else {
             frame = .xArbitraryCorrectedZVertical
             usingTrueNorth = false
         }
         confidence = .uncalibrated
+        availability = .starting
 
         manager.startDeviceMotionUpdates(using: frame, to: .main) { [weak self] motion, error in
             guard let self else { return }
             if error != nil {
                 self.setConfidence(.uncalibrated)
+                self.setAvailability(.unavailable)
                 return
             }
             guard let motion else { return }
@@ -52,6 +70,7 @@ final class MotionPointingProvider: PointingProvider {
     func stop() {
         manager.stopDeviceMotionUpdates()
         hasSample = false
+        availability = .idle
     }
 
     /// 真北参考系只是能力声明；只有磁场达到中/高校准质量时才报告可靠真北。
@@ -75,6 +94,11 @@ final class MotionPointingProvider: PointingProvider {
         confidence = value
     }
 
+    private func setAvailability(_ value: PointingAvailability) {
+        guard availability != value else { return }
+        availability = value
+    }
+
     private func ingest(_ motion: CMDeviceMotion) {
         let q = motion.attitude.quaternion
         let raw = simd_quatd(ix: q.x, iy: q.y, iz: q.z, r: q.w)
@@ -90,6 +114,7 @@ final class MotionPointingProvider: PointingProvider {
         }
 
         pointing = Self.pointing(from: smoothed)
+        setAvailability(.tracking)
     }
 
     /// 姿态四元数 → Pointing。
@@ -112,13 +137,19 @@ final class MotionPointingProvider: PointingProvider {
         let deviceUp = q.act(simd_double3(0, 1, 0))
         let boreENU = simd_double3(east, north, up)
         let worldUp = simd_double3(0, 0, 1)
-        // 视野平面里的参考"上"：世界上方向去掉沿视轴分量
-        let refUp = simd_normalize(worldUp - boreENU * simd_dot(worldUp, boreENU))
         let devUpENU = simd_double3(-deviceUp.y, deviceUp.x, deviceUp.z)
         let projUp = devUpENU - boreENU * simd_dot(devUpENU, boreENU)
         let projLen = simd_length(projUp)
         var roll = 0.0
         if projLen > 1e-6 {
+            var reference = worldUp - boreENU * simd_dot(worldUp, boreENU)
+            // 正对天顶/天底时，“世界向上”与视轴重合，不能再作为屏幕上方向。
+            // 改用真北在视平面中的投影，避免 normalize(0) 产生 NaN 并让整片天空消失。
+            if simd_length(reference) < 1e-6 {
+                let worldNorth = simd_double3(0, 1, 0)
+                reference = worldNorth - boreENU * simd_dot(worldNorth, boreENU)
+            }
+            let refUp = simd_normalize(reference)
             let pu = projUp / projLen
             let cross = simd_cross(refUp, pu)
             roll = atan2(simd_dot(cross, boreENU), simd_dot(refUp, pu))

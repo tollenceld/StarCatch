@@ -1,8 +1,11 @@
 .DS_Store
 DerivedData/
 build/
+__pycache__/
+*.py[cod]
 *.xcuserstate
 xcuserdata/
 *.xccheckout
 *.xcscmblueprint
 audit/
+SatelliteKnowledge/.obsidian/

@@ -50,6 +50,15 @@ enum Palette {
     /// Starlink 星座：与网络类同源、但更冷更清晰的轨道钢蓝灰。
     static let starlinkTint = Color(hex: 0x99A9BA)
 
+    /// 其他大型星座使用同样克制的低饱和光谱，只改变外晕，不把天空变成彩色点阵。
+    static let oneWebTint = Color(hex: 0xA7A0B8)
+    static let qianfanTint = Color(hex: 0xB8AA92)
+    static let hulianwangTint = Color(hex: 0xAF9991)
+    static let kuiperTint = Color(hex: 0x93AEAA)
+    static let iridiumTint = Color(hex: 0xA3A9AD)
+    static let globalstarTint = Color(hex: 0x9EAFA2)
+    static let orbcommTint = Color(hex: 0xB0A49B)
+
     /// 失效航天器与轨道残留：灰化的陶土色。
     static let legacyTint = Color(hex: 0xB79282)
 
@@ -83,16 +92,58 @@ extension CatalogCategory {
 }
 
 extension CatalogFilter {
-    /// “全部”保持中性；其余筛选与天空中的类别光晕一一对应。
+    /// 具体镜片沿用低饱和任务色；大型网络只改变微光，不把天空做成彩色图例。
     var tint: Color {
-        category?.tint ?? Palette.inkMid
+        switch self {
+        case .all: Palette.inkMid
+        case .featured: Palette.signal
+        case .humanScience: Palette.explorationTint
+        case .earthObservation: Palette.observationTint
+        case .navigation, .communications: Palette.networkTint
+        case .orbitalHeritage: Palette.legacyTint
+        case .unitedStates: Palette.explorationTint
+        case .europe: Palette.observationTint
+        case .china: Palette.legacyTint
+        case .otherPublic: Palette.signal
+        case .starlink: Palette.starlinkTint
+        case .oneweb: Palette.oneWebTint
+        case .chinaConstellations: Palette.qianfanTint
+        case .kuiper: Palette.kuiperTint
+        case .mobileConstellations: Palette.iridiumTint
+        }
+    }
+}
+
+extension CatalogFilterGroup {
+    var tint: Color {
+        switch self {
+        case .overview: Palette.inkMid
+        case .mission: Palette.explorationTint
+        case .authority: Palette.observationTint
+        case .constellation: Palette.networkTint
+        }
+    }
+}
+
+extension CatalogFamily {
+    var tint: Color {
+        switch self {
+        case .starlink: Palette.starlinkTint
+        case .oneweb: Palette.oneWebTint
+        case .qianfan: Palette.qianfanTint
+        case .hulianwang: Palette.hulianwangTint
+        case .kuiper: Palette.kuiperTint
+        case .iridium: Palette.iridiumTint
+        case .globalstar: Palette.globalstarTint
+        case .orbcomm: Palette.orbcommTint
+        }
     }
 }
 
 extension CatalogObject {
-    /// Starlink 是网络类别中的高密度家族，需要在相同色族中单独辨识。
+    /// 大型星座使用各自的低饱和光谱；普通目标仍由任务类别表达身份。
     var identityTint: Color {
-        isStarlink ? Palette.starlinkTint : category.tint
+        family?.tint ?? category.tint
     }
 }
 

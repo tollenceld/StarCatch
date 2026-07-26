@@ -7,6 +7,44 @@ import SatelliteKit
 final class TimeTests: XCTestCase {
     private static let store = CatalogStore()
 
+    func testObservationLogPersistsRealSnapshotAndClears() throws {
+        let suiteName = "StarCatchTests.ObservationLog.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        let object = try XCTUnwrap(Self.store.objects.first)
+        let observedAt = Date(timeIntervalSince1970: 1_750_000_000)
+        let snapshot = Ephemeris(
+            objectId: object.id,
+            azimuth: 1.2,
+            elevation: 0.5,
+            rangeKm: 1_230,
+            altitudeKm: 550,
+            velocityKmS: 7.6,
+            orbitalPosition: SIMD3(6_900, 0, 0)
+        )
+
+        let first = ObservationLog(defaults: defaults)
+        first.record(
+            objectId: object.id,
+            catalog: Self.store,
+            observationTime: observedAt,
+            ephemeris: snapshot
+        )
+
+        let restored = ObservationLog(defaults: defaults)
+        let entry = try XCTUnwrap(restored.entries.first)
+        XCTAssertEqual(entry.objectId, object.id)
+        XCTAssertEqual(entry.objectName, object.name)
+        XCTAssertEqual(entry.observedAt, observedAt)
+        XCTAssertEqual(entry.azimuth, snapshot.azimuth)
+        XCTAssertEqual(entry.altitudeKm, snapshot.altitudeKm)
+        XCTAssertEqual(entry.poetic, object.poetic)
+
+        restored.clear()
+        XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
+    }
+
     func testArchiveAnimationFitsCaptureLifecycle() {
         let revealTotal = Motion.archiveRevealDuration
             + Double(Motion.archiveLineCount - 1) * Motion.archiveRevealStagger
@@ -29,11 +67,18 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(session.pointing, manual.pointing)
     }
 
-    func testAcquisitionProgressSurvivesHandJitterAndCompletes() {
+    func testCaptureEnvelopeRemainsNarrowAroundTheReticle() {
+        let degrees = 180 / Double.pi
+        XCTAssertEqual(CaptureStateMachine.enterAcquiring * degrees, 2.5, accuracy: 0.001)
+        XCTAssertEqual(CaptureStateMachine.enterLocked * degrees, 1.25, accuracy: 0.001)
+        XCTAssertEqual(CaptureStateMachine.exitAcquiring * degrees, 4, accuracy: 0.001)
+    }
+
+    func testAcquisitionProgressSurvivesHandJitterAndWaitsForConfirmation() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 1_000)
-        let core = 4.0 * Double.pi / 180
-        let jitter = 9.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
+        let jitter = 3.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         for step in 1 ... 6 {
@@ -63,15 +108,17 @@ final class TimeTests: XCTestCase {
                 now: start.addingTimeInterval(Double(step) * 0.1)
             )
         }
-        XCTAssertTrue(capture.isLocked)
+        XCTAssertTrue(capture.isAcquiring)
+        XCTAssertEqual(capture.acquisitionProgress, 1, accuracy: 0.001)
+        XCTAssertTrue(capture.confirmAcquisition(now: start.addingTimeInterval(1.8)))
         XCTAssertEqual(capture.lockedObjectId, "iss")
     }
 
     func testAcquisitionNeedsClearSustainedExitBeforeReset() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 2_000)
-        let core = 4.0 * Double.pi / 180
-        let outside = 12.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
+        let outside = 5.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         for step in 1 ... 5 {
@@ -99,10 +146,104 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(capture.acquisitionProgress, 0)
     }
 
-    func testManualConfirmationAndNaturalLockShareStableReadingState() {
+    func testTransientRecognitionClearsQuicklyWhenCaptureModeIsOff() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 2_100)
+        let core = 1.0 * Double.pi / 180
+        let outside = 5.0 * Double.pi / 180
+
+        capture.update(
+            nearest: ("iss", core),
+            captureEnabled: false,
+            now: start
+        )
+        XCTAssertTrue(capture.isAcquiring)
+        XCTAssertFalse(capture.recognitionReady)
+
+        capture.update(
+            nearest: nil,
+            trackedDistance: outside,
+            captureEnabled: false,
+            now: start.addingTimeInterval(0.1)
+        )
+        capture.update(
+            nearest: nil,
+            trackedDistance: outside,
+            captureEnabled: false,
+            now: start.addingTimeInterval(0.23)
+        )
+
+        XCTAssertEqual(capture.phase, .exploring)
+        XCTAssertFalse(capture.recognitionReady)
+    }
+
+    func testAutomaticRecognitionOpensOnlyAfterRingCompletesAndDoesNotFlicker() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 2_200)
+        let core = 1.0 * Double.pi / 180
+        let jitter = 3.0 * Double.pi / 180
+        let outside = 5.0 * Double.pi / 180
+
+        capture.update(
+            nearest: ("iss", core),
+            captureEnabled: false,
+            now: start
+        )
+        for step in 1 ... 5 {
+            capture.update(
+                nearest: ("iss", core),
+                trackedDistance: core,
+                captureEnabled: false,
+                now: start.addingTimeInterval(Double(step) * 0.1)
+            )
+        }
+        XCTAssertFalse(
+            capture.recognitionReady,
+            "捕获环尚未闭合时不应先插入半张信息面板"
+        )
+
+        for step in 6 ... 11 {
+            capture.update(
+                nearest: ("iss", core),
+                trackedDistance: core,
+                captureEnabled: false,
+                now: start.addingTimeInterval(Double(step) * 0.1)
+            )
+        }
+        XCTAssertEqual(capture.acquisitionProgress, 1, accuracy: 0.001)
+        XCTAssertTrue(capture.recognitionReady)
+
+        capture.update(
+            nearest: ("iss", jitter),
+            trackedDistance: jitter,
+            captureEnabled: false,
+            now: start.addingTimeInterval(1.2)
+        )
+        XCTAssertTrue(
+            capture.recognitionReady,
+            "识别完成后轻微手持抖动不应让完整面板闪烁"
+        )
+
+        capture.update(
+            nearest: nil,
+            trackedDistance: outside,
+            captureEnabled: false,
+            now: start.addingTimeInterval(1.3)
+        )
+        capture.update(
+            nearest: nil,
+            trackedDistance: outside,
+            captureEnabled: false,
+            now: start.addingTimeInterval(1.43)
+        )
+        XCTAssertEqual(capture.phase, .exploring)
+        XCTAssertFalse(capture.recognitionReady)
+    }
+
+    func testManualConfirmationEntersStableReadingState() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 3_000)
-        let core = 4.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         XCTAssertTrue(capture.confirmAcquisition(now: start.addingTimeInterval(0.1)))
@@ -118,12 +259,38 @@ final class TimeTests: XCTestCase {
             .locked(objectId: "iss"),
             "移动手机或放下设备不能自动关闭档案"
         )
+        XCTAssertFalse(capture.lockedTargetAligned)
+    }
+
+    func testLockedTargetAlignmentUsesNarrowHysteresisWithoutUnlocking() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 3_100)
+        let core = 1.0 * Double.pi / 180
+
+        capture.update(nearest: ("iss", core), now: start)
+        capture.confirmAcquisition(now: start.addingTimeInterval(0.1))
+        XCTAssertTrue(capture.lockedTargetAligned)
+
+        capture.update(
+            nearest: nil,
+            trackedDistance: 4.1 * Double.pi / 180,
+            now: start.addingTimeInterval(0.2)
+        )
+        XCTAssertFalse(capture.lockedTargetAligned)
+        XCTAssertEqual(capture.phase, .locked(objectId: "iss"))
+
+        capture.update(
+            nearest: ("iss", 2.4 * Double.pi / 180),
+            trackedDistance: 2.4 * Double.pi / 180,
+            now: start.addingTimeInterval(0.3)
+        )
+        XCTAssertTrue(capture.lockedTargetAligned)
     }
 
     func testExplicitReleaseCannotBeUndoneByStillPointingAtTarget() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 4_000)
-        let core = 4.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         capture.confirmAcquisition(now: start.addingTimeInterval(0.1))
@@ -153,7 +320,7 @@ final class TimeTests: XCTestCase {
     func testLockedTargetCanSwitchByExplicitSelection() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 5_000)
-        let core = 4.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         capture.confirmAcquisition(now: start.addingTimeInterval(0.1))
@@ -162,10 +329,10 @@ final class TimeTests: XCTestCase {
         XCTAssertFalse(capture.selectLockedTarget("himawari9"))
     }
 
-    func testSustainedFocusOnAnotherTargetAtomicallyReplacesLock() {
+    func testSustainedFocusOnAnotherTargetWaitsForExplicitConfirmation() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 5_100)
-        let core = 4.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         capture.confirmAcquisition(now: start.addingTimeInterval(0.1))
@@ -177,6 +344,11 @@ final class TimeTests: XCTestCase {
             )
         }
 
+        XCTAssertEqual(capture.phase, .locked(objectId: "iss"))
+        XCTAssertEqual(capture.replacementObjectId, "himawari9")
+        XCTAssertEqual(capture.replacementProgress, 1, accuracy: 0.001)
+
+        XCTAssertTrue(capture.confirmReplacement(now: start.addingTimeInterval(1.6)))
         XCTAssertEqual(capture.phase, .locked(objectId: "himawari9"))
         XCTAssertNil(capture.replacementObjectId)
         XCTAssertEqual(capture.replacementProgress, 0)
@@ -185,7 +357,7 @@ final class TimeTests: XCTestCase {
     func testAbandonedReplacementKeepsExistingArchiveLocked() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 5_200)
-        let core = 4.0 * Double.pi / 180
+        let core = 1.0 * Double.pi / 180
 
         capture.update(nearest: ("iss", core), now: start)
         capture.confirmAcquisition(now: start.addingTimeInterval(0.1))
@@ -277,6 +449,24 @@ final class TimeTests: XCTestCase {
 
         XCTAssertFalse(clock.isScrubbing)
         XCTAssertEqual(clock.scrubPresentationProgress, 0)
+    }
+
+    func testReturnToLiveUsesBoundedLinearTiming() {
+        XCTAssertEqual(
+            SkyClock.returningOffset(startOffset: 3_600, progress: 0.5),
+            1_800,
+            accuracy: 0.001
+        )
+        XCTAssertLessThan(
+            SkyClock.returnDuration(forOffset: 3_600),
+            SkyClock.returnDuration(forOffset: SkyClock.maxOffset)
+        )
+        XCTAssertEqual(
+            SkyClock.returnDuration(forOffset: SkyClock.maxOffset),
+            SkyClock.maximumReturnDuration,
+            accuracy: 0.001
+        )
+        XCTAssertLessThanOrEqual(SkyClock.maximumReturnDuration, 3)
     }
 
     func testTrailAccumulatesWhileTimeIsMoving() {

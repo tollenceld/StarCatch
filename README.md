@@ -2,6 +2,9 @@
 
 一台安静、深邃、克制、精密的深空仪器。举起手机指向真实天空，那个方向上真实存在的人造物（卫星、退役航天器、火箭残骸）会从黑暗中缓慢浮现，以遥测档案的形式呈现。
 
+完整功能、数据规模、用户流程、技术架构与上架状态见
+[`Documentation/PROJECT_OVERVIEW.md`](Documentation/PROJECT_OVERVIEW.md)。
+
 ## 运行
 
 ```bash
@@ -15,9 +18,11 @@ open StarCatch.xcodeproj
 
 ## 体验链路
 
-唤醒（仪器上电，可随时轻触跳过）→ 首启观测手册（可随时继续或跳过）→ 探索（星尘 + 微弱点位）→ 靠近对象方向（点位增亮、刻度环合拢、扫描带掠过）→ 停留（锁定，触觉反馈，信号线生长，档案逐行浮现）→ 转开设备（档案随目标离开视野，边缘保留方向提示）→ 转回目标或使用“结束观测”。持续对准另一目标会完成换锁并替换当前档案。
+唤醒（产品名称、用途与本地目录整体淡入，可随时轻触跳过）→ 首启观测手册（可随时继续或跳过）→ 探索 → 准星进入中心 2.5° 感应范围（点位增亮，瞬时档案随视线出现；移开后快速消失）。设置中的“确认捕获”默认关闭，因此主视野没有底部捕获按钮；开启后，主按钮只负责“捕获卫星 / 切换捕获”，旁边的独立按钮负责“取消捕获”。
 
-**时间维度**：屏幕下缘是观测时钟（TimeDial），持续以低强度拖动提示和中心把手表明交互。左右拨动刻度改变观测时刻（±24h），整片天空按 SGP4 推算到对应时刻——拖动全览时暂时冻结捕捉，松手回到指向视野后，历史或未来时刻仍可锁定对象、查看档案并接收边缘方向提示。点按“返回此刻”或拖回零点时，天体沿回归轨迹返回 LIVE，天空球以缩放、虚化和淡出消散。
+每个完整即时信息面板都会在画面下方中部唤出“深入档案”：单体卫星读取按 NORAD 独立维护的 Markdown，页面离线保存任务背景、关键节点、工程意义与来源；Starlink、OneWeb、千帆、国网、Kuiper、Iridium、Globalstar 与 Orbcomm 的任意节点进入各自项目的共享档案，避免把同一段文字复制成上万份。实时 SGP4 读数始终来自当前节点。左侧筛选以少数常用“观察镜片”为第一层，再按“任务、运营者或轨道网络”进入更多角度；主天空中的每一个点始终对应一颗真实卫星。
+
+**时间维度**：点按左上角入口进入全局星图后，屏幕下缘才出现观测时钟（TimeDial）。左右拨动刻度改变观测时刻（±24h），整片星图按 SGP4 推算到对应时刻，并实时留下轨迹。点按“返回此刻”或拖回零点时，天体按距离在线性时间内返回 LIVE，最远 24 小时偏移也不超过 2.4 秒；从非 LIVE 状态退出全局星图时也会先启动回归。主天空保持实时指向，承担即时识别与用户可选的持续捕获。
 
 每次锁定自动落观测日志（本地 UserDefaults），并保存当时的时间与轨道读数；右上角设置页显示识别摘要，点按后进入独立记录页，再点某个对象可查看任务信息、观测时间和当时的方位、仰角、高度、距离与速度。
 
@@ -25,7 +30,9 @@ open StarCatch.xcodeproj
 
 ## 数据
 
-`StarCatch/Resources/catalog.json` 是随包发布的 CelesTrak GP/OMM 离线快照；当前快照包含 16,019 个轨道目标及少量人工编写的任务档案元数据。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
+`StarCatch/Resources/catalog.json` 是随包发布的 schema v2 CelesTrak GP/OMM 离线快照，当前包含 16,243 个轨道目标；不在 active GP 分组中的少量历史目标以同一 schema 内的策展 TLE 载荷保留，运行时不再兼容旧版整份小目录文档。构建测试核对唯一 NORAD/COSPAR 标识、元素历元时效、代表性物理量和档案覆盖是否确实存在于目录；这不等同于替代官方运营方对任务状态的持续公告。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
+
+人工编写的逐星档案位于 [`SatelliteKnowledge`](SatelliteKnowledge/README.md)。它是可直接用 Obsidian 打开的 Markdown 资料库；Xcode 构建会自动校验并编译为紧凑 JSON，APP 运行时按 NORAD 编号读取。数千份源笔记不会进入安装包，也不会拖慢启动时的文件扫描。
 
 轨道元素会随时间漂移，随包快照必须作为发布资产维护。统一使用 `Scripts/update_catalog.py` 更新并校验目录，不要手工替换单个对象；完整流程与时效约束见 `Scripts/README.md`。
 
@@ -47,23 +54,26 @@ xcodebuild -project StarCatch.xcodeproj -scheme StarCatch \
 ## 结构
 
 ```
-StarCatch/
-├── App/          StarCatchApp RootView BootSequenceView(启动唤醒序列)
-├── Design/       Palette(色彩) Typography(字体) Motion(动效) —— 全部视觉规范常量
-├── Sky/          SkyView(编排) SkyRenderer(绘制) Projection(gnomonic投影) StarDust SkySession
-│                 SkyClock TimeDial TrailStore CatalogFilterControl SkyActionControls
-├── Shaders/      Grain.metal —— 胶片颗粒 + 阈下扫描线
-├── Pointing/     MotionPointingProvider(真机) ManualPointingProvider(模拟器) ObserverLocation
-├── Orbits/       CatalogModels CatalogStore EphemerisEngine(SGP4调度+任意时刻快照) TrackSampler
-│                 PassPredictor(过境预报) ObservationLog(观测日志)
-├── Engagement/   CaptureStateMachine —— 四态 + 迟滞 + 换锁 + 主动释放
-├── Archive/      ArchiveOverlay ArchiveField ArchiveTopBar
-│                 ManualBookView(FIELD MANUAL 分页手册)
-│                 InstrumentPanel(右上设置入口唤出的单屏偏好+观测摘要)
-└── Resources/    catalog.json
+.
+├── Documentation/       架构、完整项目说明与 App Store 提交清单
+├── SatelliteKnowledge/  Obsidian 可编辑的逐星与星座 Markdown
+├── Scripts/             发布期目录生成、资料校验与编译
+├── StarCatch/
+│   ├── App/             App 生命周期、启动与隐私页面
+│   ├── Archive/         即时信息、深入档案、设置与观测记录
+│   ├── Design/          Palette、Typography、Motion
+│   ├── Engagement/      CaptureStateMachine
+│   ├── Orbits/          目录、SGP4 调度、轨迹、过境与观测日志
+│   ├── Pointing/        真机姿态、模拟器指向与观察者位置
+│   ├── Sky/             主天空、投影、绘制、筛选、全局星图与时间轴
+│   ├── Resources/       构建后的 catalog.json 与 satellite_profiles.json
+│   └── Shaders/         Grain.metal
+├── StarCatchTests/      轨道、状态、时间和资料完整性测试
+└── project.yml          XcodeGen 工程结构唯一来源
 ```
 
-更具体的状态所有权、并发边界、工程生成与验证约束见 [`ARCHITECTURE.md`](ARCHITECTURE.md)。
+更具体的状态所有权、并发边界、工程生成与验证约束见
+[`Documentation/ARCHITECTURE.md`](Documentation/ARCHITECTURE.md)。
 
 ## 设计原则（改动时对表）
 

@@ -7,11 +7,9 @@ enum Motion {
 
     /// 场景级转场：前段迅速建立层级，尾段留出柔和收束，不让二级页面显得迟滞。
     static let sceneTransition = Animation.timingCurve(0.18, 0.7, 0.2, 1, duration: 0.54)
-    static let sceneTransitionDuration: Double = 0.54
 
     /// 临时界面与玻璃控件：展开快、尾段慢；收拢更果断。
     static let interfaceExpand = Animation.timingCurve(0.16, 0.76, 0.2, 1, duration: 0.36)
-    static let interfaceExpandDuration: Double = 0.36
     static let interfaceCollapse = Animation.timingCurve(0.28, 0, 0.24, 1, duration: 0.24)
     static let interfaceCollapseDuration: Double = 0.24
 
@@ -20,22 +18,10 @@ enum Motion {
 
     /// 手册页显影：阅读节奏，不让逐行 stagger 变成等待。
     static let manualReveal = Animation.timingCurve(0.32, 0, 0.2, 1, duration: 0.44)
-    static let manualRevealDuration: Double = 0.44
     static let manualRevealStagger: Double = 0.035
-
-    /// 启动页文字需要快速建立完整构图；停留负责从容，显影本身不制造等待。
-    static let bootReveal = Animation.timingCurve(0.22, 0.72, 0.16, 1, duration: 0.36)
-    static let bootRevealDuration: Double = 0.36
-
-    /// 点位渐显（进入视野）：1.6s easeOut，绝不 pop。
-    static let dotAppear = Animation.easeOut(duration: 1.6)
-    static let dotAppearDuration: Double = 1.6
 
     /// 档案文字浮现：每行 1.2s，纯 fade + 2pt 上浮。不做打字机/乱码解算。
     static let archiveLine = Animation.timingCurve(0.4, 0, 0.2, 1, duration: 1.2)
-    static let archiveLineDuration: Double = 1.2
-    /// 行间 stagger。
-    static let archiveStagger: Double = 0.18
     /// 上浮距离。
     static let archiveRise: CGFloat = 2
 
@@ -43,8 +29,6 @@ enum Motion {
     static let lockConfirmationDuration: Double = 0.72
 
     /// 档案外壳先建立边界，正文随后快速、逐层显影。
-    static let archiveSurface = Animation.timingCurve(0.18, 0.72, 0.2, 1, duration: 0.48)
-    static let archiveSurfaceDuration: Double = 0.48
     static let archiveContentDelay: Double = 0.10
     static let archiveRevealLine = Animation.timingCurve(0.2, 0.68, 0.2, 1, duration: 0.62)
     static let archiveRevealDuration: Double = 0.62

@@ -45,11 +45,18 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         if manager.authorizationStatus == .authorizedWhenInUse
             || manager.authorizationStatus == .authorizedAlways {
             manager.requestLocation()
+        } else if manager.authorizationStatus == .denied
+                    || manager.authorizationStatus == .restricted {
+            // 撤销权限后立即停止沿用上一份真实坐标。界面与轨道引擎会同步回到
+            // 明确标注的北京假定坐标，和应用内隐私说明保持一致。
+            coordinates = Self.fallback
         }
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let loc = locations.last else { return }
+        guard let loc = locations.last,
+              loc.horizontalAccuracy >= 0,
+              CLLocationCoordinate2DIsValid(loc.coordinate) else { return }
         coordinates = Coordinates(
             latitude: loc.coordinate.latitude,
             longitude: loc.coordinate.longitude,

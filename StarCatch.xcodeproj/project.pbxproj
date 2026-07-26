@@ -19,9 +19,11 @@
 		21F5EF356F93C7D06E28E3F2 /* ManualBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B847A4F87DAAF9559DDBA0 /* ManualBookView.swift */; };
 		2FCC2E3974F45F4973293A3A /* SkyClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */; };
 		352EAAF4270E9334DC47F26E /* Grain.metal in Sources */ = {isa = PBXBuildFile; fileRef = 54D43B6181117F9B6935B886 /* Grain.metal */; };
+		39A138A742BE73310774170E /* satellite_profiles.json in Resources */ = {isa = PBXBuildFile; fileRef = 7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */; };
 		41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343FF92394A7814FD1DE6EFA /* PointingProvider.swift */; };
 		4523B094EC9EE4E1793C7D24 /* ArchiveField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632683082A137E5178D42060 /* ArchiveField.swift */; };
 		47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15874937BFB5C04ABF07F03A /* BootSequenceView.swift */; };
+		489F2384F2AEF996008F6118 /* SatelliteStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */; };
 		5D275617161364BBE646062E /* ObservationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE08D9AC749129724E543DB0 /* ObservationLog.swift */; };
 		5D5DAFCEFE7D46958DF98D88 /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5E65F462749E92BDC454CC83 /* SatelliteKit */; };
 		5E50679C759F41669BB6A568 /* SkySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1242DAD73E4C1124A97F05 /* SkySession.swift */; };
@@ -33,15 +35,20 @@
 		84A99B3E6B2A799F19F48142 /* SkyOverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D39BE6D95DEEAE2EE45F4A /* SkyOverviewView.swift */; };
 		8655D611AECDF55AFF029CE6 /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = CCE30D04AE0C36A786F287FD /* SatelliteKit */; };
 		87157B4DDA549A8CDFB1C12C /* SkyActionControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 116D67906640E5C006C8B390 /* SkyActionControls.swift */; };
+		88A4314B681E3A0DD07A44BF /* SkyStatusIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C04E10A71AC0927222EF0D5 /* SkyStatusIndicator.swift */; };
+		8EB6D29AA68FEBA9A4DB181D /* AppLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EC47464247306D244B9499E /* AppLinks.swift */; };
 		95ADA40FA7051C75178FE81F /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 441F1955000D3A76CDF9E931 /* PrivacyInfo.xcprivacy */; };
+		9C6F502C1BCEB4A05156F06F /* BootFieldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FED1030585A23748457611A8 /* BootFieldView.swift */; };
 		AB16A1D1AA173D83B21D4079 /* TrailStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E25E6EC5BF476DE6E6D759FF /* TrailStore.swift */; };
 		ACF22B027FC0CE7B3B4EE2D3 /* CatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22944084EE07EF80863E4089 /* CatalogStore.swift */; };
 		B06EE5A9211468963079D27F /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3ED49626A8ECAFCCD5421A5 /* Typography.swift */; };
+		B2005F5DA969169B64720C2A /* SatelliteStoryLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */; };
 		BC4DEC4E59BFD7C4D7898133 /* TimeDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F56DD137CFA306BC531DC61 /* TimeDial.swift */; };
 		C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 7CDEE5FF1B933D8AF1C1D67B /* catalog.json */; };
 		C9EF9FD2DDEC995351B91F51 /* InstrumentPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */; };
 		CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */; };
 		D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */; };
+		D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */; };
 		D25E6AC16A24F696AB385FE6 /* StarDust.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */; };
 		D8047DD627EAA63983B35DDC /* ObserverLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9861BF03D2309E5C83352667 /* ObserverLocation.swift */; };
 		E3E01010329E67DE6D88DD2A /* PassPredictor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B87AB74CC95F0BA75141AA /* PassPredictor.swift */; };
@@ -49,6 +56,7 @@
 		E7270D554FD76E845317E301 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB167B224BDD0ECF02BBB8EB /* Motion.swift */; };
 		F260B9BA3A5AA778CCC17F6B /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47C592100FBDC1B43902AB9 /* Palette.swift */; };
 		F662AE819F0CFCE71508A820 /* CaptureStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC72F3D341678B6E05B6865B /* CaptureStateMachine.swift */; };
+		FD11133E4DFD2DF20B02938A /* SatelliteStories.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1592AA0926AAD0D3FAF55AEF /* SatelliteStories.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,9 +73,12 @@
 		0E4F255374E7857BC413B1C5 /* TimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeTests.swift; sourceTree = "<group>"; };
 		116D67906640E5C006C8B390 /* SkyActionControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyActionControls.swift; sourceTree = "<group>"; };
 		15874937BFB5C04ABF07F03A /* BootSequenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootSequenceView.swift; sourceTree = "<group>"; };
+		1592AA0926AAD0D3FAF55AEF /* SatelliteStories.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStories.swift; sourceTree = "<group>"; };
 		17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitTests.swift; sourceTree = "<group>"; };
+		1C04E10A71AC0927222EF0D5 /* SkyStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyStatusIndicator.swift; sourceTree = "<group>"; };
 		1F56DD137CFA306BC531DC61 /* TimeDial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeDial.swift; sourceTree = "<group>"; };
 		22944084EE07EF80863E4089 /* CatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogStore.swift; sourceTree = "<group>"; };
+		2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryLibrary.swift; sourceTree = "<group>"; };
 		2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyClock.swift; sourceTree = "<group>"; };
 		343FF92394A7814FD1DE6EFA /* PointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointingProvider.swift; sourceTree = "<group>"; };
 		36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFilterControl.swift; sourceTree = "<group>"; };
@@ -79,11 +90,15 @@
 		5AF4AD5A77F90459147777B6 /* StarCatch.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StarCatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyStatementView.swift; sourceTree = "<group>"; };
 		632683082A137E5178D42060 /* ArchiveField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveField.swift; sourceTree = "<group>"; };
+		66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarMagnitudeScale.swift; sourceTree = "<group>"; };
 		68DA121A3B77B11BF915A698 /* ManualPointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualPointingProvider.swift; sourceTree = "<group>"; };
 		790DFD44DB0F129F096490F9 /* TrackSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSampler.swift; sourceTree = "<group>"; };
 		7CDEE5FF1B933D8AF1C1D67B /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = catalog.json; sourceTree = "<group>"; };
+		7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = satellite_profiles.json; sourceTree = "<group>"; };
+		7EC47464247306D244B9499E /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
 		8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyRenderer.swift; sourceTree = "<group>"; };
 		8E2E05D9DE4E02C4A53A4729 /* ArchiveTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveTopBar.swift; sourceTree = "<group>"; };
+		8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryView.swift; sourceTree = "<group>"; };
 		9861BF03D2309E5C83352667 /* ObserverLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverLocation.swift; sourceTree = "<group>"; };
 		A3ED49626A8ECAFCCD5421A5 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		A9E5B1529B1CE8693E33F30E /* StarCatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = StarCatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -94,6 +109,7 @@
 		B9F2A45838C56EA1F6114C60 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstrumentPanel.swift; sourceTree = "<group>"; };
 		BE08D9AC749129724E543DB0 /* ObservationLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationLog.swift; sourceTree = "<group>"; };
+		C2CCEDFEA2F14F120C28C217 /* SatelliteKnowledge */ = {isa = PBXFileReference; lastKnownFileType = folder; path = SatelliteKnowledge; sourceTree = SOURCE_ROOT; };
 		C46654E6CDC6B538BA4F54DF /* StarCatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarCatchApp.swift; sourceTree = "<group>"; };
 		CAED47075CCD0A05E34BD0F4 /* ArchiveOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOverlay.swift; sourceTree = "<group>"; };
 		CC1242DAD73E4C1124A97F05 /* SkySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkySession.swift; sourceTree = "<group>"; };
@@ -105,6 +121,7 @@
 		DBCBF174ADA5422354480551 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarDust.swift; sourceTree = "<group>"; };
 		E25E6EC5BF476DE6E6D759FF /* TrailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailStore.swift; sourceTree = "<group>"; };
+		FED1030585A23748457611A8 /* BootFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootFieldView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -151,6 +168,8 @@
 		4BA644AFCFD6982F76DA34DA /* App */ = {
 			isa = PBXGroup;
 			children = (
+				7EC47464247306D244B9499E /* AppLinks.swift */,
+				FED1030585A23748457611A8 /* BootFieldView.swift */,
 				15874937BFB5C04ABF07F03A /* BootSequenceView.swift */,
 				5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */,
 				B9F2A45838C56EA1F6114C60 /* RootView.swift */,
@@ -192,6 +211,7 @@
 			isa = PBXGroup;
 			children = (
 				7CDEE5FF1B933D8AF1C1D67B /* catalog.json */,
+				7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -224,6 +244,9 @@
 				8E2E05D9DE4E02C4A53A4729 /* ArchiveTopBar.swift */,
 				BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */,
 				B6B847A4F87DAAF9559DDBA0 /* ManualBookView.swift */,
+				1592AA0926AAD0D3FAF55AEF /* SatelliteStories.swift */,
+				2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */,
+				8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */,
 			);
 			path = Archive;
 			sourceTree = "<group>";
@@ -247,8 +270,10 @@
 				D8D39BE6D95DEEAE2EE45F4A /* SkyOverviewView.swift */,
 				8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */,
 				CC1242DAD73E4C1124A97F05 /* SkySession.swift */,
+				1C04E10A71AC0927222EF0D5 /* SkyStatusIndicator.swift */,
 				D2F9347467801F9F456031BB /* SkyView.swift */,
 				E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */,
+				66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */,
 				1F56DD137CFA306BC531DC61 /* TimeDial.swift */,
 				E25E6EC5BF476DE6E6D759FF /* TrailStore.swift */,
 			);
@@ -266,6 +291,7 @@
 		F5AC8366E27E14D8D9D6A9B3 = {
 			isa = PBXGroup;
 			children = (
+				C2CCEDFEA2F14F120C28C217 /* SatelliteKnowledge */,
 				6AACD9CC570F95E7E973AD15 /* StarCatch */,
 				E54D96FB74FBBAF2C916BDD9 /* StarCatchTests */,
 				72FE2C116DEB22884CE2DFCC /* Products */,
@@ -279,6 +305,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 10B23056B2DC4C8A58AF9E94 /* Build configuration list for PBXNativeTarget "StarCatch" */;
 			buildPhases = (
+				D67C2194481B6D61DE2E8AF8 /* Compile Satellite Knowledge */,
 				6C24143EACF512ECB90E49B0 /* Sources */,
 				F73AB9E95BBC6C7AA46D67F7 /* Resources */,
 				EE191A8158AF76725D86FB2A /* Frameworks */,
@@ -325,16 +352,17 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					7F03680D89542EA60AB48347 = {
+						DevelopmentTeam = 8SJJ8MN7H8;
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
 			buildConfigurationList = 303261C39D7685C248564FD1 /* Build configuration list for PBXProject "StarCatch" */;
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
-				en,
+				"zh-Hans",
 			);
 			mainGroup = F5AC8366E27E14D8D9D6A9B3;
 			minimizedProjectReferenceProxies = 1;
@@ -360,10 +388,34 @@
 				E6C65C8211E88265E6DD9236 /* Assets.xcassets in Resources */,
 				95ADA40FA7051C75178FE81F /* PrivacyInfo.xcprivacy in Resources */,
 				C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */,
+				39A138A742BE73310774170E /* satellite_profiles.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		D67C2194481B6D61DE2E8AF8 /* Compile Satellite Knowledge */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Compile Satellite Knowledge";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"$SRCROOT/Scripts/satellite_knowledge.py\" compile\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		40391080BCA720BF9A5C164E /* Sources */ = {
@@ -379,9 +431,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				8EB6D29AA68FEBA9A4DB181D /* AppLinks.swift in Sources */,
 				4523B094EC9EE4E1793C7D24 /* ArchiveField.swift in Sources */,
 				1730FED9CCFF915878B1C857 /* ArchiveOverlay.swift in Sources */,
 				0D43A8E52081657EA908BB87 /* ArchiveTopBar.swift in Sources */,
+				9C6F502C1BCEB4A05156F06F /* BootFieldView.swift in Sources */,
 				47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */,
 				F662AE819F0CFCE71508A820 /* CaptureStateMachine.swift in Sources */,
 				100E9ECA0F4E99680CD2DA35 /* CatalogFilterControl.swift in Sources */,
@@ -402,14 +456,19 @@
 				CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */,
 				606A8D0AEF6B51252C88DE5A /* Projection.swift in Sources */,
 				5ED6B3516EEDE0915D439471 /* RootView.swift in Sources */,
+				FD11133E4DFD2DF20B02938A /* SatelliteStories.swift in Sources */,
+				B2005F5DA969169B64720C2A /* SatelliteStoryLibrary.swift in Sources */,
+				489F2384F2AEF996008F6118 /* SatelliteStoryView.swift in Sources */,
 				87157B4DDA549A8CDFB1C12C /* SkyActionControls.swift in Sources */,
 				2FCC2E3974F45F4973293A3A /* SkyClock.swift in Sources */,
 				84A99B3E6B2A799F19F48142 /* SkyOverviewView.swift in Sources */,
 				79807E3EBF4A6032770A5EF3 /* SkyRenderer.swift in Sources */,
 				5E50679C759F41669BB6A568 /* SkySession.swift in Sources */,
+				88A4314B681E3A0DD07A44BF /* SkyStatusIndicator.swift in Sources */,
 				1C258D66159E2EF75EFE75A8 /* SkyView.swift in Sources */,
 				0C598B57E274A88996F14F0A /* StarCatchApp.swift in Sources */,
 				D25E6AC16A24F696AB385FE6 /* StarDust.swift in Sources */,
+				D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */,
 				BC4DEC4E59BFD7C4D7898133 /* TimeDial.swift in Sources */,
 				7F255E890DCD37471227A734 /* TrackSampler.swift in Sources */,
 				AB16A1D1AA173D83B21D4079 /* TrailStore.swift in Sources */,
@@ -434,11 +493,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8SJJ8MN7H8;
 				INFOPLIST_FILE = StarCatch/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.starcatch.StarCatch;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.10;
@@ -605,11 +667,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 8SJJ8MN7H8;
 				INFOPLIST_FILE = StarCatch/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.starcatch.StarCatch;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.10;

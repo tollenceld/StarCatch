@@ -31,6 +31,16 @@ enum HeadingConfidence: Equatable {
     case manual          // 模拟器/手动指向模式
 }
 
+/// 指向服务是否真的在产出数据。`HeadingConfidence` 只描述方位参考系质量，
+/// 不能区分“正在等待首帧”和“传感器已经失败”。
+enum PointingAvailability: Equatable {
+    case idle
+    case starting
+    case tracking
+    case manual
+    case unavailable
+}
+
 /// 指向源协议：真机 CoreMotion 或模拟器手势。
 protocol PointingProvider: ObservableObject {
     var pointing: Pointing { get }

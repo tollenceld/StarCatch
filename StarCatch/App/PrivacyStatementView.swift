@@ -4,6 +4,8 @@ import SwiftUI
 struct PrivacyStatementView: View {
     let onFinished: () -> Void
 
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
@@ -31,6 +33,20 @@ struct PrivacyStatementView: View {
                         "你的选择",
                         "你可以在系统设置中撤销定位权限，也可以随时删除应用以移除全部本地数据。"
                     )
+
+                    VStack(spacing: 0) {
+                        externalLink(
+                            title: "查看公开隐私政策",
+                            eyebrow: "PUBLIC POLICY",
+                            url: AppLinks.privacyPolicy
+                        )
+                        externalLink(
+                            title: "反馈隐私或支持问题",
+                            eyebrow: "SUPPORT",
+                            url: AppLinks.support
+                        )
+                    }
+                    .overlay(alignment: .top) { hairline }
                 }
                 .padding(.horizontal, 36)
                 .padding(.top, 28)
@@ -52,7 +68,7 @@ struct PrivacyStatementView: View {
                 .font(Typography.objectName)
                 .tracking(Typography.objectNameTracking + 1)
                 .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-            Text("隐私说明 · 2026-07-12")
+            Text("隐私说明 · 2026-07-17")
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
@@ -75,6 +91,39 @@ struct PrivacyStatementView: View {
                 .lineSpacing(Typography.poeticLineSpacing)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
         }
+    }
+
+    private func externalLink(title: String, eyebrow: String, url: URL) -> some View {
+        Button { openURL(url) } label: {
+            HStack(spacing: 14) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(Typography.guide)
+                        .tracking(Typography.guideTracking)
+                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    Text(eyebrow)
+                        .font(Typography.statusTag)
+                        .tracking(Typography.statusTagTracking)
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .frame(width: 34, height: 34)
+            }
+            .frame(minHeight: 54)
+            .contentShape(Rectangle())
+            .overlay(alignment: .bottom) { hairline }
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("在浏览器中打开")
+    }
+
+    private var hairline: some View {
+        Rectangle()
+            .fill(Palette.inkFaint.opacity(0.34))
+            .frame(height: 0.5)
     }
 }
 

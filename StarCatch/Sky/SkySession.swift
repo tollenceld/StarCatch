@@ -1,4 +1,5 @@
 import Combine
+import CoreLocation
 import CoreMotion
 import Foundation
 import SwiftUI
@@ -10,7 +11,7 @@ final class SkySession: ObservableObject {
     let manualProvider: ManualPointingProvider?
     let motionProvider: MotionPointingProvider?
     let observer = ObserverLocation()
-    let catalog = CatalogStore()
+    let catalog: CatalogStore
     let ephemeris: EphemerisEngine
     let tracks: TrackSampler
     let passes: PassPredictor
@@ -18,6 +19,7 @@ final class SkySession: ObservableObject {
 
     @Published private(set) var pointing: Pointing = .initial
     @Published private(set) var confidence: HeadingConfidence = .manual
+    @Published private(set) var pointingAvailability: PointingAvailability = .idle
     @Published private(set) var catalogFilter: CatalogFilter = .all
     @Published private(set) var visibleObjects: [CatalogObject] = []
     @Published private(set) var displayObjects: [CatalogObject] = []
@@ -31,7 +33,10 @@ final class SkySession: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    /// 正式启动路径会先在后台准备目录，再在主线程装配轻量会话对象。
+    /// 默认值保留给测试与 Preview；它们仍可独立创建完整会话。
+    init(catalog: CatalogStore = CatalogStore()) {
+        self.catalog = catalog
         ephemeris = EphemerisEngine(store: catalog, observer: ObserverLocation.fallback)
         tracks = TrackSampler(store: catalog)
         passes = PassPredictor(store: catalog)
@@ -69,6 +74,16 @@ final class SkySession: ObservableObject {
                 self?.ephemeris.updateObserver(coords)
             }
             .store(in: &cancellables)
+
+        observer.$authorizationStatus
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status in
+                guard let self, self.started, let motion = self.motionProvider else { return }
+                motion.start(prefersTrueNorth: Self.locationAllowsTrueNorth(status))
+            }
+            .store(in: &cancellables)
     }
 
     /// 直接订阅 `@Published` 的新值。过去监听 `objectWillChange` 时，回调发生在属性
@@ -80,20 +95,28 @@ final class SkySession: ObservableObject {
                 guard let self, let provider else { return }
                 self.pointing = pointing
                 self.confidence = provider.confidence
+                self.pointingAvailability = .manual
             }
             .store(in: &cancellables)
         confidence = provider.confidence
+        pointingAvailability = .manual
     }
 
     private func bind(_ provider: MotionPointingProvider) {
-        Publishers.CombineLatest(provider.$pointing, provider.$confidence)
+        Publishers.CombineLatest3(
+            provider.$pointing,
+            provider.$confidence,
+            provider.$availability
+        )
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] pointing, confidence in
+            .sink { [weak self] pointing, confidence, availability in
                 self?.pointing = pointing
                 self?.confidence = confidence
+                self?.pointingAvailability = availability
             }
             .store(in: &cancellables)
         confidence = provider.confidence
+        pointingAvailability = provider.availability
     }
 
     private var started = false
@@ -102,7 +125,9 @@ final class SkySession: ObservableObject {
         guard !started else { return }
         started = true
         manualProvider?.start()
-        motionProvider?.start()
+        motionProvider?.start(
+            prefersTrueNorth: Self.locationAllowsTrueNorth(observer.authorizationStatus)
+        )
         ephemeris.start()
     }
 
@@ -121,6 +146,12 @@ final class SkySession: ObservableObject {
         ephemeris.stop()
     }
 
+    private nonisolated static func locationAllowsTrueNorth(
+        _ status: CLAuthorizationStatus
+    ) -> Bool {
+        status == .authorizedAlways || status == .authorizedWhenInUse
+    }
+
     /// 默认保留完整目录；用户选择的类别只改变当前天空，不改写观测历史。
     func setCatalogFilter(_ filter: CatalogFilter) {
         guard filter != catalogFilter else { return }
@@ -133,18 +164,28 @@ final class SkySession: ObservableObject {
         ephemeris.setPropagationObjects(objects)
     }
 
-    /// 完整数据保留在 `visibleObjects`；默认绘制只对 Starlink 做确定性抽样。
+    /// 完整数据保留在 `visibleObjects`；默认绘制对大型星座分别做确定性抽样。
+    /// 深度档案目标永远保留，避免策展入口因为密度收束而从天空消失。
     nonisolated static func makeDisplaySample(
         from objects: [CatalogObject],
         starlinkDivisor: Int
     ) -> [CatalogObject] {
-        guard starlinkDivisor > 1 else { return objects }
+        // 已经经过具体镜片筛选的小目录不再二次抽稀。这样导航、移动通信等
+        // 百余颗规模的真实集合能够提供足够观测密度；完整天空才压低大型星座。
+        guard starlinkDivisor > 1, objects.count > 1_400 else { return objects }
         return objects.filter { object in
-            !object.isStarlink || object.isCurated || object.noradId.isMultiple(of: starlinkDivisor)
+            guard let family = object.family else { return true }
+            if object.isCurated || object.isFeatured { return true }
+            let divisor: Int = switch family {
+            case .starlink: starlinkDivisor
+            case .oneweb, .qianfan, .hulianwang: max(2, starlinkDivisor / 3)
+            case .kuiper, .iridium, .globalstar, .orbcomm: max(2, starlinkDivisor / 4)
+            }
+            return object.noradId.isMultiple(of: divisor)
         }
     }
 
-    /// 全部点位仍参与显示、捕捉和方向信标；只有长光轨使用稳定的代表性子集，
+    /// 显示点位仍参与捕捉和方向信标；只有长光轨使用稳定的代表性子集，
     /// 避免上万条轨迹把星图涂成一整片亮面并占用过多内存。
     private static func makeTrailSample(
         from objects: [CatalogObject],
@@ -152,7 +193,11 @@ final class SkySession: ObservableObject {
     ) -> [CatalogObject] {
         guard objects.count > limit else { return objects }
 
-        var result = Array(objects.lazy.filter(\.isCurated).prefix(min(48, limit)))
+        var result = Array(
+            objects.lazy
+                .filter { $0.isFeatured || $0.isCurated }
+                .prefix(min(48, limit))
+        )
         var selected = Set(result.map(\.id))
         let remaining = max(1, limit - result.count)
         let strideLength = max(1, objects.count / remaining)

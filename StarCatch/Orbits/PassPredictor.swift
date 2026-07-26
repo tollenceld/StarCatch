@@ -19,8 +19,14 @@ final class PassPredictor {
         case none
     }
 
+    private struct CacheKey: Hashable {
+        let objectId: String
+        let latitudeCentidegrees: Int
+        let longitudeCentidegrees: Int
+    }
+
     private let store: CatalogStore
-    private var cache: [String: (prediction: Prediction, at: Date)] = [:]
+    private var cache: [CacheKey: (prediction: Prediction, at: Date)] = [:]
     /// 预报缓存 60s —— 分钟级精度足够。
     private let cacheLifetime: TimeInterval = 60
 
@@ -33,12 +39,17 @@ final class PassPredictor {
         observer: ObserverLocation.Coordinates,
         after start: Date
     ) -> Prediction {
-        if let cached = cache[objectId],
+        let key = CacheKey(
+            objectId: objectId,
+            latitudeCentidegrees: Int((observer.latitude * 100).rounded()),
+            longitudeCentidegrees: Int((observer.longitude * 100).rounded())
+        )
+        if let cached = cache[key],
            Date().timeIntervalSince(cached.at) < cacheLifetime {
             return cached.prediction
         }
         let prediction = compute(objectId: objectId, observer: observer, start: start)
-        cache[objectId] = (prediction, Date())
+        cache[key] = (prediction, Date())
         return prediction
     }
 

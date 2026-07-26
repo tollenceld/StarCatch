@@ -43,14 +43,192 @@ final class OrbitTests: XCTestCase {
         XCTAssertEqual(store.objects(matching: .all).count, store.objects.count)
     }
 
-    func testCatalogFiltersAreCompleteAndDisjoint() {
+    func testCatalogFiltersAreSelectiveAndCountedFromTheSameSource() {
         let store = Self.store
-        let categorySets = CatalogCategory.allCases.map { category in
-            Set(store.objects(matching: CatalogFilter(rawValue: category.rawValue)!).map(\.id))
-        }
-        XCTAssertEqual(categorySets.reduce(0) { $0 + $1.count }, store.objects.count)
-        XCTAssertEqual(Set(categorySets.flatMap { $0 }).count, store.objects.count)
         XCTAssertEqual(store.objects(matching: .all).count, store.objects.count)
+        for filter in CatalogFilter.allCases {
+            let objects = store.objects(matching: filter)
+            XCTAssertFalse(objects.isEmpty, "\(filter.title) 不应为空")
+            if filter != .all {
+                XCTAssertLessThan(objects.count, store.objects.count, "\(filter.title) 应真正缩小目录")
+            }
+            XCTAssertEqual(store.filterCounts[filter], objects.count)
+            XCTAssertGreaterThanOrEqual(
+                store.filterReadableCounts[filter, default: 0],
+                3,
+                "\(filter.title) 至少应保留数个有任务资料的可探索目标"
+            )
+            XCTAssertTrue(
+                objects.contains(where: \CatalogObject.hasMeaningfulProfile),
+                "\(filter.title) 不应只剩没有可读资料的轨道编号"
+            )
+        }
+        for filter in CatalogFilter.allCases where filter != .all {
+            XCTAssertGreaterThanOrEqual(
+                store.objects(matching: filter).count,
+                80,
+                "\(filter.title) 需要足够形成基础观测密度的真实对象"
+            )
+        }
+        XCTAssertGreaterThan(store.objects(matching: .starlink).count, 8_000)
+    }
+
+    func testFilterHierarchyCoversEveryConcreteLensExactlyOnce() {
+        let groupedFilters = CatalogFilterGroup.allCases.flatMap(\.filters)
+        XCTAssertEqual(groupedFilters.count, CatalogFilter.allCases.count)
+        XCTAssertEqual(Set(groupedFilters), Set(CatalogFilter.allCases))
+        for group in CatalogFilterGroup.allCases {
+            XCTAssertFalse(group.filters.isEmpty, "\(group.title) 需要至少一个二级筛选")
+            XCTAssertTrue(group.filters.allSatisfy { $0.group == group })
+        }
+    }
+
+    func testFrequentLensesStaySmallExplicitAndRestorable() {
+        let lenses = CatalogFilter.frequentLenses
+        XCTAssertEqual(lenses.first, .all)
+        XCTAssertLessThanOrEqual(lenses.count, 4)
+        XCTAssertEqual(Set(lenses).count, lenses.count)
+        XCTAssertTrue(lenses.allSatisfy { CatalogFilter.allCases.contains($0) })
+    }
+
+    func testTaskLensesDoNotLeakUnrelatedCuratedObjects() throws {
+        let store = Self.store
+        let iss = try XCTUnwrap(store.objectsByID["iss"])
+        let himawari = try XCTUnwrap(store.objectsByID["himawari9"])
+        let tdrs = try XCTUnwrap(store.objectsByID["tdrs3"])
+        let lageos = try XCTUnwrap(store.objectsByID["lageos1"])
+
+        XCTAssertTrue(CatalogFilter.humanScience.includes(iss))
+        XCTAssertFalse(CatalogFilter.humanScience.includes(himawari))
+        XCTAssertFalse(CatalogFilter.humanScience.includes(tdrs))
+        XCTAssertTrue(CatalogFilter.orbitalHeritage.includes(tdrs))
+        XCTAssertTrue(CatalogFilter.orbitalHeritage.includes(lageos))
+        XCTAssertFalse(CatalogFilter.orbitalHeritage.includes(himawari))
+    }
+
+    func testMajorConstellationFamiliesAreDistinguished() {
+        let store = Self.store
+        for family in CatalogFamily.allCases {
+            XCTAssertTrue(
+                store.objects.contains(where: { $0.family == family }),
+                "\(family.title) 应能从离线目录中辨认"
+            )
+        }
+        XCTAssertEqual(store.objectsByID["starlink-32000"]?.family, .starlink)
+        XCTAssertEqual(
+            store.objects.first(where: { $0.name.uppercased().contains("ONEWEB") })?.family,
+                .oneweb
+        )
+        XCTAssertEqual(
+            store.familyCounts[.starlink],
+            store.objectsByFamily[.starlink]?.count
+        )
+    }
+
+    func testMainSkySamplesOnlyRealObjectsAndKeepsSmallFiltersDense() {
+        let store = Self.store
+        for filter in CatalogFilter.allCases where filter != .all {
+            let matching = store.objects(matching: filter)
+            let displayed = SkySession.makeDisplaySample(
+                from: matching,
+                starlinkDivisor: 8
+            )
+            let matchingIDs = Set(matching.map(\.id))
+
+            XCTAssertTrue(
+                displayed.allSatisfy { matchingIDs.contains($0.id) },
+                "\(filter.title) 的每个显示点都必须来自真实筛选结果"
+            )
+            XCTAssertGreaterThanOrEqual(
+                displayed.count,
+                80,
+                "\(filter.title) 不应在显示采样后变成空天空"
+            )
+            if matching.count <= 1_400 {
+                XCTAssertEqual(
+                    displayed.map(\.id),
+                    matching.map(\.id),
+                    "小型筛选结果不应再次抽稀"
+                )
+            }
+        }
+    }
+
+    func testFeaturedArchiveUsesRealCatalogObjects() {
+        let store = Self.store
+        let featured = store.objects.filter(\.isFeatured)
+        let individuallyEditable = store.objects.filter { $0.family == nil }
+
+        XCTAssertEqual(featured.count, individuallyEditable.count)
+        XCTAssertTrue(featured.allSatisfy { $0.story != nil })
+        XCTAssertTrue(featured.allSatisfy { $0.family == nil })
+        XCTAssertTrue(featured.contains(where: { $0.noradId == 5 }))
+        XCTAssertTrue(featured.contains(where: { $0.noradId == 20_580 }))
+        XCTAssertTrue(featured.contains(where: { $0.noradId == 49_260 }))
+        XCTAssertTrue(featured.contains(where: { $0.noradId == 54_754 }))
+        XCTAssertFalse(featured.contains(where: { $0.noradId == 44_714 }))
+        XCTAssertGreaterThan(featured.count, 3_500)
+    }
+
+    func testCompiledMarkdownKnowledgeLibraryIsPackagedAndReadable() throws {
+        let store = Self.store
+        XCTAssertTrue(
+            SatelliteStoryCatalog.diagnostics.isEmpty,
+            SatelliteStoryCatalog.diagnostics.joined(separator: "\n")
+        )
+        XCTAssertEqual(
+            SatelliteStoryCatalog.storyCount,
+            store.objects.filter { $0.family == nil }.count
+        )
+        XCTAssertEqual(
+            SatelliteStoryCatalog.familyStoryCount,
+            CatalogFamily.allCases.count
+        )
+        XCTAssertNil(SatelliteStoryCatalog.story(forNORAD: 44_714))
+        XCTAssertTrue(store.objects.allSatisfy { $0.deepArchiveStory != nil })
+
+        let hubble = try XCTUnwrap(SatelliteStoryCatalog.story(forNORAD: 20_580))
+        XCTAssertEqual(hubble.program, "HUBBLE SPACE TELESCOPE")
+        XCTAssertEqual(hubble.organization, "NASA · ESA")
+        XCTAssertTrue(hubble.lead.contains("大气层之外"))
+        XCTAssertGreaterThanOrEqual(hubble.chapters.count, 2)
+        XCTAssertGreaterThanOrEqual(hubble.milestones.count, 3)
+        XCTAssertGreaterThanOrEqual(hubble.facts.count, 3)
+        XCTAssertTrue(hubble.sources.contains("NASA Hubble Mission"))
+
+        let generated = try XCTUnwrap(SatelliteStoryCatalog.story(forNORAD: 43_226))
+        XCTAssertEqual(generated.program, "GOES 17")
+        XCTAssertTrue(generated.lead.contains("地球同步轨道"))
+        XCTAssertGreaterThanOrEqual(generated.facts.count, 6)
+
+        let starlink = try XCTUnwrap(store.objects.first(where: { $0.family == .starlink }))
+        let starlinkArchive = try XCTUnwrap(starlink.deepArchiveStory)
+        XCTAssertEqual(starlink.deepArchiveTitle, "STARLINK")
+        XCTAssertEqual(starlinkArchive.program, "STARLINK CONSTELLATION")
+        XCTAssertTrue(starlinkArchive.lead.contains("低轨宽带网络"))
+        XCTAssertGreaterThanOrEqual(starlinkArchive.chapters.count, 2)
+
+        let qianfan = try XCTUnwrap(store.objects.first(where: { $0.family == .qianfan }))
+        XCTAssertEqual(qianfan.deepArchiveStory?.program, "千帆星座")
+    }
+
+    func testPackagedCatalogHasPlausiblePublicIdentifiers() {
+        let store = Self.store
+        XCTAssertTrue(store.source.contains("CelesTrak"))
+        let invalid = store.objects.filter { object in
+            guard object.noradId > 0, !object.name.isEmpty else { return true }
+            let parts = object.cosparId.split(separator: "-", omittingEmptySubsequences: false)
+            guard parts.count == 2,
+                  parts[0].count == 4,
+                  parts[0].allSatisfy(\.isNumber),
+                  parts[1].count >= 4 else { return true }
+            let launchNumber = parts[1].prefix(3)
+            let piece = parts[1].dropFirst(3)
+            return !launchNumber.allSatisfy(\.isNumber)
+                || piece.isEmpty
+                || !piece.allSatisfy { $0.isASCII && $0.isLetter }
+        }
+        XCTAssertTrue(invalid.isEmpty, "存在异常公共标识：\(invalid.prefix(5).map(\.name))")
     }
 
     func testGeneratedElementsWereFreshAtPackaging() throws {
@@ -247,6 +425,27 @@ final class OrbitTests: XCTestCase {
         let pointing = MotionPointingProvider.pointing(from: deviceToWorld)
         XCTAssertEqual(pointing.azimuth, 0, accuracy: 0.001)
         XCTAssertEqual(pointing.elevation, 0, accuracy: 0.001)
+    }
+
+    func testMotionBackCameraBoreMapsToTrueEastHorizon() {
+        let deviceToWorld = simd_quatd(
+            angle: -.pi / 2,
+            axis: SIMD3<Double>(1, 0, 0)
+        )
+        let pointing = MotionPointingProvider.pointing(from: deviceToWorld)
+        XCTAssertEqual(pointing.azimuth, .pi / 2, accuracy: 0.001)
+        XCTAssertEqual(pointing.elevation, 0, accuracy: 0.001)
+    }
+
+    func testMotionPointingRemainsFiniteAtZenith() {
+        let deviceToWorld = simd_quatd(
+            angle: .pi,
+            axis: SIMD3<Double>(0, 1, 0)
+        )
+        let pointing = MotionPointingProvider.pointing(from: deviceToWorld)
+        XCTAssertTrue(pointing.azimuth.isFinite)
+        XCTAssertEqual(pointing.elevation, .pi / 2, accuracy: 0.001)
+        XCTAssertTrue(pointing.roll.isFinite)
     }
 }
 

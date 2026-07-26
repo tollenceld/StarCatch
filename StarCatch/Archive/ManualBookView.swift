@@ -9,6 +9,7 @@ import SwiftUI
 /// 交付语气：像一份深空探测器的任务档案，不像 App onboarding。
 struct ManualBookView: View {
     @ObservedObject var session: SkySession
+    var revisiting = false
     let onFinished: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -89,14 +90,14 @@ struct ManualBookView: View {
                 Button {
                     finish(interrupted: true)
                 } label: {
-                    Text("跳过")
+                    Text(revisiting ? "返回设置" : "跳过")
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
                         .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("跳过观测手册")
+                .accessibilityLabel(revisiting ? "返回设置" : "跳过观测手册")
             }
             Text("STARCATCH · 观测手册")
                 .font(Typography.guide)
@@ -189,7 +190,7 @@ struct ManualBookView: View {
         let isLast = pageIndex == pages.count - 1
         return Button(action: advance) {
             HStack(spacing: 12) {
-                Text(isLast ? "开始观测" : "继续")
+                Text(isLast ? (revisiting ? "返回设置" : "开始观测") : "继续")
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking + 0.4)
                     .foregroundStyle(
@@ -208,7 +209,9 @@ struct ManualBookView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isLast ? "开始观测" : "继续到下一页")
+        .accessibilityLabel(
+            isLast ? (revisiting ? "返回设置" : "开始观测") : "继续到下一页"
+        )
         .opacity(pageRevealed ? 1 : 0.72)
         .animation(.easeOut(duration: suppressMotion ? 0.12 : 0.28), value: pageRevealed)
     }
@@ -340,7 +343,8 @@ struct ManualPage: Equatable {
             paragraphs: [
                 "举起设备，屏幕即视野，中心十字丝即指向。",
                 "缓慢移动。视野中的光点是真实在轨物；空域之外的目标会由屏幕边缘提示方向。",
-                "让十字丝靠近它，信号增强，档案浮现。移开视线，或轻触屏幕，把信号归还给天空。",
+                "让十字丝靠近它，档案会随视线浮现，移开后自行消失。若在设置中开启“确认捕获”，主视野才会出现确认、切换与取消捕获按钮。",
+                "完整信息出现后，画面下方会浮现“深入档案”。单体卫星读取自己的资料；大型星座的任意节点进入同一份项目档案，避免用重复文字伪装成不同故事。",
             ],
             fields: []
         ),
@@ -349,8 +353,8 @@ struct ManualPage: Equatable {
             titleEN: "TIME COORDINATE",
             titleCN: "时间坐标",
             paragraphs: [
-                "屏幕下缘是观测时钟。左右拨动刻度，天空会收束成全览，并抵达过去或未来。",
-                "松开后回到指向视野；此时仍可捕捉天体。点按“返回此刻”即可回到 LIVE。",
+                "点按左上角进入全局星图，屏幕下缘才会出现观测时钟。左右拨动刻度，即可抵达过去或未来。",
+                "点按“返回此刻”即可回到 LIVE；退出全局星图时，时间也会先归还到此刻。",
             ],
             fields: []
         ),

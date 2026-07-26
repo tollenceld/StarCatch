@@ -118,6 +118,17 @@ NAVIGATION_TOKENS = (
 
 TELESCOPE_TOKENS = ("HST", "HUBBLE", "TELESCOPE", "OBSERVATORY", "CHEOPS")
 
+FAMILY_TOKENS = (
+    ("starlink", ("STARLINK",)),
+    ("oneweb", ("ONEWEB",)),
+    ("qianfan", ("QIANFAN",)),
+    ("hulianwang", ("HULIANWANG",)),
+    ("kuiper", ("KUIPER",)),
+    ("iridium", ("IRIDIUM",)),
+    ("globalstar", ("GLOBALSTAR",)),
+    ("orbcomm", ("ORBCOMM",)),
+)
+
 
 def load_json(path: Path) -> Any:
     with path.open("r", encoding="utf-8") as handle:
@@ -243,6 +254,14 @@ def poetic_for(name: str, identifier: int, category: str, kind: str, orbit: str)
     return "它携带一项仍在轨道上运行的任务，按自己的周期越过天空。"
 
 
+def family_for(name: str) -> str | None:
+    upper = name.upper()
+    for family, tokens in FAMILY_TOKENS:
+        if any(token in upper for token in tokens):
+            return family
+    return None
+
+
 def stable_slug(name: str, identifier: int) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:36]
     return f"{slug or 'object'}-{identifier}"
@@ -278,8 +297,8 @@ def metadata_for_active(
             "STARCATCH_CURATED": curated_record is not None,
         }
     )
-    if name.upper().startswith("STARLINK"):
-        output["STARCATCH_FAMILY"] = "starlink"
+    if family := family_for(name):
+        output["STARCATCH_FAMILY"] = family
     return output
 
 

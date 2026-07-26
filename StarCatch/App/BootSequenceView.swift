@@ -1,205 +1,168 @@
 import SwiftUI
 
-/// 启动唤醒序列 —— 不是 loading，是一次仪器上电。
-///
-/// 逐行浮现的都是真实状态：观察者坐标、星历对象数、快照历元、指向模式。
-/// 全部就绪后短暂停驻，整层缓慢淡出，天空从下面透出来。轻触可跳过。
+/// 仅首次启动出现的产品署名。它不伪装成加载进度，也不承担手册职责；
+/// 回访用户使用不带介绍文案的 StartupLoadingView。
 struct BootSequenceView: View {
-    @ObservedObject var session: SkySession
-    let compact: Bool
+    /// 轨道目录已在后台完成准备。未完成时仍保持可见，不把用户退回纯黑画面。
+    let isReady: Bool
     /// true 表示用户主动打断；调用方可直接进入主观测界面。
     let onFinished: (Bool) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
 
-    @State private var revealedLines = 0
+    @State private var contentVisible = false
+    @State private var actionVisible = false
     @State private var fadingOut = false
-    @State private var promptVisible = false
+    @State private var pendingInterrupted: Bool?
+    /// 自检层进度。与文字显影共享同一时间轴，但由较慢的缓动推进。
+    @State private var fieldProgress: Double = 0
+    @State private var titleVisible = false
+    @State private var bodyVisible = false
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
-    private var lineInterval: TimeInterval { compact ? 0.2 : 0.24 }
-    private var holdAfterReady: TimeInterval { compact ? 1.8 : 2.15 }
-    private var fadeOutDuration: TimeInterval {
-        suppressMotion ? 0.16 : (compact ? 0.68 : 0.86)
-    }
-
-    private var totalLines: Int { 5 }
+    private var fadeOutDuration: TimeInterval { suppressMotion ? 0.08 : 0.18 }
 
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 10) {
-                // 铭牌
+            BootFieldView(progress: fieldProgress, suppressMotion: suppressMotion)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text("ORBITAL FIELD INSTRUMENT")
+                    .font(Typography.statusTag)
+                    .tracking(1.65)
+                    .foregroundStyle(Palette.signal.opacity(0.72))
+                    .opacity(titleVisible ? 1 : 0)
+
                 Text("STARCATCH")
                     .font(Typography.objectName)
-                    .tracking(4.0)
+                    .tracking(4.2)
                     .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                    .bootReveal(index: 0, revealed: revealedLines)
+                    .padding(.top, 12)
+                    .opacity(titleVisible ? 1 : 0)
+                    .offset(y: suppressMotion || titleVisible ? 0 : 3)
 
-                Text("人造天体观察器")
-                    .font(Typography.guide)
-                    .tracking(Typography.guideTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                    .padding(.bottom, 14)
-                    .bootReveal(index: 0, revealed: revealedLines)
+                // 分隔线从零宽度展开，是"仪器完成一次标定"的收束动作。
+                Rectangle()
+                    .fill(Palette.inkFaint.opacity(0.52))
+                    .frame(width: titleVisible ? 54 : 0, height: 0.5)
+                    .padding(.vertical, 20)
 
-                Text("把手机举向天空。\n让看不见的轨道逐一显影。")
+                Text("一台面向真实天空的轨道观测仪。")
                     .font(.custom("PingFangSC-Light", size: 15, relativeTo: .body))
-                    .tracking(1.15)
-                    .lineSpacing(7)
-                    .foregroundStyle(Palette.inkMid.opacity(0.76))
-                    .padding(.bottom, 18)
-                    .bootReveal(index: 1, revealed: revealedLines)
+                    .tracking(0.72)
+                    .foregroundStyle(Palette.inkMid.opacity(0.82))
+                    .opacity(bodyVisible ? 1 : 0)
+                    .offset(y: suppressMotion || bodyVisible ? 0 : 2)
 
-                progressRail
-                    .padding(.bottom, 24)
+                Text("举起手机，辨认此刻经过你上空的人造天体，沿时间查看它们的轨迹。")
+                    .font(.custom("PingFangSC-Light", size: 13, relativeTo: .body))
+                    .tracking(0.58)
+                    .lineSpacing(6)
+                    .foregroundStyle(Palette.inkLow.opacity(0.62))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+                    .opacity(bodyVisible ? 1 : 0)
+                    .offset(y: suppressMotion || bodyVisible ? 0 : 2)
 
-                bootLine(index: 2, label: "OBSERVER", value: observerText)
-                bootLine(index: 3, label: "CATALOG", value: "\(session.catalog.objects.count) OBJECTS")
-                bootLine(index: 4, label: "EPOCH", value: epochText)
-                bootLine(index: 5, label: "POINTING", value: pointingText, valueColor: Palette.signal)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .padding(.leading, 44)
-            .padding(.trailing, 24)
-
-            VStack {
-                Spacer()
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.tap")
-                        .font(.system(size: 10, weight: .regular))
-                        .foregroundStyle(Palette.signal.opacity(0.68))
-                    Text("轻触任意位置 · 立即进入观测")
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                Button {
+                    finish(interrupted: true)
+                } label: {
+                    HStack(spacing: 11) {
+                        Text(pendingInterrupted == nil ? "进入观测" : "正在进入")
+                            .font(.custom("PingFangSC-Medium", size: 13, relativeTo: .body))
+                            .tracking(1.2)
+                        Rectangle()
+                            .fill(Palette.signal.opacity(0.42))
+                            .frame(width: 20, height: 0.5)
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                    .frame(width: 156, height: 44)
+                    .background {
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .fill(Palette.inkHigh.opacity(0.055))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                    .stroke(Palette.inkFaint.opacity(0.58), lineWidth: 0.65)
+                            }
+                    }
                 }
-                .opacity(promptVisible ? 1 : 0)
-                .offset(y: promptVisible ? 0 : 3)
-                .animation(.easeOut(duration: 0.42), value: promptVisible)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 34)
-                .padding(.bottom, 34)
+                .buttonStyle(.plain)
+                .disabled(pendingInterrupted != nil)
+                .opacity(actionVisible ? 1 : 0)
+                .offset(y: suppressMotion || actionVisible ? 0 : 3)
+                .padding(.top, 28)
+                .accessibilityLabel("进入观测")
+                .accessibilityHint(isReady ? "进入主天空" : "数据准备完成后进入主天空")
             }
+            .frame(maxWidth: 330, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.horizontal, 42)
+            .opacity(contentVisible ? 1 : 0)
+            .offset(y: suppressMotion || contentVisible ? 0 : 4)
+
+            Text(isReady ? "LOCAL ORBIT CATALOG · READY" : "LOCAL ORBIT CATALOG · PREPARING")
+                .font(Typography.statusTag)
+                .tracking(1.05)
+                .foregroundStyle(Palette.inkLow.opacity(0.38))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .padding(.horizontal, 42)
+                .padding(.bottom, 30)
+                .opacity(contentVisible ? 1 : 0)
         }
         .opacity(fadingOut ? 0 : 1)
-        .contentShape(Rectangle())
-        .onTapGesture { finish(interrupted: true) }
-        .accessibilityAction(named: "进入观测") { finish(interrupted: true) }
         .task { await run() }
-    }
-
-    // MARK: - 内容
-
-    private var observerText: String {
-        let c = session.observer.coordinates
-        let lat = String(format: "%.2f°%@", abs(c.latitude), c.latitude >= 0 ? "N" : "S")
-        let lon = String(format: "%.2f°%@", abs(c.longitude), c.longitude >= 0 ? "E" : "W")
-        return c.assumed ? "\(lat) \(lon) · ASSUMED" : "\(lat) \(lon)"
-    }
-
-    private var epochText: String {
-        let days = session.tleAgeDays
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        let dateStr = session.catalog.snapshotEpoch == .distantPast
-            ? "—" : formatter.string(from: session.catalog.snapshotEpoch)
-        return "\(dateStr) · AGE \(days)D"
-    }
-
-    private var pointingText: String {
-        switch session.confidence {
-        case .trueNorth: "TRUE NORTH"
-        case .uncalibrated: "UNCALIBRATED"
-        case .manual: "MANUAL"
+        .onChange(of: isReady) { _, ready in
+            guard ready, let interrupted = pendingInterrupted else { return }
+            pendingInterrupted = nil
+            finish(interrupted: interrupted)
         }
     }
 
-    private var progressRail: some View {
-        let widths: [CGFloat] = [22, 12, 26, 16, 20, 14]
-        return HStack(spacing: 6) {
-            ForEach(widths.indices, id: \.self) { index in
-                ZStack(alignment: .leading) {
-                    Rectangle()
-                        .fill(Palette.inkFaint.opacity(0.24))
-                        .frame(width: widths[index], height: 0.5)
-                    Rectangle()
-                        .fill(Palette.signal.opacity(0.52))
-                        .frame(
-                            width: revealedLines > index ? widths[index] : 0,
-                            height: 0.75
-                        )
-                }
-                .frame(width: widths[index], alignment: .leading)
-            }
-        }
-        .animation(
-            .timingCurve(0.25, 0.1, 0.18, 1, duration: 0.72),
-            value: revealedLines
-        )
-    }
-
-    @ViewBuilder
-    private func bootLine(
-        index: Int, label: String, value: String,
-        valueColor: Color = Palette.inkMid
-    ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label)
-                .font(Typography.fieldLabel)
-                .tracking(Typography.fieldLabelTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                .frame(width: 76, alignment: .leading)
-            Text(value)
-                .font(Typography.dataValue)
-                .tracking(Typography.dataValueTracking)
-                .foregroundStyle(valueColor.opacity(Palette.Level.full))
-                .lineLimit(1)
-                .minimumScaleFactor(0.82)
-        }
-        .bootReveal(index: index, revealed: revealedLines)
-    }
-
-    // MARK: - 时序
-
+    /// 显影顺序表达一次仪器自检：星野先在真空中积累，署名随之确认，说明文字最后
+    /// 落位，进入动作在自检收束时才可用。任何一步都可以被点击跳过。
     private func run() async {
         if suppressMotion {
-            revealedLines = totalLines + 1
-            promptVisible = true
-            guard await pause(for: 1.1) else { return }
-            finish()
+            fieldProgress = 1
+            contentVisible = true
+            titleVisible = true
+            bodyVisible = true
+            actionVisible = true
             return
         }
 
-        // 每次启动都保留可读的排版节奏；回访略快，但不再整页一闪而过。
-        guard await pause(for: compact ? 0.32 : 0.46) else { return }
-        withAnimation(.easeOut(duration: 0.42)) { promptVisible = true }
-        guard await pause(for: 0.16) else { return }
-        for i in 1 ... (totalLines + 1) {
-            guard !fadingOut else { return }
-            withAnimation(Motion.bootReveal) { revealedLines = i }
-            guard await pause(for: lineInterval) else { return }
+        contentVisible = true
+        // 自检层用一条长缓动独立推进，比文字慢，让星野始终领先于文案。
+        withAnimation(.timingCurve(0.22, 0.6, 0.2, 1, duration: 2.1)) {
+            fieldProgress = 1
         }
-        guard await pause(for: holdAfterReady) else { return }
-        finish()
-    }
 
-    /// A removed boot view must never complete a stale transition.
-    private func pause(for seconds: TimeInterval) async -> Bool {
-        do {
-            try await Task.sleep(for: .seconds(seconds))
-            return !Task.isCancelled
-        } catch {
-            return false
-        }
+        try? await Task.sleep(for: .milliseconds(260))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.manualReveal) { titleVisible = true }
+
+        try? await Task.sleep(for: .milliseconds(420))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.manualReveal) { bodyVisible = true }
+
+        try? await Task.sleep(for: .milliseconds(480))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.manualReveal) { actionVisible = true }
     }
 
     private func finish(interrupted: Bool = false) {
         guard !fadingOut else { return }
-        let duration = interrupted ? (suppressMotion ? 0.12 : 0.28) : fadeOutDuration
+        guard isReady else {
+            // 记住用户意图，但绝不淡成一张无法交互的黑屏；目录完成后立即兑现。
+            pendingInterrupted = interrupted
+            return
+        }
+        let duration = interrupted ? (suppressMotion ? 0.08 : 0.2) : fadeOutDuration
         withAnimation(.easeIn(duration: duration)) { fadingOut = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             onFinished(interrupted)
@@ -207,20 +170,51 @@ struct BootSequenceView: View {
     }
 }
 
-/// 启动行浮现：与档案层同一语言（fade + 2pt 上浮）。
-private struct BootLineReveal: ViewModifier {
-    let index: Int
-    let revealed: Int
+/// 回访用户只看到极简品牌准备层，不重复首启文案；数据完成即进入天空。
+/// 与首启共用同一自检层，因此两条入口读作同一台仪器的不同开机时长。
+struct StartupLoadingView: View {
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @AppStorage("reducedMotion") private var reducedMotion = false
 
-    func body(content: Content) -> some View {
-        content
-            .opacity(revealed > index ? 1 : 0)
-            .offset(y: revealed > index ? 0 : Motion.archiveRise)
-    }
-}
+    @State private var fieldProgress: Double = 0
+    @State private var textVisible = false
 
-private extension View {
-    func bootReveal(index: Int, revealed: Int) -> some View {
-        modifier(BootLineReveal(index: index, revealed: revealed))
+    private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+
+    var body: some View {
+        ZStack {
+            Palette.voidBlack.ignoresSafeArea()
+
+            BootFieldView(progress: fieldProgress, suppressMotion: suppressMotion)
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("STARCATCH")
+                    .font(Typography.objectName)
+                    .tracking(4.2)
+                    .foregroundStyle(Palette.inkHigh.opacity(0.82))
+                Text("LOCAL ORBIT CATALOG · PREPARING")
+                    .font(Typography.statusTag)
+                    .tracking(1.15)
+                    .foregroundStyle(Palette.inkLow.opacity(0.42))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .padding(.horizontal, 42)
+            .opacity(textVisible ? 1 : 0)
+        }
+        .task {
+            if suppressMotion {
+                fieldProgress = 1
+                textVisible = true
+                return
+            }
+            // 回访路径通常只存在几百毫秒，因此自检推进得更快，不制造人为等待。
+            withAnimation(.timingCurve(0.22, 0.6, 0.2, 1, duration: 1.2)) {
+                fieldProgress = 1
+            }
+            withAnimation(.easeOut(duration: 0.3)) { textVisible = true }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("正在准备本地星图")
     }
 }

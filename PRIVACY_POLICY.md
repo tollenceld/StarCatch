@@ -1,6 +1,6 @@
 # StarCatch 隐私政策
 
-生效日期：2026-07-12
+生效日期：2026-07-17
 
 StarCatch 是一款在设备本地计算人造天体位置的观测工具。我们重视你的隐私，并按照最少数据原则设计本应用。
 
@@ -30,4 +30,8 @@ StarCatch 是一款在设备本地计算人造天体位置的观测工具。我�
 
 ## 联系我们
 
-上架前请在此填写开发者名称、支持邮箱和公开支持网址，并将本政策发布到可公开访问的 HTTPS 页面。
+支持与隐私问题可通过公开项目的 Issues 页面提交：
+https://github.com/tollenceld/StarCatch/issues
+
+本政策公开地址：
+https://github.com/tollenceld/StarCatch/blob/main/PRIVACY_POLICY.md

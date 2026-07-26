@@ -7,18 +7,19 @@ enum SkyTopBarMetrics {
     static let controlHeight: CGFloat = 44
 }
 
-/// 顶层视图。三段流程：
+/// 顶层视图。核心流程：
 ///
-///   1. BootSequenceView —— 一次仪器上电（首启约 6 秒，可轻触直达观测）
-///   2. ManualBookView —— 仅首启，逐页翻阅的观测手册（约 5 页）
-///   3. SkyView —— 主观测视图
+///   1. BootSequenceView —— 仅首次启动的简短产品说明与明确进入动作
+///   2. SkyView —— 主观测视图
+///   3. ManualBookView —— 从设置按需打开的五页观测手册
 ///
-/// 首启是一次完整的仪式：Boot 淡出直接进入 Manual，Manual 最后一页收束
-/// 直接进入 Sky，全程无跳跃、无自动弹窗。老用户 Boot → Sky。
+/// 首启由用户明确进入天空；回访用户由极简品牌准备层直接进入 Sky。
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
-    @StateObject private var session = SkySession()
+    /// 11 MB 轨道目录必须在首帧之后于后台解析；同步构造会让系统 Launch Screen
+    /// 持续占据屏幕，用户只能看到一段没有反馈的纯黑。
+    @State private var session: SkySession?
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
@@ -30,8 +31,11 @@ struct RootView: View {
         case privacy
     }
 
+    /// 无论首启还是回访都先建立一个可立即绘制的启动层；目录完成后再进入业务页面。
     @State private var stage: Stage = .booting
     @State private var instrumentPresented = false
+    @State private var manualReturnsToInstrument = false
+    @State private var satelliteStoryPresented = false
     @AppStorage("manualSeen") private var manualSeen = false
     @AppStorage("reducedMotion") private var reducedMotion = false
 
@@ -44,54 +48,80 @@ struct RootView: View {
             Palette.voidBlack.ignoresSafeArea()
 
             // 天空：只在 sky 阶段显示
-            if stage == .sky, !instrumentPresented {
+            if stage == .sky, !instrumentPresented, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView()
                 } else {
-                    SkyView(session: session, capture: capture, clock: clock)
+                    SkyView(
+                        session: session,
+                        capture: capture,
+                        clock: clock,
+                        onStoryPresentationChanged: { presented in
+                            satelliteStoryPresented = presented
+                        },
+                        onOpenInstrument: {
+                            withAnimation(sceneAnimation) { instrumentPresented = true }
+                        }
+                    )
                         .transition(.opacity)
-                        .overlay(alignment: .topTrailing) { sysEntry }
                 }
             }
 
-            // 手册：仅首启，Boot 之后进入
-            if stage == .manual {
-                ManualBookView(session: session) {
+            // 手册：从设置中按需重新打开
+            if stage == .manual, let session {
+                ManualBookView(
+                    session: session,
+                    revisiting: manualReturnsToInstrument
+                ) {
                     manualSeen = true
-                    withAnimation(sceneAnimation) { stage = .sky }
+                    let returnsToInstrument = manualReturnsToInstrument
+                    withAnimation(sceneAnimation) {
+                        stage = .sky
+                        instrumentPresented = returnsToInstrument
+                    }
+                    manualReturnsToInstrument = false
                 }
                 .transition(.opacity)
             }
 
             // 启动序列
             if stage == .booting {
-                BootSequenceView(session: session, compact: manualSeen) { interrupted in
-                    withAnimation(sceneAnimation) {
-                        if interrupted {
-                            manualSeen = true
-                            stage = .sky
-                        } else {
-                            stage = manualSeen ? .sky : .manual
+                if manualSeen {
+                    StartupLoadingView()
+                        .transition(.opacity)
+                } else {
+                    BootSequenceView(isReady: session != nil) { interrupted in
+                        withAnimation(sceneAnimation) {
+                            if interrupted {
+                                manualSeen = true
+                                stage = .sky
+                            } else {
+                                stage = .manual
+                            }
                         }
+                    }
+                    .transition(.opacity)
+                }
+            }
+
+            if stage == .privacy {
+                PrivacyStatementView {
+                    withAnimation(sceneAnimation) {
+                        stage = .sky
+                        instrumentPresented = true
                     }
                 }
                 .transition(.opacity)
             }
 
-            if stage == .privacy {
-                PrivacyStatementView {
-                    withAnimation(sceneAnimation) { stage = .sky }
-                }
-                .transition(.opacity)
-            }
-
             // 仪器参数面板
-            if stage == .sky, instrumentPresented {
+            if stage == .sky, instrumentPresented, let session {
                 InstrumentPanel(
                     presented: $instrumentPresented,
                     session: session,
                     onOpenManual: {
                         withAnimation(sceneAnimation) {
+                            manualReturnsToInstrument = true
                             instrumentPresented = false
                             stage = .manual
                         }
@@ -106,25 +136,52 @@ struct RootView: View {
                     .transition(.opacity)
             }
         }
-        .onAppear {
-            session.start()
-            #if DEBUG
-            applyDebugArgs()
-            #endif
-        }
+        .task { await prepareSession() }
         .onChange(of: stage) { _, newStage in
-            if newStage == .sky { session.requestObserverAccess() }
+            guard let session else { return }
+            if newStage == .sky {
+                session.start()
+                session.requestObserverAccess()
+            } else {
+                satelliteStoryPresented = false
+                session.stop()
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
-                session.start()
-                if stage == .sky { session.requestObserverAccess() }
+                clock.resume()
+                if stage == .sky, let session {
+                    session.start()
+                    session.requestObserverAccess()
+                }
             case .inactive, .background:
-                session.stop()
+                session?.stop()
+                clock.suspend()
             @unknown default:
                 break
             }
+        }
+    }
+
+    /// 第一帧只绘制启动品牌信息。轨道 JSON、SatelliteKit 对象和筛选索引全部在
+    /// userInitiated 后台任务中完成，避免阻塞 SwiftUI 建立首个窗口。
+    private func prepareSession() async {
+        guard session == nil else { return }
+        let catalog = await Task.detached(priority: .userInitiated) {
+            CatalogStore()
+        }.value
+        guard !Task.isCancelled else { return }
+
+        session = SkySession(catalog: catalog)
+
+        #if DEBUG
+        applyDebugArgs()
+        #endif
+
+        // 回访用户没有首启介绍需要停留：目录完成就直接进入天空。
+        if manualSeen, stage == .booting {
+            withAnimation(sceneAnimation) { stage = .sky }
         }
     }
 
@@ -142,6 +199,7 @@ struct RootView: View {
     /// --previewReturnToLive 自动从一小时偏移回归 LIVE；
     /// --autoReleaseAfter <秒> 用于验证完整锁定/释放动画。
     private func applyDebugArgs() {
+        guard let session else { return }
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--markManualSeen") { manualSeen = true }
         if args.contains("--skipBoot") {
@@ -167,10 +225,14 @@ struct RootView: View {
            let seconds = Double(args[idx + 1]) {
             clock.scrub(by: seconds)
         }
-        if args.contains("--focusVisibleObject"), let manual = session.manualProvider {
+        if (args.contains("--focusVisibleObject") || args.contains("--focusFeaturedObject")),
+           let manual = session.manualProvider {
             let observation = clock.observationTime()
             // 与主天空实际参与捕捉的采样集合保持一致，避免调试时对准了被收束的星座节点。
-            let target = session.displayObjects
+            let candidates = args.contains("--focusFeaturedObject")
+                ? session.displayObjects.filter(\.isFeatured)
+                : session.displayObjects
+            let target = candidates
                 .compactMap { object -> Ephemeris? in
                     session.ephemeris.ephemeris(
                         object.id,
@@ -178,7 +240,7 @@ struct RootView: View {
                         live: clock.isLive
                     )
                 }
-                .filter { $0.elevation > -0.1 }
+                .filter { $0.elevation > 0 }
                 .max { $0.elevation < $1.elevation }
             if let target {
                 manual.focusForPreview(
@@ -228,36 +290,6 @@ struct RootView: View {
     #endif
 
     /// 右上角微型仪器端口。视觉直径克制，触控区域仍保持 44pt。
-    private var sysEntry: some View {
-        Button {
-            withAnimation(sceneAnimation) { instrumentPresented = true }
-        } label: {
-            ZStack {
-                Circle()
-                    .fill(Palette.voidBlack.opacity(0.9))
-                Circle()
-                    .stroke(Palette.inkFaint.opacity(0.72), lineWidth: 0.65)
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                Circle()
-                    .fill(Palette.signal.opacity(0.9))
-                    .frame(width: 2.5, height: 2.5)
-                    .offset(x: 10, y: -10)
-            }
-            .frame(width: 30, height: 30)
-            .frame(
-                width: SkyTopBarMetrics.controlHeight,
-                height: SkyTopBarMetrics.controlHeight
-            )
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
-        .safeAreaPadding(.top, SkyTopBarMetrics.safeAreaSpacing)
-        .safeAreaPadding(.trailing, 8)
-        .accessibilityLabel("打开仪器状态与设置")
-        .accessibilityHint("进入设置、观测记录与帮助")
-    }
 }
 
 private struct CatalogUnavailableView: View {

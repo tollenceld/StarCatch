@@ -1,16 +1,18 @@
 import Foundation
 import simd
 
-/// 捕捉状态机：准星只负责发现与完成锁定，锁定后的阅读不再依赖持续对准。
+/// 捕捉状态机：准星先建立可随视线出现/消失的感应档案；只有“确认捕获”开启时，
+/// 锁定与换锁才由用户明确确认。
 ///
 /// ```
-/// EXPLORING ─(θ<8°)→ ACQUIRING ─(驻留进度=1 / 主动确认)→ LOCKED
-///     ▲                  │(θ>11° 持续0.75s)              │
+/// EXPLORING ─(θ<2.5°)→ ACQUIRING ─(主动确认)→ LOCKED
+///     ▲                    │(θ>4° 持续0.75s)              │
 ///     └──── RELEASING (主动释放后的消隐) ←────────────────┘
 /// ```
 ///
 /// ACQUIRING 同时使用距离迟滞与有记忆的驻留进度：轻微晃动只会暂停或缓慢回退，
-/// 不会把已经建立的捕获感知瞬间清空。LOCKED 是稳定阅读态，只能由明确用户行为退出。
+/// 不会把已经建立的捕获感知瞬间清空。进度到达 1 后，默认模式一次性开放完整档案；
+/// 确认模式仍只代表“可以确认”，LOCKED 只能由明确用户行为进入或退出。
 @MainActor
 final class CaptureStateMachine: ObservableObject {
 
@@ -34,8 +36,12 @@ final class CaptureStateMachine: ObservableObject {
     /// 驻留捕获进度 0..1。与单纯角距分离，专门驱动锁定外环和渐进触觉。
     @Published private(set) var acquisitionProgress: Double = 0
 
+    /// 默认即时识别模式下，只有捕获环完整收束后才开放档案。
+    /// 一旦完成便保持到本次 acquiring 结束，避免手持抖动令面板在阈值附近闪烁。
+    @Published private(set) var recognitionReady = false
+
     /// 阅读已锁定档案时，准星可以在不销毁旧锁定的前提下感应另一目标。
-    /// 只有新目标驻留完成后才原子替换档案，避免经过其他点位时内容闪换。
+    /// 新目标驻留完成后只进入待确认态，避免经过其他点位时内容闪换。
     @Published private(set) var replacementObjectId: String?
     @Published private(set) var replacementProgress: Double = 0
     @Published private(set) var replacementTriggeredAt: Date?
@@ -43,10 +49,13 @@ final class CaptureStateMachine: ObservableObject {
     /// 一次性扫描动效触发时刻（进入 ACQUIRING 时设置一次）。
     @Published private(set) var scanTriggeredAt: Date?
 
-    // 阈值（弧度）
-    static let enterAcquiring = 8.0 * .pi / 180
-    static let enterLocked = 5.0 * .pi / 180
-    static let exitAcquiring = 11.0 * .pi / 180
+    /// 锁定目标是否仍在准星的迟滞范围内。只表达空间关系，不会自行解除锁定。
+    @Published private(set) var lockedTargetAligned = false
+
+    // 阈值（弧度）。1×、55° 纵向视场下约对应 35pt / 18pt / 57pt 屏幕半径。
+    static let enterAcquiring = 2.5 * .pi / 180
+    static let enterLocked = 1.25 * .pi / 180
+    static let exitAcquiring = 4.0 * .pi / 180
 
     // 驻留时间
     static let lockDwell: TimeInterval = 1.05
@@ -69,19 +78,31 @@ final class CaptureStateMachine: ObservableObject {
         suppressedObjectId = id
         suppressedUntil = now.addingTimeInterval(Self.resuppressWindow)
         exitCandidateSince = nil
+        lockedTargetAligned = false
         clearReplacement()
     }
 
-    /// 用户在感应态轻触：与自然驻留汇入完全相同的 LOCKED 状态。
+    /// 用户在感应态点按底部确认动作，进入稳定的 LOCKED 状态。
     @discardableResult
     func confirmAcquisition(now: Date = Date()) -> Bool {
         guard case .acquiring(let id) = phase else { return false }
         acquisitionProgress = 1
+        recognitionReady = false
         phase = .locked(objectId: id)
         exitCandidateSince = nil
+        lockedTargetAligned = true
         clearReplacement()
         lastUpdate = now
         return true
+    }
+
+    /// 锁定阅读时确认当前替换候选。驻留只负责建立候选，不会自行替换档案。
+    @discardableResult
+    func confirmReplacement(now: Date = Date()) -> Bool {
+        guard case .locked(let current) = phase,
+              let candidate = replacementObjectId,
+              candidate != current else { return false }
+        return selectLockedTarget(candidate, now: now)
     }
 
     /// 锁定阅读时直接选择另一个明确点位。只允许从稳定锁定态切换，避免探索态误触。
@@ -92,6 +113,7 @@ final class CaptureStateMachine: ObservableObject {
         acquisitionProgress = 1
         scanTriggeredAt = now
         exitCandidateSince = nil
+        lockedTargetAligned = true
         lastUpdate = now
         clearReplacement()
         return true
@@ -125,6 +147,7 @@ final class CaptureStateMachine: ObservableObject {
     func update(
         nearest rawNearest: (objectId: String, angularDistance: Double)?,
         trackedDistance: Double? = nil,
+        captureEnabled: Bool = true,
         now: Date
     ) {
         // 抑制期内该对象视为不存在
@@ -156,7 +179,8 @@ final class CaptureStateMachine: ObservableObject {
 
             if theta > Self.exitAcquiring {
                 if let since = exitCandidateSince {
-                    if now.timeIntervalSince(since) > Self.acquireExitDwell {
+                    let exitDwell = captureEnabled ? Self.acquireExitDwell : 0.12
+                    if now.timeIntervalSince(since) > exitDwell {
                         transitionToExploring()
                     }
                 } else {
@@ -178,14 +202,16 @@ final class CaptureStateMachine: ObservableObject {
                 acquisitionProgress = max(0, acquisitionProgress - dt * 0.30)
             }
 
-            if acquisitionProgress >= 1 {
-                phase = .locked(objectId: id)
-                exitCandidateSince = nil
+            if captureEnabled {
+                recognitionReady = false
+            } else if acquisitionProgress >= 1 {
+                recognitionReady = true
             }
 
         case .locked(let currentID):
-            // 旧档案稳定保留；准星对另一目标的驻留独立积累，完成后一次性替换。
+            // 旧档案稳定保留；另一目标只形成待确认候选，不会自动替换。
             acquisitionProgress = 1
+            updateLockedAlignment(distance: trackedDistance)
             updateReplacement(
                 currentObjectId: currentID,
                 nearest: nearest,
@@ -232,8 +258,10 @@ final class CaptureStateMachine: ObservableObject {
     private func beginAcquiring(objectId: String, now: Date) {
         phase = .acquiring(objectId: objectId)
         acquisitionProgress = 0
+        recognitionReady = false
         scanTriggeredAt = now
         exitCandidateSince = nil
+        lockedTargetAligned = false
     }
 
     private func transitionToExploring() {
@@ -241,7 +269,19 @@ final class CaptureStateMachine: ObservableObject {
         exitCandidateSince = nil
         scanTriggeredAt = nil
         acquisitionProgress = 0
+        recognitionReady = false
+        lockedTargetAligned = false
         clearReplacement()
+    }
+
+    /// 进入和离开使用不同阈值，设备在边界附近轻微抖动时按钮不会反复改字。
+    private func updateLockedAlignment(distance: Double?) {
+        let theta = distance ?? .infinity
+        if lockedTargetAligned {
+            if theta > Self.exitAcquiring { lockedTargetAligned = false }
+        } else if theta < Self.enterAcquiring {
+            lockedTargetAligned = true
+        }
     }
 
     private func updateReplacement(
@@ -275,12 +315,6 @@ final class CaptureStateMachine: ObservableObject {
             decayReplacement(by: dt * 0.42)
         }
 
-        if replacementProgress >= 1, let replacementObjectId {
-            phase = .locked(objectId: replacementObjectId)
-            acquisitionProgress = 1
-            scanTriggeredAt = now
-            clearReplacement()
-        }
     }
 
     private func decayReplacement(by amount: Double) {

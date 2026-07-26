@@ -106,6 +106,105 @@ enum SkyRenderer {
         )
     }
 
+    // MARK: - 星野
+
+    /// 星等分档。真实星空的密度感来自亮度差，而不是密度本身：绝大多数目标必须
+    /// 接近底噪，少数近距离目标才成为可辨认的亮点。四档与透明度层级一一对应。
+    enum StarMagnitude: Int, CaseIterable {
+        /// 极暗底层：只有面积没有形状，负责"密密麻麻"。
+        case faint = 0
+        /// 可辨认但不吸引注意。
+        case low = 1
+        /// 清晰星点。
+        case mid = 2
+        /// 少数近距离主导目标，唯一带光晕的一档。
+        case bright = 3
+
+        var coreRadius: CGFloat {
+            switch self {
+            case .faint: 0.42
+            case .low: 0.62
+            case .mid: 0.92
+            case .bright: 1.28
+            }
+        }
+
+        /// 星核透明度直接取自 Palette.Level 四档，不额外发明中间值。
+        var coreOpacity: Double {
+            switch self {
+            case .faint: Palette.Level.ghost
+            case .low: Palette.Level.faint * 0.72
+            case .mid: Palette.Level.faint
+            case .bright: Palette.Level.present
+            }
+        }
+
+        /// 只有最亮一档在星核外留一层极弱的类别色介质。
+        var haloStrength: Double {
+            switch self {
+            case .faint, .low: 0
+            case .mid: 0.05
+            case .bright: 0.10
+            }
+        }
+
+        var haloRadius: CGFloat {
+            self == .bright ? 4.6 : 3.2
+        }
+    }
+
+    /// 分档星野：同一档合并为单一路径，整档最多一个模糊层。16k 目标下图层数恒定。
+    ///
+    /// 星核统一使用暖纸白，类别色只存在于最亮两档的微弱外晕 —— 天空因此保持
+    /// 单色相的空旷感，而不是变成彩色点阵。
+    static func drawStarField(
+        _ context: GraphicsContext,
+        tiers: [StarMagnitude: [CGPoint]],
+        tint: Color,
+        opacity: Double = 1,
+        emphasis: Double = 1
+    ) {
+        guard opacity > 0.01 else { return }
+        for magnitude in StarMagnitude.allCases {
+            guard let points = tiers[magnitude], !points.isEmpty else { continue }
+            let radius = magnitude.coreRadius * (magnitude == .faint ? 1 : CGFloat(emphasis))
+
+            if magnitude.haloStrength > 0 {
+                var halos = Path()
+                let haloR = magnitude.haloRadius
+                for point in points {
+                    halos.addEllipse(in: CGRect(
+                        x: point.x - haloR, y: point.y - haloR,
+                        width: haloR * 2, height: haloR * 2
+                    ))
+                }
+                context.drawLayer { layer in
+                    layer.addFilter(.blur(radius: magnitude == .bright ? 2.6 : 1.9))
+                    layer.fill(
+                        halos,
+                        with: .color(tint.opacity(
+                            magnitude.haloStrength * opacity * emphasis
+                        ))
+                    )
+                }
+            }
+
+            var cores = Path()
+            for point in points {
+                cores.addEllipse(in: CGRect(
+                    x: point.x - radius, y: point.y - radius,
+                    width: radius * 2, height: radius * 2
+                ))
+            }
+            context.fill(
+                cores,
+                with: .color(Palette.inkHigh.opacity(
+                    magnitude.coreOpacity * opacity * min(1, emphasis)
+                ))
+            )
+        }
+    }
+
     /// 大目录的普通点位合并为单一路径和一个光晕层；锁定/精选目标仍用上方的
     /// 完整点位绘制。这样点数增加不会线性制造数千个模糊图层。
     static func drawTargetField(
@@ -602,13 +701,16 @@ enum SkyRenderer {
 
     // MARK: - Vignette
 
+    /// 更深的四周收拢让中心视野成为唯一的"透镜开口"：密集星野集中在画面中部，
+    /// 边缘沉入真空，屏幕因此读作一个开口而不是一张贴满点的墙。
     static func drawVignette(_ context: GraphicsContext, size: CGSize) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let radius = max(size.width, size.height) * 0.72
         let gradient = Gradient(stops: [
             .init(color: .clear, location: 0),
-            .init(color: .clear, location: 0.55),
-            .init(color: Palette.voidEdge.opacity(0.55), location: 1),
+            .init(color: .clear, location: 0.42),
+            .init(color: Palette.voidEdge.opacity(0.30), location: 0.74),
+            .init(color: Palette.voidEdge.opacity(0.72), location: 1),
         ])
         context.fill(
             Path(CGRect(origin: .zero, size: size)),

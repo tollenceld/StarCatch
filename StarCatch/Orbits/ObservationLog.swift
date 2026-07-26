@@ -36,8 +36,10 @@ final class ObservationLog: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private static let storageKey = "observationLog.v1"
+    private let defaults: UserDefaults
 
-    init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         load()
     }
 
@@ -103,11 +105,11 @@ final class ObservationLog: ObservableObject {
 
     func clear() {
         entries = []
-        UserDefaults.standard.removeObject(forKey: Self.storageKey)
+        defaults.removeObject(forKey: Self.storageKey)
     }
 
     private func load() {
-        guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
+        guard let data = defaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode([Entry].self, from: data)
         else { return }
         entries = decoded
@@ -115,6 +117,6 @@ final class ObservationLog: ObservableObject {
 
     private func save() {
         guard let data = try? JSONEncoder().encode(entries) else { return }
-        UserDefaults.standard.set(data, forKey: Self.storageKey)
+        defaults.set(data, forKey: Self.storageKey)
     }
 }

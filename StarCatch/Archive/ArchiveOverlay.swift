@@ -8,6 +8,8 @@ struct ArchiveOverlay: View {
     let object: CatalogObject
     let ephemeris: Ephemeris?
     let revealed: Bool
+    /// false 表示准星感应到的即时预览；true 才表示用户主动建立的持续捕获。
+    var captured: Bool = true
     /// 锁定确认 0...1；用于先建立档案边界，再交给逐行正文。
     var lockProgress: Double = 1
     /// 主动归还 0...1；档案、联系线与锁定标记共享同一进度源。
@@ -25,6 +27,9 @@ struct ArchiveOverlay: View {
 
     private var contentVisible: Bool { revealed && presentationVisible }
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    /// 铭牌定宽。由遥测栅格两列中文标签的可读下限决定，调用方据此在屏内定位。
+    static let plateWidth: CGFloat = 252
+
     private var clampedLockProgress: Double { min(1, max(0, lockProgress)) }
     private var clampedReleaseProgress: Double { min(1, max(0, releaseProgress)) }
     private var isReleasing: Bool { !revealed || clampedReleaseProgress > 0.001 }
@@ -42,124 +47,69 @@ struct ArchiveOverlay: View {
         object.status.isActive ? Palette.activeTint : Palette.derelictTint
     }
 
-    private var roleTitle: String {
-        if object.isStarlink { return "STARLINK CONSTELLATION · 星座节点" }
-        return switch object.kind {
-        case "station": "ORBITAL HABITAT · 载人设施"
-        case "telescope": "SPACE OBSERVATORY · 空间望远镜"
-        case "weather": "WEATHER WATCH · 气象观测"
-        case "nav": "NAVIGATION CLOCK · 导航授时"
-        case "comms": "SIGNAL RELAY · 通信中继"
-        case "science": "SCIENCE MISSION · 科学任务"
-        case "debris": "ORBITAL DEBRIS · 在轨碎片"
-        case "rocket_body": "SPENT STAGE · 火箭末级"
-        default: "ORBITAL OBJECT · 在轨物体"
-        }
-    }
-
-    private var orbitNarrative: String {
-        switch object.orbitClass {
-        case "LEO": "近地轨道 · 快速越过天空"
-        case "MEO": "中地轨道 · 长周期导航带"
-        case "GEO": "地球同步轨道 · 近似固定方位"
-        case "HEO": "高椭圆轨道 · 远地点缓慢停留"
-        default: "\(object.orbitClass) 轨道"
-        }
+    private var rangeText: String {
+        guard let ephemeris else { return "RANGE —" }
+        return String(format: "RANGE %.0f KM", ephemeris.rangeKm)
     }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
             readingVeil
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 lockHeader
+                    .padding(.bottom, 10)
 
-                // 名称
+                // 第一眼：它是谁。名称不再压缩到 0.82 倍 —— 允许折行，
+                // 因为"读得清"比"占一行"重要。
                 Text(object.name)
                     .font(Typography.archiveObjectName)
                     .tracking(Typography.objectNameTracking)
                     .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.82)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .archiveReveal(index: 0, revealed: contentVisible)
 
-                // 编号行
-                Text("\(object.cosparId)  ·  N\(String(object.noradId))")
-                    .font(Typography.statusTag)
-                    .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .padding(.bottom, 4)
+                // 身份行：状态灯 + 类别 + 编号。编号回到主面板，
+                // 它是这颗目标唯一的、可被核对的身份。
+                identityRow
+                    .padding(.top, 7)
                     .archiveReveal(index: 1, revealed: contentVisible)
 
-                Text(roleTitle)
-                    .font(Typography.statusTag)
-                    .tracking(0.7)
-                    .foregroundStyle(object.identityTint.opacity(0.78))
-                    .fixedSize(horizontal: false, vertical: true)
-                    .archiveReveal(index: 2, revealed: contentVisible)
-
-                // 每个对象独有的历史句，成为档案的视觉主体。
-                Text(object.poetic)
+                // 一句任务叙述负责回答"它正在做什么"。
+                Text(object.archiveNarrative)
                     .font(Typography.archivePoetic)
                     .tracking(Typography.archivePoeticTracking)
                     .lineSpacing(Typography.archivePoeticLineSpacing)
-                    .foregroundStyle(Palette.inkLow.opacity(0.72))
-                    .padding(.top, 5)
+                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .padding(.top, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .archiveReveal(index: 3, revealed: contentVisible)
-
-                Text(orbitNarrative)
-                    .font(Typography.statusTag)
-                    .tracking(0.55)
-                    .foregroundStyle(Palette.inkLow.opacity(0.72))
-                    .padding(.top, 3)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .archiveReveal(index: 4, revealed: contentVisible)
+                    .archiveReveal(index: 2, revealed: contentVisible)
 
                 readoutDivider
-                    .archiveReveal(index: 5, revealed: contentVisible)
+                    .padding(.top, 14)
+                    .archiveReveal(index: 3, revealed: contentVisible)
 
-                // 少量关键遥测建立尺度感，其余参数退出主档案。
-                Group {
-                    if let label = observationTimeLabel {
-                        ArchiveField(label: "TIME", value: label, valueColor: Palette.signal)
-                            .archiveReveal(index: 6, revealed: contentVisible)
-                    }
-                    if let eph = ephemeris {
-                        ArchiveField(label: "ALT", value: String(format: "%.0f KM", eph.altitudeKm))
-                            .archiveReveal(index: 7, revealed: contentVisible)
-                    }
-                    ArchiveField(label: "LAUNCH", value: object.launched)
-                        .archiveReveal(index: 8, revealed: contentVisible)
-                    ArchiveField(label: "STATUS", value: statusText, valueColor: statusColor)
-                        .archiveReveal(index: 9, revealed: contentVisible)
-                    if observationTimeLabel == nil,
-                       let pass = PassPredictor.label(for: nextPass) {
-                        ArchiveField(label: pass.label, value: pass.value, valueColor: Palette.signal)
-                            .archiveReveal(index: 10, revealed: contentVisible)
-                    }
-                }
+                // 遥测改为两列定宽栅格：读数在固定位置，扫视时不必逐行查找标签。
+                telemetryGrid
+                    .padding(.top, 10)
             }
-            .padding(.leading, 9)
-            .padding(.trailing, 5)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 13)
         }
+        .frame(maxWidth: Self.plateWidth, alignment: .leading)
         .opacity(
             (0.28 + 0.72 * clampedLockProgress)
                 * (1 - 0.18 * clampedReleaseProgress)
         )
+        // 一块有重量的铭牌应该沉降到位，而不是从侧面滑入。位移改为极小的纵向落定，
+        // 归还时同样向上收回。
         .offset(
-            x: suppressMotion
+            y: suppressMotion
                 ? 0
-                : -8 * (1 - clampedLockProgress) - 3 * clampedReleaseProgress
-        )
-        .scaleEffect(
-            x: suppressMotion ? 1 : 1 - 0.012 * clampedReleaseProgress,
-            y: 1,
-            anchor: .leading
+                : -3 * (1 - clampedLockProgress) - 2 * clampedReleaseProgress
         )
         .fixedSize(horizontal: false, vertical: true)
         .contentShape(Rectangle())
@@ -180,26 +130,149 @@ struct ArchiveOverlay: View {
         }
     }
 
+    /// 身份行：状态灯、任务类别、NORAD 编号。三者共同回答"这是什么、可信吗"。
+    private var identityRow: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(statusColor.opacity(0.88))
+                .frame(width: 3.5, height: 3.5)
+
+            Text(statusText)
+                .foregroundStyle(statusColor.opacity(0.88))
+
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.34))
+                .frame(width: 0.5, height: 9)
+
+            Text(object.category.title)
+                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.34))
+                .frame(width: 0.5, height: 9)
+
+            Text("N\(object.noradId)")
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+        }
+        .font(Typography.statusTag)
+        .tracking(0.82)
+        .lineLimit(1)
+        .minimumScaleFactor(0.82)
+    }
+
+    /// 两列遥测栅格。距离与高度建立空间尺度，速度与方位建立运动尺度，
+    /// 因此成对排布而不是排成一列长表。
+    private var telemetryGrid: some View {
+        let azimuth = ephemeris.map { eph -> String in
+            let value = eph.azimuth < 0 ? eph.azimuth + 2 * .pi : eph.azimuth
+            return String(format: "%.0f°", value * 180 / .pi)
+        }
+        let elevation = ephemeris.map { String(format: "%+.0f°", $0.elevation * 180 / .pi) }
+        let range = ephemeris.map { String(format: "%.0f KM", $0.rangeKm) }
+        let altitude = ephemeris.map { String(format: "%.0f KM", $0.altitudeKm) }
+        let velocity = ephemeris.map { String(format: "%.2f KM/S", $0.velocityKmS) }
+
+        return VStack(alignment: .leading, spacing: 9) {
+            telemetryPair(
+                leading: ("距离", range ?? "—", Palette.inkHigh),
+                trailing: ("高度", altitude ?? "—", Palette.inkHigh),
+                index: 4
+            )
+            telemetryPair(
+                leading: ("速度", velocity ?? "—", Palette.inkHigh),
+                trailing: ("轨道", object.orbitClass, Palette.inkMid),
+                index: 5
+            )
+            telemetryPair(
+                leading: ("方位", azimuth ?? "—", Palette.inkMid),
+                trailing: ("仰角", elevation ?? "—", Palette.inkMid),
+                index: 6
+            )
+
+            // 时刻与过境是互斥的：非 LIVE 时看观测时刻，LIVE 时看下次过境。
+            if let label = observationTimeLabel {
+                telemetryPair(
+                    leading: ("时刻", label, Palette.signal),
+                    trailing: nil,
+                    index: 7
+                )
+            } else if let pass = PassPredictor.label(for: nextPass) {
+                telemetryPair(
+                    leading: (passTitle(pass.label), pass.value, Palette.signal),
+                    trailing: nil,
+                    index: 7
+                )
+            }
+        }
+    }
+
+    private func telemetryPair(
+        leading: (String, String, Color),
+        trailing: (String, String, Color)?,
+        index: Int
+    ) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            telemetryCell(leading.0, leading.1, leading.2)
+            if let trailing {
+                telemetryCell(trailing.0, trailing.1, trailing.2)
+            } else {
+                Spacer(minLength: 0)
+            }
+        }
+        .archiveReveal(index: index, revealed: contentVisible)
+    }
+
+    /// 标签在上、读数在下。垂直堆叠让两列的读数自然对齐成一条基线网格，
+    /// 比"标签值标签值"的横排更易扫视。
+    private func telemetryCell(
+        _ label: String,
+        _ value: String,
+        _ valueColor: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(Typography.statusTag)
+                .tracking(0.9)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+            Text(value)
+                .font(Typography.archiveDataValue)
+                .tracking(Typography.dataValueTracking)
+                .foregroundStyle(valueColor.opacity(Palette.Level.full))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(width: 104, alignment: .leading)
+    }
+
+    private func passTitle(_ raw: String) -> String {
+        switch raw {
+        case "NEXT PASS": "下次过境"
+        case "PASS IN": "过境倒计时"
+        default: raw
+        }
+    }
+
+    /// 档案底板。原设计是一层向右淡出的渐变，文字末端悬在星空上，
+    /// 因此显得轻。改为有明确边界的暗色板：四边收口，左缘一道身份色标，
+    /// 让它读作"一块贴在视野上的仪器铭牌"。
     private var readingVeil: some View {
         ZStack(alignment: .leading) {
-            LinearGradient(
-                stops: [
-                    .init(color: Palette.voidBlack.opacity(0.92), location: 0),
-                    .init(color: Palette.voidBlack.opacity(0.68), location: 0.68),
-                    .init(color: Palette.voidBlack.opacity(0.08), location: 1),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Palette.voidBlack.opacity(0.90))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.5)
+                }
+
             Rectangle()
-                .fill(object.identityTint.opacity(0.34))
-                .frame(width: 0.5)
-                .padding(.vertical, 4)
+                .fill(object.identityTint.opacity(0.62))
+                .frame(width: 1.5)
         }
         .opacity(clampedLockProgress * (1 - clampedReleaseProgress))
-        .mask(alignment: .leading) {
+        .mask(alignment: .top) {
+            // 底板从顶部向下展开，与锁定确认同相：先立边界，再填内容。
             Rectangle()
-                .scaleEffect(x: max(0.001, clampedLockProgress), anchor: .leading)
+                .scaleEffect(y: max(0.001, clampedLockProgress), anchor: .top)
         }
         .allowsHitTesting(false)
     }
@@ -212,51 +285,40 @@ struct ArchiveOverlay: View {
                 releasing: clampedReleaseProgress
             )
 
+            // 状态词改为中文：这是面板上唯一说明"当前发生了什么"的标签，
+            // 不应该要求用户翻译 LOCKED / IN VIEW 的区别。
             ZStack(alignment: .leading) {
-                Text("LOCKED")
+                Text(captured ? "已锁定" : "视野中")
                     .opacity(isReleasing ? 0 : 1)
-                Text("RETURN")
+                Text("正在归还")
                     .opacity(isReleasing ? 1 : 0)
             }
             .font(Typography.statusTag)
             .tracking(1.15)
-            .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+            .foregroundStyle(
+                (captured ? Palette.signal : Palette.inkMid)
+                    .opacity(Palette.Level.present)
+            )
             .lineLimit(1)
             .minimumScaleFactor(0.78)
             .layoutPriority(1)
 
             Spacer(minLength: 4)
-
-            Text(isReleasing ? "CLOSING" : "LINK")
-                .font(Typography.statusTag)
-                .tracking(0.9)
-                .foregroundStyle(object.identityTint.opacity(isReleasing ? 0.36 : 0.66))
-                .lineLimit(1)
         }
-        .frame(height: 30)
+        .frame(height: 16)
         .opacity(0.22 + 0.78 * clampedLockProgress)
-        .overlay(alignment: .bottomLeading) {
-            Rectangle()
-                .fill(object.identityTint.opacity(0.30))
-                .frame(height: 0.5)
-                .scaleEffect(
-                    x: max(0.001, clampedLockProgress * (1 - clampedReleaseProgress)),
-                    anchor: .leading
-                )
-        }
     }
 
     private var readoutDivider: some View {
         HStack(spacing: 7) {
-            Text("READOUT")
+            Text("实时遥测")
                 .font(Typography.statusTag)
-                .tracking(1.15)
+                .tracking(1.0)
                 .foregroundStyle(Palette.inkLow.opacity(0.58))
             Rectangle()
                 .fill(Palette.inkFaint.opacity(0.34))
                 .frame(height: 0.5)
         }
-        .padding(.vertical, 4)
     }
 }
 

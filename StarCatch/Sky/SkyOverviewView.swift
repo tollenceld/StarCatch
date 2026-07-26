@@ -52,15 +52,12 @@ struct SkyOverviewView: View {
                 context.fill(window, with: .color(Palette.dust.opacity(0.026)))
 
                 let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
-                let revealStarlink = focusedObject?.isStarlink == true
-                let renderObjects = revealStarlink
-                    ? session.visibleObjects
-                    : session.overviewObjects
+                let focusedFamily = focusedObject?.family
                 let live = clock.isLive
 
                 var samples: [RenderSample] = []
-                samples.reserveCapacity(renderObjects.count)
-                for object in renderObjects {
+                samples.reserveCapacity(session.overviewObjects.count)
+                @MainActor func appendSample(_ object: CatalogObject) {
                     guard let ephemeris = session.ephemeris.cachedEphemeris(
                         object.id,
                         at: observation,
@@ -72,22 +69,29 @@ struct SkyOverviewView: View {
                         yaw: yaw,
                         pitch: pitch,
                         zoom: zoom
-                    ) else { continue }
+                    ) else { return }
                     samples.append(RenderSample(
                         object: object,
                         ephemeris: ephemeris,
                         projected: projected
                     ))
                 }
+                for object in session.overviewObjects {
+                    appendSample(object)
+                }
+                if let focusedObject,
+                   !session.overviewObjects.contains(where: { $0.id == focusedObject.id }) {
+                    appendSample(focusedObject)
+                }
 
                 context.drawLayer { field in
                     field.clip(to: window)
                     drawOrbitShells(field, geometry: geometry)
                     drawSpatialTrails(field, geometry: geometry, front: false)
-                    drawField(field, samples: samples, front: false, revealStarlink: revealStarlink)
+                    drawField(field, samples: samples, front: false, focusedFamily: focusedFamily)
                     drawEarth(field, geometry: geometry)
                     drawSpatialTrails(field, geometry: geometry, front: true)
-                    drawField(field, samples: samples, front: true, revealStarlink: revealStarlink)
+                    drawField(field, samples: samples, front: true, focusedFamily: focusedFamily)
                     drawFocusedObject(field, samples: samples)
                     drawObserver(field, geometry: geometry)
                 }
@@ -102,7 +106,7 @@ struct SkyOverviewView: View {
                     geometry: geometry,
                     displayed: samples.count,
                     total: session.visibleObjects.count,
-                    revealStarlink: revealStarlink
+                    focusedFamily: focusedFamily
                 )
             }
             .contentShape(Rectangle())
@@ -324,23 +328,23 @@ struct SkyOverviewView: View {
         _ context: GraphicsContext,
         samples: [RenderSample],
         front: Bool,
-        revealStarlink: Bool
+        focusedFamily: CatalogFamily?
     ) {
         var exploration: [CGPoint] = []
         var observation: [CGPoint] = []
         var network: [CGPoint] = []
         var legacy: [CGPoint] = []
-        var starlink: [CGPoint] = []
+        var familyFields: [CatalogFamily: [CGPoint]] = [:]
         exploration.reserveCapacity(samples.count / 8)
         observation.reserveCapacity(samples.count / 6)
         network.reserveCapacity(samples.count / 5)
         legacy.reserveCapacity(64)
-        starlink.reserveCapacity(samples.count / 2)
+        familyFields.reserveCapacity(CatalogFamily.allCases.count)
 
         for sample in samples where sample.object.id != focusedObjectId {
             guard (sample.projected.depth >= 0) == front else { continue }
-            if sample.object.isStarlink {
-                starlink.append(sample.projected.point)
+            if let family = sample.object.family {
+                familyFields[family, default: []].append(sample.projected.point)
             } else {
                 switch sample.object.category {
                 case .exploration: exploration.append(sample.projected.point)
@@ -384,14 +388,19 @@ struct SkyOverviewView: View {
             coreRadius: front ? 0.72 : 0.48,
             haloStrength: front ? 0.06 : 0
         )
-        SkyRenderer.drawTargetField(
-            context,
-            points: starlink,
-            tint: Palette.starlinkTint,
-            opacity: (revealStarlink ? 0.74 : 0.32) * sideOpacity,
-            coreRadius: revealStarlink ? (front ? 0.94 : 0.62) : (front ? 0.62 : 0.42),
-            haloStrength: front ? (revealStarlink ? 0.16 : 0.09) : 0
-        )
+        for family in CatalogFamily.allCases {
+            let emphasized = family == focusedFamily
+            SkyRenderer.drawTargetField(
+                context,
+                points: familyFields[family, default: []],
+                tint: family.tint,
+                opacity: (emphasized ? 0.74 : 0.32) * sideOpacity,
+                coreRadius: emphasized
+                    ? (front ? 0.94 : 0.62)
+                    : (front ? 0.62 : 0.42),
+                haloStrength: front ? (emphasized ? 0.16 : 0.09) : 0
+            )
+        }
     }
 
     private func drawFocusedObject(_ context: GraphicsContext, samples: [RenderSample]) {
@@ -631,15 +640,17 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry,
         displayed: Int,
         total: Int,
-        revealStarlink: Bool
+        focusedFamily: CatalogFamily?
     ) {
+        let legendTitle = focusedFamily.map {
+            "\($0.title)  ·  NETWORK HIGHLIGHT"
+        } ?? "EARTH  ·  ORBIT OBJECTS"
+        let legendTint = focusedFamily?.tint ?? Palette.inkLow
         context.draw(
-            Text(revealStarlink ? "STARLINK  ·  CONSTELLATION FIELD" : "EARTH  ·  ORBIT FIELD")
+            Text(legendTitle)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(
-                    (revealStarlink ? Palette.starlinkTint : Palette.inkLow).opacity(0.74)
-                ),
+                .foregroundStyle(legendTint.opacity(0.74)),
             at: CGPoint(x: geometry.center.x, y: geometry.rect.maxY + 28),
             anchor: .center
         )
