@@ -1,11 +1,51 @@
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Xcode and local IDE state
 DerivedData/
 build/
-__pycache__/
-*.py[cod]
-*.xcuserstate
 xcuserdata/
+*.xcuserstate
 *.xccheckout
 *.xcscmblueprint
+.idea/
+
+# SwiftPM, CocoaPods, and other dependency/build output
+.build/
+.swiftpm/
+Pods/
+Carthage/Build/
+vendor/bundle/
+
+# Python tooling used by the catalog/release scripts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Logs and local reports
+*.log
+logs/
 audit/
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.mobileprovision
+*.cer
+*.jks
+*.keystore
+credentials*.json
+secrets.*
+
+# Obsidian workspace state (the Markdown knowledge base remains tracked)
 SatelliteKnowledge/.obsidian/
