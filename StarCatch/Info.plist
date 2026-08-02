@@ -17,13 +17,15 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。</string>
+	<key>NSLocationDefaultAccuracyReduced</key>
+	<true/>
 	<key>NSMotionUsageDescription</key>
 	<string>用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。</string>
 	<key>UILaunchScreen</key>

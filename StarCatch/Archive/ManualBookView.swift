@@ -31,25 +31,35 @@ struct ManualBookView: View {
             // 极暗的天空底层：让手册漂浮在深空之上
             starfield
 
-            VStack(alignment: .leading, spacing: 0) {
-                masthead
-                    .padding(.horizontal, 40)
-                    .padding(.top, 68)
-                    .padding(.bottom, 22)
-
-                ScrollView(showsIndicators: false) {
-                    pageBody
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 18)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .id(pageIndex) // 换页时视图重建 → transition 生效
-                }
-
-                footer
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 52)
+            ScrollView(showsIndicators: false) {
+                pageBody
+                    .padding(.horizontal, 34)
+                    .padding(.top, revisiting ? 18 : 64)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .id(pageIndex)
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if revisiting {
+                ArchiveTopBar(
+                    backTitle: "设置",
+                    title: "观测手册",
+                    onBack: { finish(interrupted: true) }
+                )
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            footer
+                .padding(.horizontal, 34)
+                .padding(.vertical, 8)
+                .background(Palette.voidBlack.opacity(0.96))
+                .overlay(alignment: .top) { ContentHairline() }
+        }
+        .appEdgeBackGesture(enabled: revisiting) {
+            finish(interrupted: true)
+        }
+        .simultaneousGesture(pageSwipeGesture)
         .opacity(fadingOut ? 0 : 1)
         .task { await initialSetup() }
     }
@@ -68,56 +78,30 @@ struct ManualBookView: View {
         await revealCurrent()
     }
 
-    // MARK: - 组件
-
-    /// 手册铭牌：全流程恒定。轻描淡写的三行——名称、副题、REV 号。
-    private var masthead: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("FIELD MANUAL")
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking + 1.4)
-                    .foregroundStyle(Palette.signal.opacity(0.55))
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.5))
-                    .frame(height: 0.5)
-                Text(String(format: "%02d / %02d", pageIndex + 1, pages.count))
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-                Button {
-                    finish(interrupted: true)
-                } label: {
-                    Text(revisiting ? "返回设置" : "跳过")
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(revisiting ? "返回设置" : "跳过观测手册")
-            }
-            Text("STARCATCH · 观测手册")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-        }
-    }
-
     /// 页面正文。每次换页整块重生：由 revealed 驱动逐行浮现。
     @ViewBuilder
     private var pageBody: some View {
         let page = pages[pageIndex]
 
         VStack(alignment: .leading, spacing: 20) {
-            // 页码/章节标记（一行小字，独立浮现）
-            Text(page.chapterMark)
-                .font(Typography.fieldLabel)
-                .tracking(Typography.fieldLabelTracking + 0.6)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                .modifier(LineReveal(index: 0, revealed: pageRevealed))
+            HStack(alignment: .center, spacing: 12) {
+                Text(page.chapterMark)
+                    .font(Typography.fieldLabel)
+                    .tracking(Typography.fieldLabelTracking + 0.6)
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                Spacer(minLength: 8)
+                Text(String(format: "%02d / %02d", pageIndex + 1, pages.count))
+                    .font(Typography.statusTag)
+                    .tracking(Typography.statusTagTracking)
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                if !revisiting {
+                    Button("跳过") { finish(interrupted: true) }
+                        .font(Typography.statusTag)
+                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                }
+            }
+            .modifier(LineReveal(index: 0, revealed: pageRevealed))
 
             // 标题：中英各一行
             VStack(alignment: .leading, spacing: 6) {
@@ -132,12 +116,7 @@ struct ManualBookView: View {
             }
             .modifier(LineReveal(index: 1, revealed: pageRevealed))
 
-            // 一条极细的分节线（signal 色微弱）
-            Rectangle()
-                .fill(Palette.signal.opacity(0.35))
-                .frame(width: 56, height: 0.5)
-                .padding(.top, 4)
-                .padding(.bottom, 8)
+            ManualChapterVisual(pageIndex: pageIndex, revealed: pageRevealed)
                 .modifier(LineReveal(index: 2, revealed: pageRevealed))
 
             // 正文分段：每段一行渐显
@@ -157,7 +136,7 @@ struct ManualBookView: View {
                 .padding(.top, 14)
             }
         }
-        .frame(maxWidth: 340, alignment: .leading)
+        .frame(maxWidth: 360, alignment: .leading)
     }
 
     /// 页脚：左侧推进标识 + 右侧极细刻度页码。
@@ -172,15 +151,22 @@ struct ManualBookView: View {
     /// 底部页码刻度：填充过的刻度 signal 微光，未到达的刻度是 inkFaint。
     private var pageTicks: some View {
         HStack(spacing: 6) {
-            ForEach(0 ..< pages.count, id: \.self) { i in
-                Rectangle()
-                    .fill(
-                        i <= pageIndex
-                            ? Palette.signal.opacity(0.55)
-                            : Palette.inkFaint.opacity(Palette.Level.faint)
-                    )
-                    .frame(width: 10, height: 0.5)
-                    .animation(.easeOut(duration: suppressMotion ? 0.16 : 0.48), value: pageIndex)
+            ForEach(0 ..< pages.count, id: \.self) { index in
+                Button {
+                    go(to: index)
+                } label: {
+                    Capsule()
+                        .fill(
+                            index == pageIndex
+                                ? Palette.signal.opacity(0.68)
+                                : Palette.inkFaint.opacity(Palette.Level.secondary)
+                        )
+                        .frame(width: index == pageIndex ? 18 : 8, height: 2)
+                        .frame(minWidth: 22, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("第 \(index + 1) 页")
             }
         }
     }
@@ -190,7 +176,7 @@ struct ManualBookView: View {
         let isLast = pageIndex == pages.count - 1
         return Button(action: advance) {
             HStack(spacing: 12) {
-                Text(isLast ? (revisiting ? "返回设置" : "开始观测") : "继续")
+                Text(isLast ? (revisiting ? "完成阅读" : "开始观测") : "继续")
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking + 0.4)
                     .foregroundStyle(
@@ -210,7 +196,7 @@ struct ManualBookView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            isLast ? (revisiting ? "返回设置" : "开始观测") : "继续到下一页"
+            isLast ? (revisiting ? "完成阅读" : "开始观测") : "继续到下一页"
         )
         .opacity(pageRevealed ? 1 : 0.72)
         .animation(.easeOut(duration: suppressMotion ? 0.12 : 0.28), value: pageRevealed)
@@ -233,6 +219,36 @@ struct ManualBookView: View {
             guard !Task.isCancelled, !fadingOut else { return }
             pageRevealed = true
         }
+    }
+
+    private func retreat() {
+        guard pageIndex > 0, !fadingOut else { return }
+        go(to: pageIndex - 1)
+    }
+
+    private func go(to index: Int) {
+        guard pages.indices.contains(index), index != pageIndex, !fadingOut else { return }
+        withAnimation(.easeIn(duration: suppressMotion ? 0.08 : 0.16)) {
+            pageRevealed = false
+            pageIndex = index
+        }
+        Task { @MainActor in
+            await Task.yield()
+            guard !Task.isCancelled, !fadingOut else { return }
+            pageRevealed = true
+        }
+    }
+
+    private var pageSwipeGesture: some Gesture {
+        DragGesture(minimumDistance: 24)
+            .onEnded { value in
+                if revisiting, value.startLocation.x < 32 { return }
+                let horizontal = value.predictedEndTranslation.width
+                guard abs(horizontal) > abs(value.predictedEndTranslation.height) * 1.25,
+                      abs(horizontal) > 54
+                else { return }
+                if horizontal < 0 { advance() } else { retreat() }
+            }
     }
 
     private func revealCurrent() async {
@@ -258,9 +274,9 @@ struct ManualBookView: View {
 
     private func paragraph(_ text: String) -> some View {
         Text(text)
-            .font(Typography.poetic)
-            .tracking(Typography.poeticTracking)
-            .lineSpacing(Typography.poeticLineSpacing)
+            .font(Typography.readingBody)
+            .tracking(Typography.readingBodyTracking)
+            .lineSpacing(Typography.readingBodyLineSpacing)
             .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -295,11 +311,169 @@ struct ManualBookView: View {
         case .epochAge: return "\(session.tleAgeDays)D"
         case .snapshotDate:
             if session.catalog.snapshotEpoch == .distantPast { return "—" }
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd"
-            f.timeZone = TimeZone(identifier: "UTC")
-            return f.string(from: session.catalog.snapshotEpoch)
+            return Self.snapshotDateFormatter.string(
+                from: session.catalog.snapshotEpoch
+            )
         }
+    }
+
+    private static let snapshotDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+}
+
+/// 手册页复用主界面的细线、准星与轨道语法，承担章节示意而不是装饰插画。
+private struct ManualChapterVisual: View {
+    let pageIndex: Int
+    let revealed: Bool
+
+    var body: some View {
+        Canvas { context, size in
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let signal = Palette.signal.opacity(revealed ? 0.48 : 0.18)
+            let line = Palette.inkFaint.opacity(Palette.Level.secondary)
+
+            switch pageIndex {
+            case 0:
+                drawField(context, size: size, center: center, signal: signal, line: line)
+            case 1:
+                drawFocus(context, center: center, signal: signal, line: line)
+            case 2:
+                drawTimeline(context, size: size, center: center, signal: signal, line: line)
+            case 3:
+                drawLocalGlobe(context, center: center, signal: signal, line: line)
+            default:
+                drawReady(context, center: center, signal: signal, line: line)
+            }
+        }
+        .frame(height: 122)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Palette.inkFaint.opacity(0.22), lineWidth: 0.5)
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func drawField(
+        _ context: GraphicsContext,
+        size: CGSize,
+        center: CGPoint,
+        signal: Color,
+        line: Color
+    ) {
+        for index in 0 ..< 18 {
+            let seed = CGFloat(index)
+            let point = CGPoint(
+                x: 18 + (seed * 47).truncatingRemainder(dividingBy: max(1, size.width - 36)),
+                y: 16 + (seed * 31).truncatingRemainder(dividingBy: max(1, size.height - 32))
+            )
+            context.fill(
+                Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 1.4, height: 1.4)),
+                with: .color(index == 9 ? signal : line.opacity(0.72))
+            )
+        }
+        drawCrosshair(context, center: center, color: signal)
+    }
+
+    private func drawFocus(
+        _ context: GraphicsContext,
+        center: CGPoint,
+        signal: Color,
+        line: Color
+    ) {
+        drawCrosshair(context, center: center, color: signal)
+        for radius in [22.0, 34.0] {
+            var arc = Path()
+            arc.addArc(
+                center: center,
+                radius: radius,
+                startAngle: .degrees(-64),
+                endAngle: .degrees(58),
+                clockwise: false
+            )
+            context.stroke(arc, with: .color(radius < 30 ? signal : line), lineWidth: 0.7)
+        }
+        context.fill(
+            Path(ellipseIn: CGRect(x: center.x - 2, y: center.y - 2, width: 4, height: 4)),
+            with: .color(Palette.inkHigh.opacity(0.82))
+        )
+    }
+
+    private func drawTimeline(
+        _ context: GraphicsContext,
+        size: CGSize,
+        center: CGPoint,
+        signal: Color,
+        line: Color
+    ) {
+        var axis = Path()
+        axis.move(to: CGPoint(x: 22, y: center.y))
+        axis.addLine(to: CGPoint(x: size.width - 22, y: center.y))
+        context.stroke(axis, with: .color(line), lineWidth: 0.6)
+        for index in 0 ... 12 {
+            let x = 22 + (size.width - 44) * CGFloat(index) / 12
+            var tick = Path()
+            tick.move(to: CGPoint(x: x, y: center.y - (index == 6 ? 9 : 4)))
+            tick.addLine(to: CGPoint(x: x, y: center.y + (index == 6 ? 9 : 4)))
+            context.stroke(tick, with: .color(index == 6 ? signal : line), lineWidth: 0.65)
+        }
+    }
+
+    private func drawLocalGlobe(
+        _ context: GraphicsContext,
+        center: CGPoint,
+        signal: Color,
+        line: Color
+    ) {
+        let globe = CGRect(x: center.x - 42, y: center.y - 42, width: 84, height: 84)
+        context.stroke(Path(ellipseIn: globe), with: .color(line), lineWidth: 0.7)
+        context.stroke(
+            Path(ellipseIn: globe.insetBy(dx: 25, dy: 0)),
+            with: .color(line.opacity(0.72)),
+            lineWidth: 0.5
+        )
+        var equator = Path()
+        equator.addEllipse(in: globe.insetBy(dx: 0, dy: 29))
+        context.stroke(equator, with: .color(line.opacity(0.72)), lineWidth: 0.5)
+        context.fill(
+            Path(ellipseIn: CGRect(x: center.x + 16, y: center.y - 18, width: 4, height: 4)),
+            with: .color(signal)
+        )
+    }
+
+    private func drawReady(
+        _ context: GraphicsContext,
+        center: CGPoint,
+        signal: Color,
+        line: Color
+    ) {
+        drawCrosshair(context, center: center, color: signal)
+        context.stroke(
+            Path(ellipseIn: CGRect(x: center.x - 31, y: center.y - 31, width: 62, height: 62)),
+            with: .color(line),
+            lineWidth: 0.6
+        )
+    }
+
+    private func drawCrosshair(
+        _ context: GraphicsContext,
+        center: CGPoint,
+        color: Color
+    ) {
+        var path = Path()
+        path.move(to: CGPoint(x: center.x - 24, y: center.y))
+        path.addLine(to: CGPoint(x: center.x - 7, y: center.y))
+        path.move(to: CGPoint(x: center.x + 7, y: center.y))
+        path.addLine(to: CGPoint(x: center.x + 24, y: center.y))
+        path.move(to: CGPoint(x: center.x, y: center.y - 24))
+        path.addLine(to: CGPoint(x: center.x, y: center.y - 7))
+        path.move(to: CGPoint(x: center.x, y: center.y + 7))
+        path.addLine(to: CGPoint(x: center.x, y: center.y + 24))
+        context.stroke(path, with: .color(color), lineWidth: 0.7)
     }
 }
 
@@ -343,7 +517,7 @@ struct ManualPage: Equatable {
             paragraphs: [
                 "举起设备，屏幕即视野，中心十字丝即指向。",
                 "缓慢移动。视野中的光点是真实在轨物；空域之外的目标会由屏幕边缘提示方向。",
-                "让十字丝靠近它，档案会随视线浮现，移开后自行消失。若在设置中开启“确认捕获”，主视野才会出现确认、切换与取消捕获按钮。",
+                "让十字丝靠近它，档案会随视线浮现。移开后仍保留短暂阅读时间；触碰面板可将它固定。若在设置中开启“确认捕获”，主视野才会出现确认、切换与取消捕获按钮。",
                 "完整信息出现后，画面下方会浮现“深入档案”。单体卫星读取自己的资料；大型星座的任意节点进入同一份项目档案，避免用重复文字伪装成不同故事。",
             ],
             fields: []
@@ -365,6 +539,7 @@ struct ManualPage: Equatable {
             paragraphs: [
                 "轨道来自 NORAD 两行根数，并由 SGP4 在设备上推算；数据龄期会被如实标注。",
                 "位置与姿态只用于建立观察者坐标和设备指向，不离开设备。拒绝定位后，仪器会明确使用假定坐标。",
+                "这些结果用于教育与观测，不用于导航、碰撞规避或任何安全决策。",
             ],
             fields: [
                 Field(label: "MODEL", value: .literal("SGP4 / WGS-72")),
@@ -422,7 +597,7 @@ struct StaticDustBackdrop: View {
                 Path(CGRect(origin: .zero, size: size)),
                 with: .color(Palette.voidBlack)
             )
-            SkyRenderer.drawDust(context, dust: Self.dust, time: 0, size: size, parallax: .zero)
+            SkyRenderer.drawDust(context, dust: Self.dust, size: size)
             SkyRenderer.drawVignette(context, size: size)
         }
     }

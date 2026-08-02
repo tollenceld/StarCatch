@@ -37,10 +37,21 @@ final class ManualPointingProvider: PointingProvider {
         decayTimer?.invalidate()
         decayTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
-            let dt = 1.0 / 30.0
+            let dt = SpatialMotion.frameInterval
+            let elevationVelocity = Double(self.velocity.dy) * self.radiansPerPoint
+            let boundaryScale = SpatialMotion.boundaryVelocityScale(
+                value: self.pointing.elevation,
+                velocity: elevationVelocity,
+                lowerBound: -0.2,
+                upperBound: .pi / 2,
+                slowZone: 0.22
+            )
+            self.velocity.dy *= boundaryScale
             self.apply(dx: self.velocity.dx * dt, dy: self.velocity.dy * dt)
-            // 指数衰减，~1.2s 停下
-            let decay = exp(-dt / 0.35)
+            let decay = SpatialMotion.decayFactor(
+                rate: SpatialMotion.rotationDecay,
+                deltaTime: dt
+            )
             self.velocity.dx *= decay
             self.velocity.dy *= decay
             if abs(self.velocity.dx) < 2, abs(self.velocity.dy) < 2 {

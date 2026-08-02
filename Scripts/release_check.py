@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Fail fast when a StarCatch archive would ship with stale or incomplete assets."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import plistlib
+import struct
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+MAX_CATALOG_AGE_DAYS = 14.0
+MIN_CATALOG_OBJECTS = 10_000
+
+
+class ReleaseCheckError(RuntimeError):
+    pass
+
+
+def require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ReleaseCheckError(message)
+
+
+def load_json(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ReleaseCheckError(f"无法读取 {path.relative_to(ROOT)}：{error}") from error
+
+
+def parse_date(value: object, label: str) -> datetime:
+    require(isinstance(value, str), f"{label} 缺少 ISO-8601 日期")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ReleaseCheckError(f"{label} 日期无效：{value}") from error
+    require(parsed.tzinfo is not None, f"{label} 必须包含时区")
+    return parsed.astimezone(timezone.utc)
+
+
+def check_info_plist() -> None:
+    path = ROOT / "StarCatch/Info.plist"
+    with path.open("rb") as handle:
+        info = plistlib.load(handle)
+    require(
+        info.get("CFBundleShortVersionString") == "$(MARKETING_VERSION)",
+        "Info.plist 必须从 MARKETING_VERSION 读取版本号",
+    )
+    require(
+        info.get("CFBundleVersion") == "$(CURRENT_PROJECT_VERSION)",
+        "Info.plist 必须从 CURRENT_PROJECT_VERSION 读取构建号",
+    )
+    require(bool(info.get("NSLocationWhenInUseUsageDescription")), "缺少定位用途说明")
+    require(bool(info.get("NSMotionUsageDescription")), "缺少运动用途说明")
+    require(info.get("NSLocationDefaultAccuracyReduced") is True, "定位应默认请求近似精度")
+    require(info.get("ITSAppUsesNonExemptEncryption") is False, "加密出口声明必须明确为 false")
+
+
+def check_privacy_manifest() -> None:
+    path = ROOT / "StarCatch/PrivacyInfo.xcprivacy"
+    with path.open("rb") as handle:
+        privacy = plistlib.load(handle)
+    require(privacy.get("NSPrivacyTracking") is False, "隐私清单必须明确不跟踪")
+    require(privacy.get("NSPrivacyCollectedDataTypes") == [], "当前版本不应声明收集数据")
+    accessed = privacy.get("NSPrivacyAccessedAPITypes", [])
+    defaults = next(
+        (
+            item
+            for item in accessed
+            if item.get("NSPrivacyAccessedAPIType")
+            == "NSPrivacyAccessedAPICategoryUserDefaults"
+        ),
+        None,
+    )
+    require(defaults is not None, "UserDefaults 的 Required Reason API 声明缺失")
+    require("CA92.1" in defaults.get("NSPrivacyAccessedAPITypeReasons", []), "UserDefaults 理由必须包含 CA92.1")
+
+
+def check_catalog(now: datetime) -> tuple[int, float]:
+    catalog = load_json(ROOT / "StarCatch/Resources/catalog.json")
+    profiles = load_json(ROOT / "StarCatch/Resources/satellite_profiles.json")
+    require(catalog.get("schemaVersion") == 2, "catalog.json schemaVersion 必须为 2")
+    require(profiles.get("schemaVersion") == 2, "satellite_profiles.json schemaVersion 必须为 2")
+    objects = catalog.get("objects")
+    require(isinstance(objects, list), "catalog.json objects 必须是数组")
+    require(len(objects) >= MIN_CATALOG_OBJECTS, f"轨道目录少于 {MIN_CATALOG_OBJECTS:,} 个对象")
+    require("CelesTrak" in str(catalog.get("source", "")), "轨道目录缺少 CelesTrak 来源声明")
+
+    generated = parse_date(catalog.get("generatedAt"), "catalog.generatedAt")
+    snapshot = parse_date(catalog.get("snapshotEpoch"), "catalog.snapshotEpoch")
+    profile_generated = parse_date(profiles.get("generatedAt"), "profiles.generatedAt")
+    require(abs((generated - profile_generated).total_seconds()) < 1, "目录与档案不是同一次生成")
+    require(snapshot <= now.replace(microsecond=999999), "轨道快照时间位于未来")
+    age_days = (now - snapshot).total_seconds() / 86_400
+    require(age_days <= MAX_CATALOG_AGE_DAYS, f"轨道快照已过期：{age_days:.1f} 天（上限 {MAX_CATALOG_AGE_DAYS:.0f} 天）")
+    require(len(profiles.get("stories", [])) > 0, "逐星档案为空")
+    require(len(profiles.get("familyStories", [])) > 0, "星座家族档案为空")
+    return len(objects), age_days
+
+
+def check_icon() -> None:
+    path = ROOT / "StarCatch/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
+    with path.open("rb") as handle:
+        header = handle.read(26)
+    require(header[:8] == b"\x89PNG\r\n\x1a\n", "App Icon 必须是 PNG")
+    width, height, bit_depth, color_type = struct.unpack(">IIBB", header[16:26])
+    require((width, height) == (1024, 1024), "App Icon 必须为 1024×1024")
+    require(bit_depth == 8, "App Icon 必须为 8-bit PNG")
+    require(color_type not in (4, 6), "App Icon 不得包含 Alpha 通道")
+
+
+def check_dependency_lock() -> None:
+    path = ROOT / "StarCatch.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+    resolved = load_json(path)
+    pins = resolved.get("pins", [])
+    satellite = next((pin for pin in pins if pin.get("identity") == "satellitekit"), None)
+    require(satellite is not None, "Package.resolved 未锁定 SatelliteKit")
+    state = satellite.get("state", {})
+    require(bool(state.get("version")), "SatelliteKit 必须锁定语义版本")
+    require(bool(state.get("revision")), "SatelliteKit 必须锁定提交 revision")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--now",
+        help="测试用 ISO-8601 当前时间；默认使用真实 UTC 时间",
+    )
+    args = parser.parse_args()
+    now = parse_date(args.now, "--now") if args.now else datetime.now(timezone.utc)
+
+    try:
+        check_info_plist()
+        check_privacy_manifest()
+        objects, age_days = check_catalog(now)
+        check_icon()
+        check_dependency_lock()
+    except (OSError, plistlib.InvalidFileException, ReleaseCheckError) as error:
+        print(f"RELEASE CHECK FAILED: {error}", file=sys.stderr)
+        return 1
+
+    print(
+        "RELEASE CHECK PASSED · "
+        f"{objects:,} OBJECTS · CATALOG AGE {age_days:.1f}D · "
+        "PRIVACY / ICON / DEPENDENCIES VERIFIED"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

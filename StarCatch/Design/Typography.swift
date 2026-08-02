@@ -27,6 +27,15 @@ enum Typography {
     static let poeticTracking: CGFloat = 1.0
     static let poeticLineSpacing: CGFloat = 10
 
+    /// 阅读型页面的中文正文。仪器感由版式和标签承担，连续中文不再强制等宽或大字距。
+    static let readingBody = Font.system(.callout, design: .default, weight: .regular)
+    static let readingBodyTracking: CGFloat = 0.1
+    static let readingBodyLineSpacing: CGFloat = 6
+
+    /// 设置说明与列表摘要使用的紧凑正文，保持两行内稳定可读。
+    static let readingCompact = Font.system(.footnote, design: .default, weight: .regular)
+    static let readingCompactTracking: CGFloat = 0.15
+
     /// 天体档案的诗意说明：刻意退到遥测数据之后，恢复较轻、较暗的旧版气质。
     static let archivePoetic = Font.custom("PingFangSC-Light", size: 12.5, relativeTo: .footnote)
     static let archivePoeticTracking: CGFloat = 0.9

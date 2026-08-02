@@ -27,9 +27,9 @@ struct SatelliteStoryView: View {
                         .padding(.bottom, 28)
 
                     Text(story.lead)
-                        .font(Typography.poetic)
-                        .tracking(0.65)
-                        .lineSpacing(8)
+                        .font(Typography.readingBody)
+                        .tracking(Typography.readingBodyTracking)
+                        .lineSpacing(Typography.readingBodyLineSpacing)
                         .foregroundStyle(Palette.inkMid.opacity(0.9))
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.bottom, 30)
@@ -70,20 +70,19 @@ struct SatelliteStoryView: View {
 
                     sourceNote
                 }
-                .padding(.horizontal, 34)
-                .padding(.top, 24)
+                .padding(.horizontal, 30)
+                .padding(.top, 18)
                 .padding(.bottom, 42)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             ArchiveTopBar(
                 backTitle: "天空",
-                trailingTitle: object.family == nil
-                    ? "SATELLITE ARCHIVE"
-                    : "CONSTELLATION ARCHIVE",
+                title: "目标档案",
                 onBack: onDismiss
             )
         }
+        .appEdgeBackGesture(action: onDismiss)
         .opacity(revealed ? 1 : 0)
         .offset(y: suppressMotion ? 0 : revealed ? 0 : 8)
         .onAppear {
@@ -134,9 +133,9 @@ struct SatelliteStoryView: View {
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkHigh.opacity(0.86))
             Text(chapter.body)
-                .font(Typography.archiveNarrative)
-                .tracking(Typography.archiveNarrativeTracking)
-                .lineSpacing(Typography.archiveNarrativeLineSpacing)
+                .font(Typography.readingBody)
+                .tracking(Typography.readingBodyTracking)
+                .lineSpacing(Typography.readingBodyLineSpacing)
                 .foregroundStyle(Palette.inkMid.opacity(0.76))
                 .fixedSize(horizontal: false, vertical: true)
         }

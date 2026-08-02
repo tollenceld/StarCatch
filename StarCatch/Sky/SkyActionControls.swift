@@ -48,7 +48,7 @@ enum FocusActionMode: Equatable {
         }
     }
 
-    var width: CGFloat { self == .seeking ? 194 : 154 }
+    var width: CGFloat { AppChromeMetrics.mainActionWidth }
 }
 
 struct FocusActionControl: View {
@@ -115,7 +115,7 @@ struct FocusActionControl: View {
                     .fill(Palette.signal.opacity(mode.isReleasing ? 0.68 : 0.4 + 0.26 * mode.readiness))
                     .frame(width: 14 + 8 * CGFloat(mode.readiness), height: 0.65)
             }
-            .frame(width: mode.width, height: 42)
+            .frame(width: mode.width, height: AppChromeMetrics.controlHeight)
             .contentShape(Capsule())
             .overlay {
                 Capsule()
@@ -211,7 +211,7 @@ struct CaptureSecondaryControl: View {
                     .tracking(0.9)
             }
             .foregroundStyle(Palette.inkMid.opacity(mode == .cancelling ? 0.48 : 0.82))
-            .frame(width: 102, height: 38)
+            .frame(width: 108, height: AppChromeMetrics.controlHeight)
             .contentShape(Capsule())
         }
         .buttonStyle(SkyCapsulePressStyle())
@@ -277,7 +277,10 @@ struct ReturnToLiveControl: View {
                     .fill(Palette.signal.opacity(returning ? 0.72 : 0.42))
                     .frame(width: returning ? 22 : 14, height: 0.65)
             }
-            .frame(width: 154, height: 42)
+            .frame(
+                width: AppChromeMetrics.mainActionWidth,
+                height: AppChromeMetrics.controlHeight
+            )
             .contentShape(Capsule())
             .overlay {
                 Capsule()
@@ -352,7 +355,10 @@ struct FieldOfViewResetControl: View {
                     .tracking(1.1)
                     .foregroundStyle(Palette.inkHigh.opacity(0.88))
             }
-            .frame(width: 124, height: 38)
+            .frame(
+                width: AppChromeMetrics.mainActionWidth,
+                height: AppChromeMetrics.controlHeight
+            )
             .contentShape(Capsule())
         }
         .buttonStyle(SkyCapsulePressStyle())

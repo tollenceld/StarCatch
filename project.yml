@@ -25,6 +25,9 @@ targets:
       - name: Compile Satellite Knowledge
         script: |
           python3 "$SRCROOT/Scripts/satellite_knowledge.py" compile
+          if [ "${ACTION:-}" = "install" ]; then
+            python3 "$SRCROOT/Scripts/release_check.py"
+          fi
         basedOnDependencyAnalysis: false
         showEnvVars: false
     dependencies:
@@ -38,6 +41,9 @@ targets:
         SWIFT_VERSION: "5.10"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: 8SJJ8MN7H8
+      configs:
+        Release:
+          VALIDATE_PRODUCT: YES
     info:
       path: StarCatch/Info.plist
       properties:
@@ -48,6 +54,7 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationWhenInUseUsageDescription: 用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。
+        NSLocationDefaultAccuracyReduced: true
         NSMotionUsageDescription: 用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。
         UIRequiresFullScreen: true
         UIStatusBarHidden: true

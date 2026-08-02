@@ -114,7 +114,7 @@ xcodegen generate
   `StarCatch/Resources/satellite_profiles.json` 是受校验的运行时产物。
 - `project.yml` 是工程结构唯一来源，`StarCatch.xcodeproj` 是为了直接打开 Xcode
   而保留的生成结果。二者改变时必须一起验证。
-- 归档截图如确需保留，应存到仓库外的发布资料目录，不能长期堆积在 APP 工作区。
+- 经过挑选的商店截图只存入仓库根目录 `AppStore/Screenshots`；临时截图、模拟器窗口图和对比图不得堆积在 `StarCatch` 源码目录。
 
 ## 暂缓的高风险重构
 

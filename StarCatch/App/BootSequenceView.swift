@@ -14,11 +14,10 @@ struct BootSequenceView: View {
     @State private var contentVisible = false
     @State private var actionVisible = false
     @State private var fadingOut = false
-    @State private var pendingInterrupted: Bool?
-    /// 自检层进度。与文字显影共享同一时间轴，但由较慢的缓动推进。
-    @State private var fieldProgress: Double = 0
+    @State private var handoffProgress: Double = 0
     @State private var titleVisible = false
     @State private var bodyVisible = false
+    @State private var startedAt = Date()
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
     private var fadeOutDuration: TimeInterval { suppressMotion ? 0.08 : 0.18 }
@@ -27,8 +26,12 @@ struct BootSequenceView: View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            BootFieldView(progress: fieldProgress, suppressMotion: suppressMotion)
-                .ignoresSafeArea()
+            SystemWakeView(
+                isReady: isReady,
+                handoffProgress: handoffProgress,
+                suppressMotion: suppressMotion
+            )
+            .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("ORBITAL FIELD INSTRUMENT")
@@ -72,7 +75,7 @@ struct BootSequenceView: View {
                     finish(interrupted: true)
                 } label: {
                     HStack(spacing: 11) {
-                        Text(pendingInterrupted == nil ? "进入观测" : "正在进入")
+                        Text("进入观测")
                             .font(.custom("PingFangSC-Medium", size: 13, relativeTo: .body))
                             .tracking(1.2)
                         Rectangle()
@@ -93,7 +96,6 @@ struct BootSequenceView: View {
                     }
                 }
                 .buttonStyle(.plain)
-                .disabled(pendingInterrupted != nil)
                 .opacity(actionVisible ? 1 : 0)
                 .offset(y: suppressMotion || actionVisible ? 0 : 3)
                 .padding(.top, 28)
@@ -106,29 +108,17 @@ struct BootSequenceView: View {
             .opacity(contentVisible ? 1 : 0)
             .offset(y: suppressMotion || contentVisible ? 0 : 4)
 
-            Text(isReady ? "LOCAL ORBIT CATALOG · READY" : "LOCAL ORBIT CATALOG · PREPARING")
-                .font(Typography.statusTag)
-                .tracking(1.05)
-                .foregroundStyle(Palette.inkLow.opacity(0.38))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-                .padding(.horizontal, 42)
-                .padding(.bottom, 30)
-                .opacity(contentVisible ? 1 : 0)
         }
         .opacity(fadingOut ? 0 : 1)
-        .task { await run() }
-        .onChange(of: isReady) { _, ready in
-            guard ready, let interrupted = pendingInterrupted else { return }
-            pendingInterrupted = nil
-            finish(interrupted: interrupted)
-        }
+        .task(id: isReady) { await runWhenReady() }
     }
 
     /// 显影顺序表达一次仪器自检：星野先在真空中积累，署名随之确认，说明文字最后
     /// 落位，进入动作在自检收束时才可用。任何一步都可以被点击跳过。
-    private func run() async {
+    private func runWhenReady() async {
+        guard isReady else { return }
         if suppressMotion {
-            fieldProgress = 1
+            handoffProgress = 1
             contentVisible = true
             titleVisible = true
             bodyVisible = true
@@ -136,15 +126,25 @@ struct BootSequenceView: View {
             return
         }
 
-        contentVisible = true
-        // 自检层用一条长缓动独立推进，比文字慢，让星野始终领先于文案。
-        withAnimation(.timingCurve(0.22, 0.6, 0.2, 1, duration: 2.1)) {
-            fieldProgress = 1
+        let elapsed = Date().timeIntervalSince(startedAt)
+        let remaining = max(0, BootVisualTimeline.minimumPresentationDuration - elapsed)
+        if remaining > 0 {
+            try? await Task.sleep(for: .seconds(remaining))
         }
-
-        try? await Task.sleep(for: .milliseconds(260))
         guard !Task.isCancelled else { return }
-        withAnimation(Motion.manualReveal) { titleVisible = true }
+
+        // READY 先稳定停留，再只让文字退场；星场从头到尾保持原位。
+        try? await Task.sleep(for: .milliseconds(300))
+        guard !Task.isCancelled else { return }
+        withAnimation(.easeInOut(duration: 0.45)) {
+            handoffProgress = 1
+        }
+        try? await Task.sleep(for: .milliseconds(450))
+        guard !Task.isCancelled else { return }
+        withAnimation(Motion.manualReveal) {
+            contentVisible = true
+            titleVisible = true
+        }
 
         try? await Task.sleep(for: .milliseconds(420))
         guard !Task.isCancelled else { return }
@@ -157,11 +157,7 @@ struct BootSequenceView: View {
 
     private func finish(interrupted: Bool = false) {
         guard !fadingOut else { return }
-        guard isReady else {
-            // 记住用户意图，但绝不淡成一张无法交互的黑屏；目录完成后立即兑现。
-            pendingInterrupted = interrupted
-            return
-        }
+        guard isReady else { return }
         let duration = interrupted ? (suppressMotion ? 0.08 : 0.2) : fadeOutDuration
         withAnimation(.easeIn(duration: duration)) { fadingOut = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
@@ -173,11 +169,15 @@ struct BootSequenceView: View {
 /// 回访用户只看到极简品牌准备层，不重复首启文案；数据完成即进入天空。
 /// 与首启共用同一自检层，因此两条入口读作同一台仪器的不同开机时长。
 struct StartupLoadingView: View {
+    let isReady: Bool
+    let onFinished: () -> Void
+
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
 
-    @State private var fieldProgress: Double = 0
-    @State private var textVisible = false
+    @State private var handoffProgress: Double = 0
+    @State private var completed = false
+    @State private var startedAt = Date()
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
 
@@ -185,34 +185,44 @@ struct StartupLoadingView: View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            BootFieldView(progress: fieldProgress, suppressMotion: suppressMotion)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("STARCATCH")
-                    .font(Typography.objectName)
-                    .tracking(4.2)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.82))
-                Text("LOCAL ORBIT CATALOG · PREPARING")
-                    .font(Typography.statusTag)
-                    .tracking(1.15)
-                    .foregroundStyle(Palette.inkLow.opacity(0.42))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .padding(.horizontal, 42)
-            .opacity(textVisible ? 1 : 0)
+            SystemWakeView(
+                isReady: isReady,
+                handoffProgress: handoffProgress,
+                suppressMotion: suppressMotion
+            )
+            .ignoresSafeArea()
         }
-        .task {
-            if suppressMotion {
-                fieldProgress = 1
-                textVisible = true
+        .task(id: isReady) {
+            guard isReady, !completed else { return }
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--holdStartup") {
                 return
             }
-            // 回访路径通常只存在几百毫秒，因此自检推进得更快，不制造人为等待。
-            withAnimation(.timingCurve(0.22, 0.6, 0.2, 1, duration: 1.2)) {
-                fieldProgress = 1
+            #endif
+            if suppressMotion {
+                handoffProgress = 1
+                completed = true
+                try? await Task.sleep(for: .milliseconds(120))
+                guard !Task.isCancelled else { return }
+                onFinished()
+                return
             }
-            withAnimation(.easeOut(duration: 0.3)) { textVisible = true }
+
+            let elapsed = Date().timeIntervalSince(startedAt)
+            let remaining = max(0, BootVisualTimeline.minimumPresentationDuration - elapsed)
+            if remaining > 0 {
+                try? await Task.sleep(for: .seconds(remaining))
+            }
+            guard !Task.isCancelled, !completed else { return }
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled, !completed else { return }
+            withAnimation(.easeInOut(duration: 0.45)) {
+                handoffProgress = 1
+            }
+            try? await Task.sleep(for: .milliseconds(460))
+            guard !Task.isCancelled else { return }
+            completed = true
+            onFinished()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("正在准备本地星图")

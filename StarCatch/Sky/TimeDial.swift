@@ -45,7 +45,11 @@ struct TimeDial: View {
         }
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Palette.inkFaint.opacity(dragging || !clock.isLive ? 0.54 : 0.34))
+                .fill(
+                    Palette.inkFaint.opacity(
+                        dragging || !clock.isLive ? 0.54 : Palette.Level.functionalDivider
+                    )
+                )
                 .frame(height: 0.5)
         }
         .contentShape(Rectangle())
@@ -79,7 +83,15 @@ struct TimeDial: View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             dragHint
 
-            Spacer(minLength: 12)
+            Spacer(minLength: 6)
+
+            Text("完整范围  ±24H")
+                .font(Typography.statusTag)
+                .tracking(0.7)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                .lineLimit(1)
+
+            Spacer(minLength: 6)
 
             timeStatus
         }
@@ -114,7 +126,7 @@ struct TimeDial: View {
         .tracking(Typography.statusTagTracking)
         .foregroundStyle(
             Palette.inkLow.opacity(
-                hasInteracted ? Palette.Level.faint : Palette.Level.present
+                hasInteracted ? Palette.Level.readableSecondary : Palette.Level.present
             )
         )
         .allowsHitTesting(false)
@@ -210,9 +222,9 @@ struct TimeDial: View {
                 let halfWindow = Double(proxy.size.width) / 2 * Self.secondsPerPoint
                 let scale = scaleWindowLabel(seconds: halfWindow)
                 HStack {
-                    Text("−\(scale)")
+                    Text("可见 −\(scale)")
                     Spacer()
-                    Text("+\(scale)")
+                    Text("+\(scale) 可见")
                 }
                 .font(.system(size: 7.5, weight: .medium, design: .monospaced))
                 .tracking(0.8)

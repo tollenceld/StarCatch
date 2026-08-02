@@ -1,41 +1,46 @@
-# 当前任务：建立本地版本管理与模型交接机制
+# 当前任务：收口 Release Candidate 并统一到 main
 
 状态：已完成（2026-08-02）
 
 ## 目标
 
-在不破坏现有 Git 历史、不连接 GitHub、不 push 的前提下，补齐长期可用的本地仓库卫生和跨模型交接入口。
+保留当前全部产品、性能、导航、发布与商店资料改动，将开发历史安全快进到本地 `main`，并删除不再需要的本地开发/备份分支，使这台设备后续只在 `main` 上开发。
 
 ## 已完成
 
-- 确认项目已有 Git 仓库、现有提交历史和远端配置；未重复初始化、未抓取远端、未修改远端。
-- 保留任务开始前工作区中的业务改动、删除项和 App Store 资产，没有重置或混入本次提交。
-- 扩充 `.gitignore`：覆盖 macOS/Xcode 本机状态、构建与依赖目录、Python 缓存、日志、环境变量、签名材料和凭据文件。
-- 新增 `AGENTS.md`，规定模型切换/新会话的读取顺序、Git 安全边界、提交纪律和验证要求。
-- 新增 `PROJECT_CONTEXT.md`，提供稳定项目背景并链接现有权威产品/架构文档，避免重复维护长篇说明。
-- 新增本文件作为后续任务的进度、涉及文件、验证结果和下一步入口。
+- 完成主天空、目标感应/对焦/锁定、详情阅读宽限、筛选、顶部状态翼、统一导航与底部控件的整体收口。
+- 完成局部天空与沉浸式三维全局星图的连续尺度、地球与观察者表达、时间轴和惯性交互优化。
+- 完成设置、观测记录、隐私、手册和深入档案的页面规范、对齐与返回行为统一。
+- 清理不再使用的 `ArchiveField.swift`，并保留经过验证的运行时与工程结构。
+- 优化目录加载、轨道传播和首个目标档案预热，避免首轮交互承担大资源初始化。
+- 补齐默认近似定位、目录失败诊断、教育/观测用途声明与更新后的隐私政策。
+- 新增 Archive 发布门禁，校验轨道目录时效、隐私清单、图标、版本配置和依赖锁定。
+- 准备简体中文 App Store 元数据、审核答卷草案、软件物料清单、发布审计和 6 张 6.9 英寸实际界面截图。
+- 核对三个本地分支：旧备份分支的最终文件树与原 `main` 完全一致；当前开发分支可从 `main` 直接 fast-forward。
+- 当前成果已提交并快进到本地 `main`；另外两个本地分支已删除。远端未执行 fetch、push 或分支删除。
 
-## 本次涉及文件
+## 主要涉及范围
 
-- `.gitignore`
-- `AGENTS.md`
-- `PROJECT_CONTEXT.md`
-- `CURRENT_TASK.md`
+- `StarCatch/App`、`StarCatch/Sky`、`StarCatch/Archive`
+- `StarCatch/Orbits`、`StarCatch/Pointing`、`StarCatch/Design`、`StarCatch/Engagement`
+- `StarCatchTests`
+- `AppStore`
+- `Documentation`
+- `Scripts/release_check.py`
+- `project.yml`、`StarCatch.xcodeproj`、`Info.plist`、隐私与项目说明
 
 ## 验证
 
-- 已检查现有分支、提交历史、远端配置和工作区状态。
-- 已确认仓库没有已跟踪的典型构建产物、凭据文件或环境文件。
-- 已执行敏感信息模式扫描；未发现匹配的私钥、云密钥或明文凭据模式。
-- 提交前/后执行 `git diff --check`，并复核选择性暂存内容。
+- 78 项单元测试通过，0 失败、0 跳过。
+- Debug 模拟器构建运行通过；Release 模拟器构建通过。
+- 无签名 iOS Device Archive 通过，并包含 dSYM、隐私清单和随包轨道资源。
+- `SatelliteKnowledge` 校验通过：3,832 份逐星档案、8 份星座共享档案。
+- 发布门禁通过：16,243 个对象，目录龄期 6.3 天；模拟 24.6 天旧目录时可正确阻止发布。
+- 6 张商店截图均为 1320×2868 RGB JPEG。
+- 已执行 `git diff --check` 并复核未跟踪文件、忽略规则和分支关系。
 
 ## 下一步
 
-后续模型开始工作时，先读取 `AGENTS.md`、`PROJECT_CONTEXT.md`、本文件，再执行 `git status --short --branch`。当前工作区中任务开始前已有一批业务和发布资料改动，后续应先逐项审阅，再按功能拆成独立提交；不要把它们自动并入本次仓库卫生提交。
-
-## 后续 GitHub 上传（2026-08-02）
-
-- 用户明确授权后，确认远端为 `git@github.com:tollenceld/StarCatch.git`，并确认当前分支只有一个待推送本地提交。
-- 已将 `0eabc20 chore: establish local repo hygiene and handoff docs` 推送到 `origin/agent/consolidate-current-work`。
-- 未创建 Pull Request，未暂存或上传工作区中的未提交业务改动、删除项和 App Store 资产。
-- 后续继续按功能审阅现有工作区改动，并为每个重要任务单独更新本文件和创建提交。
+- 后续工作直接从本地 `main` 开始，保持一次重要任务对应一个范围清晰的提交。
+- 需要同步 GitHub 时，由用户明确授权后再 push `main`；远端旧开发分支也仅在明确授权后删除。
+- 正式上架前完成有签名 Archive、Validate App、TestFlight 真机验证、商家身份和数据分发权利确认。

@@ -31,3 +31,15 @@ limit. Authored objects absent from the active source are retained only in the
 legacy category and marked silent. TLE/OMM propagation is most reliable near
 its epoch; refreshing the
 bundled snapshot is therefore part of every App Store release.
+
+Run the repository-wide archive gate after generating the catalog:
+
+```sh
+python3 Scripts/satellite_knowledge.py validate
+python3 Scripts/release_check.py
+```
+
+An Xcode Archive (`ACTION=install`) runs the same release check automatically.
+The check rejects a stale packaged snapshot even if no catalog generation took
+place during that build, and also verifies the privacy manifest, Info.plist,
+App Icon and locked Swift Package dependency.

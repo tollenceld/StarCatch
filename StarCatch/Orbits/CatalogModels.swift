@@ -86,6 +86,42 @@ enum CatalogFilterGroup: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// 天空显示范围使用单选语义；它与下方可叠加的任务、运营方和网络镜片分离。
+enum CatalogScope: String, CaseIterable, Identifiable, Sendable {
+    case all
+    case lowEarth
+    case mediumAndHigh
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: "全部轨道"
+        case .lowEarth: "近地轨道"
+        case .mediumAndHigh: "中高轨道"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .all: "scope"
+        case .lowEarth: "circle.dashed"
+        case .mediumAndHigh: "circle.circle"
+        }
+    }
+
+    func includes(_ object: CatalogObject) -> Bool {
+        switch self {
+        case .all:
+            true
+        case .lowEarth:
+            object.orbitClass == "LEO"
+        case .mediumAndHigh:
+            object.orbitClass != "LEO"
+        }
+    }
+}
+
 /// 面向观测者的具体目录镜片。每一项都必须能从随 App 打包的离线目录得到
 /// 非空结果，并拥有独立的任务叙述或星座资料。
 enum CatalogFilter: String, CaseIterable, Identifiable, Sendable {

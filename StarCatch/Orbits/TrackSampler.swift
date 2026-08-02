@@ -6,7 +6,7 @@ import SatelliteKit
 @MainActor
 final class TrackSampler {
 
-    struct TrackPoint {
+    struct TrackPoint: Sendable {
         let azimuth: Double
         let elevation: Double
         /// 相对当前的秒偏移（负 = 过去）。
@@ -19,6 +19,8 @@ final class TrackSampler {
     /// 缓存对应的观测时刻 —— 拨动时间时轨迹要跟着走。
     private var cachedObservation: Date?
     private var cachedTrack: [TrackPoint] = []
+    private var preparationTask: Task<Void, Never>?
+    private var preparingObjectId: String?
 
     /// 缓存有效期 —— 轨迹弧不需要每帧重算。
     private let cacheLifetime: TimeInterval = 10
@@ -32,21 +34,62 @@ final class TrackSampler {
         observer: ObserverLocation.Coordinates,
         at now: Date
     ) -> [TrackPoint] {
-        if cachedObjectId == objectId,
-           let at = cachedAt,
-           let obs = cachedObservation,
-           Date().timeIntervalSince(at) < cacheLifetime,
-           abs(obs.timeIntervalSince(now)) < 5 {
+        if cacheIsValid(for: objectId, at: now) {
             return cachedTrack
         }
-        guard let sat = store.satellites[objectId] else { return [] }
+        prepareTrack(for: objectId, observer: observer, at: now)
+        return []
+    }
 
-        let geo = LatLonAlt(observer.latitude, observer.longitude, observer.altitudeMeters / 1000.0)
+    /// 感应一开始即异步准备轨迹。Canvas 在缓存抵达前宁可省略一帧轨迹，
+    /// 也不在锁定完成的那一帧同步传播 19 个时间点。
+    func prepareTrack(
+        for objectId: String,
+        observer: ObserverLocation.Coordinates,
+        at now: Date
+    ) {
+        guard !cacheIsValid(for: objectId, at: now) else { return }
+        if preparingObjectId == objectId, preparationTask != nil { return }
+        guard let sat = store.satellites[objectId] else { return }
+
+        preparationTask?.cancel()
+        preparingObjectId = objectId
+        preparationTask = Task.detached(priority: .userInitiated) {
+            let points = Self.sampleTrack(
+                satellite: sat,
+                observer: observer,
+                at: now
+            )
+            guard !Task.isCancelled else { return }
+            await MainActor.run { [weak self] in
+                guard let self, self.preparingObjectId == objectId else { return }
+                self.cachedObjectId = objectId
+                self.cachedAt = Date()
+                self.cachedObservation = now
+                self.cachedTrack = points
+                self.preparingObjectId = nil
+                self.preparationTask = nil
+            }
+        }
+    }
+
+    nonisolated private static func sampleTrack(
+        satellite: Satellite,
+        observer: ObserverLocation.Coordinates,
+        at now: Date
+    ) -> [TrackPoint] {
+        let geo = LatLonAlt(
+            observer.latitude,
+            observer.longitude,
+            observer.altitudeMeters / 1000.0
+        )
         var points: [TrackPoint] = []
+        points.reserveCapacity(19)
         var offset: TimeInterval = -180
         while offset <= 180 {
+            if Task.isCancelled { return [] }
             let jd = now.addingTimeInterval(offset).julianDate
-            if let topo = try? sat.topPosition(julianDays: jd, observer: geo) {
+            if let topo = try? satellite.topPosition(julianDays: jd, observer: geo) {
                 points.append(TrackPoint(
                     azimuth: topo.azim * .pi / 180,
                     elevation: topo.elev * .pi / 180,
@@ -55,15 +98,19 @@ final class TrackSampler {
             }
             offset += 20
         }
-
-        cachedObjectId = objectId
-        cachedAt = Date()
-        cachedObservation = now
-        cachedTrack = points
         return points
     }
 
+    private func cacheIsValid(for objectId: String, at now: Date) -> Bool {
+        cachedObjectId == objectId
+            && cachedAt.map { Date().timeIntervalSince($0) < cacheLifetime } == true
+            && cachedObservation.map { abs($0.timeIntervalSince(now)) < 5 } == true
+    }
+
     func invalidate() {
+        preparationTask?.cancel()
+        preparationTask = nil
+        preparingObjectId = nil
         cachedObjectId = nil
         cachedAt = nil
         cachedObservation = nil

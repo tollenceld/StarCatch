@@ -303,6 +303,69 @@ final class OrbitTests: XCTestCase {
         XCTAssertLessThan(direction.vector.dy, -0.99)
     }
 
+    func testCaptureAngularDistanceMatchesFullProjection() throws {
+        let projection = Projection(
+            pointing: Pointing(azimuth: 0.3, elevation: 0.4, roll: 0.2),
+            screenSize: CGSize(width: 390, height: 844)
+        )
+        let azimuth = 0.34
+        let elevation = 0.42
+        let projected = try XCTUnwrap(
+            projection.project(azimuth: azimuth, elevation: elevation)
+        )
+        XCTAssertEqual(
+            projection.angularDistance(
+                azimuth: azimuth,
+                elevation: elevation
+            ),
+            projected.angularDistance,
+            accuracy: 1e-12
+        )
+    }
+
+    func testBackgroundFieldUsesOpticalMotionAndWrapsAtFullAzimuth() throws {
+        let size = CGSize(width: 390, height: 844)
+        let dust = StarDust(count: 1, seed: 42)
+        let grain = try XCTUnwrap(dust.grains.first)
+        let neutral = StarDust.skyTransform(
+            pointing: Pointing(azimuth: 0, elevation: 0, roll: 0),
+            canvasSize: size,
+            verticalFOV: Projection.baseVerticalFOV
+        )
+        let moved = StarDust.skyTransform(
+            pointing: Pointing(
+                azimuth: 10 * .pi / 180,
+                elevation: 10 * .pi / 180,
+                roll: 0
+            ),
+            canvasSize: size,
+            verticalFOV: Projection.baseVerticalFOV
+        )
+
+        // 10° 设备转动必须让背景点产生明显的光学位移，
+        // 不能再是原先约 7pt 的“黏屏”弱视差。
+        XCTAssertGreaterThan(abs(moved.offset.x - neutral.offset.x), 100)
+        XCTAssertGreaterThan(abs(moved.offset.y - neutral.offset.y), 100)
+
+        let fullTurn = StarDust.skyTransform(
+            pointing: Pointing(azimuth: 2 * .pi, elevation: 0, roll: 0),
+            canvasSize: size,
+            verticalFOV: Projection.baseVerticalFOV
+        )
+        let startPoint = dust.screenPosition(
+            of: grain,
+            canvasSize: size,
+            transform: neutral
+        )
+        let wrappedPoint = dust.screenPosition(
+            of: grain,
+            canvasSize: size,
+            transform: fullTurn
+        )
+        XCTAssertEqual(startPoint.x, wrappedPoint.x, accuracy: 0.001)
+        XCTAssertEqual(startPoint.y, wrappedPoint.y, accuracy: 0.001)
+    }
+
     func testFieldMagnificationUsesOpticalFOVAndScreenScale() throws {
         let size = CGSize(width: 390, height: 844)
         let pointing = Pointing(azimuth: 0, elevation: 0, roll: 0)

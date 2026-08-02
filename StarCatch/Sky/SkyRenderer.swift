@@ -8,25 +8,31 @@ enum SkyRenderer {
     static func drawDust(
         _ context: GraphicsContext,
         dust: StarDust,
-        time: TimeInterval,
         size: CGSize,
-        parallax: CGPoint
+        transform: StarDust.SkyTransform = .identity
     ) {
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let quietRadiusSquared: CGFloat = 55 * 55
         for grain in dust.grains {
-            let p = dust.screenPosition(of: grain, time: time, canvasSize: size, parallax: parallax)
-            // 少数颗粒极慢呼吸（周期取 3 倍标准呼吸，进一步放慢）
-            let breath = 1.0 + 0.25 * sin(time / (Motion.breathPeriod * 3) * 2 * .pi + grain.phase)
+            // 背景恒星只响应统一天球变换，不随时间漂移或集体呼吸。
+            let p = dust.screenPosition(
+                of: grain,
+                canvasSize: size,
+                transform: transform
+            )
             let rect = CGRect(
                 x: p.x - grain.radius, y: p.y - grain.radius,
                 width: grain.radius * 2, height: grain.radius * 2
             )
+            let distanceSquared = pow(p.x - center.x, 2) + pow(p.y - center.y, 2)
+            let centerAttenuation = distanceSquared < quietRadiusSquared ? 0.78 : 1
             // 亮度分层：多数颗粒是 dust 底噪，最亮的少数升到 inkFaint / inkLow
             let color: Color = grain.alpha > 0.85
                 ? Palette.inkLow
                 : (grain.alpha > 0.6 ? Palette.inkFaint : Palette.dust)
             context.fill(
                 Path(ellipseIn: rect),
-                with: .color(color.opacity(grain.alpha * breath))
+                with: .color(color.opacity(grain.alpha * centerAttenuation * 0.72))
             )
         }
     }
@@ -38,13 +44,17 @@ enum SkyRenderer {
         _ context: GraphicsContext,
         center: CGPoint,
         emphasis: Double,
+        focusProgress: Double = 0,
+        response: CGVector = .zero,
+        locked: Bool = false,
         presence: Double = 1
     ) {
         let visible = min(1, max(0, presence))
         guard visible > 0.01 else { return }
-        let alpha = (0.38 + 0.38 * emphasis) * visible
-        let gap: CGFloat = 6
-        let len: CGFloat = 9
+        let focus = min(1, max(0, focusProgress))
+        let alpha = (0.48 + 0.24 * emphasis + (locked ? 0.08 : 0)) * visible
+        let gap: CGFloat = 6 - 1.2 * CGFloat(focus)
+        let len: CGFloat = 10.5
         var path = Path()
         path.move(to: CGPoint(x: center.x - gap - len, y: center.y))
         path.addLine(to: CGPoint(x: center.x - gap, y: center.y))
@@ -60,7 +70,72 @@ enum SkyRenderer {
             style: StrokeStyle(lineWidth: 0.85, lineCap: .butt)
         )
 
-        let coreRadius: CGFloat = 1.5
+        // 四枚外侧校准刻度只增加结构，不靠放大或纯提亮抢占星空。
+        let calibrationRadius: CGFloat = 21
+        let calibrationHalfWidth: CGFloat = 2.2
+        var calibration = Path()
+        calibration.move(to: CGPoint(
+            x: center.x - calibrationHalfWidth,
+            y: center.y - calibrationRadius
+        ))
+        calibration.addLine(to: CGPoint(
+            x: center.x + calibrationHalfWidth,
+            y: center.y - calibrationRadius
+        ))
+        calibration.move(to: CGPoint(
+            x: center.x - calibrationHalfWidth,
+            y: center.y + calibrationRadius
+        ))
+        calibration.addLine(to: CGPoint(
+            x: center.x + calibrationHalfWidth,
+            y: center.y + calibrationRadius
+        ))
+        calibration.move(to: CGPoint(
+            x: center.x - calibrationRadius,
+            y: center.y - calibrationHalfWidth
+        ))
+        calibration.addLine(to: CGPoint(
+            x: center.x - calibrationRadius,
+            y: center.y + calibrationHalfWidth
+        ))
+        calibration.move(to: CGPoint(
+            x: center.x + calibrationRadius,
+            y: center.y - calibrationHalfWidth
+        ))
+        calibration.addLine(to: CGPoint(
+            x: center.x + calibrationRadius,
+            y: center.y + calibrationHalfWidth
+        ))
+        context.stroke(
+            calibration,
+            with: .color(Palette.inkMid.opacity((0.28 + 0.18 * emphasis) * visible)),
+            style: StrokeStyle(lineWidth: 0.55, lineCap: .butt)
+        )
+
+        // 察觉阶段只让面向目标的一侧刻线先响应；它随捕获完成而退出。
+        let responseLength = hypot(response.dx, response.dy)
+        if responseLength > 0.01, focus < 0.92, !locked {
+            let dx = response.dx / responseLength
+            let dy = response.dy / responseLength
+            let inner: CGFloat = 20
+            let outer: CGFloat = 24 + 2 * CGFloat(1 - focus)
+            var directionalTick = Path()
+            directionalTick.move(to: CGPoint(
+                x: center.x + dx * inner,
+                y: center.y + dy * inner
+            ))
+            directionalTick.addLine(to: CGPoint(
+                x: center.x + dx * outer,
+                y: center.y + dy * outer
+            ))
+            context.stroke(
+                directionalTick,
+                with: .color(Palette.signal.opacity((0.34 + 0.28 * emphasis) * visible)),
+                style: StrokeStyle(lineWidth: 0.8, lineCap: .round)
+            )
+        }
+
+        let coreRadius: CGFloat = 1.25 + 0.25 * CGFloat(focus)
         context.fill(
             Path(ellipseIn: CGRect(
                 x: center.x - coreRadius, y: center.y - coreRadius,
@@ -80,16 +155,23 @@ enum SkyRenderer {
         brightness: Double,
         tint: Color,
         time: TimeInterval,
-        breathPhase: Double = 0
+        breathPhase: Double = 0,
+        focusProgress: Double = 0,
+        locked: Bool = false,
+        breathes: Bool = false,
+        haloStrength: Double = 1,
+        visualScale: CGFloat = 1
     ) {
-        let breath = Motion.breath(at: time, phase: breathPhase)
+        let focus = min(1, max(0, focusProgress))
+        let breath = breathes && !locked ? Motion.breath(at: time, phase: breathPhase) : 1
         let coreAlpha = (0.42 + 0.55 * brightness) * breath
-        let haloAlpha = (0.08 + 0.14 * brightness) * breath
+        let haloAlpha = (0.05 + 0.11 * brightness) * breath
+            * min(1, max(0, haloStrength))
 
-        // halo 层（独立 layer 内加 blur）
+        // 对焦时光晕从松散扩散逐渐凝聚，而不是单纯放大。
         context.drawLayer { layer in
-            layer.addFilter(.blur(radius: 3))
-            let haloR: CGFloat = 8
+            layer.addFilter(.blur(radius: 3.6 - 1.7 * focus))
+            let haloR: CGFloat = (9.5 - 3.8 * CGFloat(focus)) * visualScale
             layer.fill(
                 Path(ellipseIn: CGRect(x: point.x - haloR, y: point.y - haloR,
                                        width: haloR * 2, height: haloR * 2)),
@@ -98,7 +180,7 @@ enum SkyRenderer {
         }
 
         // core 层
-        let coreR: CGFloat = 1.65
+        let coreR: CGFloat = (1.55 + 0.32 * CGFloat(focus)) * visualScale
         context.fill(
             Path(ellipseIn: CGRect(x: point.x - coreR, y: point.y - coreR,
                                    width: coreR * 2, height: coreR * 2)),
@@ -142,9 +224,8 @@ enum SkyRenderer {
         /// 只有最亮一档在星核外留一层极弱的类别色介质。
         var haloStrength: Double {
             switch self {
-            case .faint, .low: 0
-            case .mid: 0.05
-            case .bright: 0.10
+            case .faint, .low, .mid: 0
+            case .bright: 0.07
             }
         }
 
@@ -153,26 +234,48 @@ enum SkyRenderer {
         }
     }
 
+    /// 普通目录目标的批量绘制样本。稳定种子来自 NORAD ID，因此短刻线不会因
+    /// 目标在屏幕上移动而改变方向或闪动。
+    struct SatellitePoint {
+        let point: CGPoint
+        let seed: Int
+    }
+
+    /// 同一个目录目标在不同帧、不同位置使用同一枚方向刻度。
+    static func satelliteSignatureAngle(seed: Int) -> Double {
+        Double(abs(seed % 628)) / 100
+    }
+
+    /// 高密度网格只衰减稳定的一部分低优先级目标，不按绘制顺序随机抽取。
+    static func keepsFullDensityOpacity(seed: Int, cellCount: Int) -> Bool {
+        guard cellCount > 3 else { return true }
+        return abs(seed) % max(1, cellCount) < 2
+    }
+
     /// 分档星野：同一档合并为单一路径，整档最多一个模糊层。16k 目标下图层数恒定。
     ///
     /// 星核统一使用暖纸白，类别色只存在于最亮两档的微弱外晕 —— 天空因此保持
     /// 单色相的空旷感，而不是变成彩色点阵。
     static func drawStarField(
         _ context: GraphicsContext,
-        tiers: [StarMagnitude: [CGPoint]],
+        tiers: [StarMagnitude: [SatellitePoint]],
         tint: Color,
         opacity: Double = 1,
-        emphasis: Double = 1
+        emphasis: Double = 1,
+        visualScale: CGFloat = 1
     ) {
         guard opacity > 0.01 else { return }
         for magnitude in StarMagnitude.allCases {
-            guard let points = tiers[magnitude], !points.isEmpty else { continue }
-            let radius = magnitude.coreRadius * (magnitude == .faint ? 1 : CGFloat(emphasis))
+            guard let samples = tiers[magnitude], !samples.isEmpty else { continue }
+            let radius = magnitude.coreRadius
+                * (magnitude == .faint ? 1 : CGFloat(emphasis))
+                * visualScale
 
             if magnitude.haloStrength > 0 {
                 var halos = Path()
-                let haloR = magnitude.haloRadius
-                for point in points {
+                let haloR = magnitude.haloRadius * visualScale
+                for sample in samples {
+                    let point = sample.point
                     halos.addEllipse(in: CGRect(
                         x: point.x - haloR, y: point.y - haloR,
                         width: haloR * 2, height: haloR * 2
@@ -190,11 +293,25 @@ enum SkyRenderer {
             }
 
             var cores = Path()
-            for point in points {
-                cores.addEllipse(in: CGRect(
+            var denseCores = Path()
+            let cells = Dictionary(grouping: samples) { sample in
+                let x = Int(sample.point.x / 28)
+                let y = Int(sample.point.y / 28)
+                return "\(x):\(y)"
+            }
+            for sample in samples {
+                let point = sample.point
+                let coreRect = CGRect(
                     x: point.x - radius, y: point.y - radius,
                     width: radius * 2, height: radius * 2
-                ))
+                )
+                let cellKey = "\(Int(point.x / 28)):\(Int(point.y / 28))"
+                let cellCount = cells[cellKey]?.count ?? 1
+                if !keepsFullDensityOpacity(seed: sample.seed, cellCount: cellCount) {
+                    denseCores.addEllipse(in: coreRect)
+                } else {
+                    cores.addEllipse(in: coreRect)
+                }
             }
             context.fill(
                 cores,
@@ -202,7 +319,115 @@ enum SkyRenderer {
                     magnitude.coreOpacity * opacity * min(1, emphasis)
                 ))
             )
+            if !denseCores.isEmpty {
+                context.fill(
+                    denseCores,
+                    with: .color(Palette.inkHigh.opacity(
+                        magnitude.coreOpacity * opacity * min(1, emphasis)
+                            * 0.54
+                    ))
+                )
+            }
+
+            // 可辨识的目录目标带一枚极短方向刻度；背景尘埃没有这层结构。
+            // 角度由稳定屏幕坐标散列，避免所有目标排成机械一致的纹理。
+            if magnitude == .mid || magnitude == .bright {
+                var signatures = Path()
+                let signatureLength: CGFloat = (magnitude == .bright ? 5.5 : 3.8)
+                    * visualScale
+                let offset = radius + 2 * visualScale
+                for sample in samples {
+                    let point = sample.point
+                    let angle = satelliteSignatureAngle(seed: sample.seed)
+                    let dx = CGFloat(cos(angle))
+                    let dy = CGFloat(sin(angle))
+                    signatures.move(to: CGPoint(
+                        x: point.x + dx * offset,
+                        y: point.y + dy * offset
+                    ))
+                    signatures.addLine(to: CGPoint(
+                        x: point.x + dx * (offset + signatureLength),
+                        y: point.y + dy * (offset + signatureLength)
+                    ))
+                }
+                context.stroke(
+                    signatures,
+                    with: .color(Palette.inkMid.opacity(
+                        (magnitude == .bright ? 0.23 : 0.13) * opacity
+                    )),
+                    style: StrokeStyle(lineWidth: 0.45, lineCap: .butt)
+                )
+            }
         }
+    }
+
+    /// 聚焦半径内的非目标点从类别批次中抽出，在一个图层里统一降亮与轻微失焦。
+    /// 这样环境会响应目标，但不会为每颗点位单独创建模糊层。
+    static func drawFocusedNeighbors(
+        _ context: GraphicsContext,
+        tiers: [StarMagnitude: [SatellitePoint]],
+        progress: Double
+    ) {
+        let focus = min(1, max(0, progress))
+        let response = sin(.pi * min(0.72, focus))
+        guard response > 0.01 else { return }
+
+        context.drawLayer { layer in
+            layer.addFilter(.blur(radius: 0.55 * response))
+            for magnitude in StarMagnitude.allCases {
+                guard let samples = tiers[magnitude], !samples.isEmpty else { continue }
+                let radius = magnitude.coreRadius
+                var path = Path()
+                for sample in samples {
+                    path.addEllipse(in: CGRect(
+                        x: sample.point.x - radius,
+                        y: sample.point.y - radius,
+                        width: radius * 2,
+                        height: radius * 2
+                    ))
+                }
+                layer.fill(
+                    path,
+                    with: .color(Palette.inkHigh.opacity(
+                        magnitude.coreOpacity * (1 - 0.26 * response)
+                    ))
+                )
+            }
+        }
+    }
+
+    /// 目标附近最多六条几乎不可察觉的汇聚短线。它只在聚焦中出现，锁定后归零。
+    static func drawFocusField(
+        _ context: GraphicsContext,
+        around point: CGPoint,
+        progress: Double,
+        tint: Color
+    ) {
+        let focus = min(1, max(0, progress))
+        let response = sin(.pi * min(0.72, focus))
+        guard response > 0.02 else { return }
+
+        var path = Path()
+        for index in 0 ..< 6 {
+            let angle = Double(index) * .pi / 3 + 0.18
+            let dx = CGFloat(cos(angle))
+            let dy = CGFloat(sin(angle))
+            let outer: CGFloat = 48 - 8 * CGFloat(focus) + CGFloat(index % 2) * 5
+            let inner = outer - 4.5
+            path.move(to: CGPoint(
+                x: point.x + dx * outer,
+                y: point.y + dy * outer
+            ))
+            path.addLine(to: CGPoint(
+                x: point.x + dx * inner,
+                y: point.y + dy * inner
+            ))
+        }
+        context.stroke(
+            path,
+            with: .color(tint.opacity(0.11 * response)),
+            style: StrokeStyle(lineWidth: 0.5, lineCap: .round)
+        )
     }
 
     /// 大目录的普通点位合并为单一路径和一个光晕层；锁定/精选目标仍用上方的
@@ -247,6 +472,7 @@ enum SkyRenderer {
         at point: CGPoint,
         progress: Double,
         presence: Double,
+        inward: CGVector = .zero,
         tint: Color = Palette.signal
     ) {
         let p = min(1, max(0, progress))
@@ -255,8 +481,8 @@ enum SkyRenderer {
         let visible = min(1, max(0, presence))
         guard visible > 0.01 else { return }
         let radius: CGFloat = 38 - 24 * pCGFloat
-        let alpha = (0.20 + 0.36 * eased) * visible
-        let segmentSweep = Angle.degrees(18 + 58 * eased)
+        let alpha = (0.18 + 0.36 * eased) * visible
+        let segmentSweep = Angle.degrees(15 + 61 * eased)
 
         // 先让目标周围的介质逐渐聚拢，再由细刻度给出精度；比单独出现圆环更自然。
         let haloRadius = 8 + 7 * CGFloat(1 - eased)
@@ -272,18 +498,25 @@ enum SkyRenderer {
                 with: .color(tint.opacity((0.09 + 0.13 * eased) * visible))
             )
         }
+        let inwardAngle = atan2(Double(inward.dy), Double(inward.dx)) * 180 / .pi
         for i in 0 ..< 4 {
-            let start = Angle.degrees(Double(i) * 90 + 45 - segmentSweep.degrees / 2)
+            // 四段依次贴合：察觉阶段只有面向准星的一段，随后才形成完整闭合。
+            let staggerStart = 0.05 + Double(i) * 0.14
+            let arcProgress = min(1, max(0, (p - staggerStart) / 0.42))
+            guard arcProgress > 0.01 else { continue }
+            let base = inwardAngle + Double(i) * 90
+            let start = Angle.degrees(base - segmentSweep.degrees * arcProgress / 2)
             var path = Path()
             path.addArc(
                 center: point, radius: radius,
-                startAngle: start, endAngle: start + segmentSweep,
+                startAngle: start,
+                endAngle: start + Angle.degrees(segmentSweep.degrees * arcProgress),
                 clockwise: false
             )
             context.stroke(
                 path,
-                with: .color(tint.opacity(alpha)),
-                style: StrokeStyle(lineWidth: 0.62, lineCap: .butt)
+                with: .color(tint.opacity(alpha * (0.42 + 0.58 * arcProgress))),
+                style: StrokeStyle(lineWidth: 0.62, lineCap: .round)
             )
         }
 
@@ -390,7 +623,7 @@ enum SkyRenderer {
                 y: point.y + inward.dy * (radius + 2)
             )
             let calibrationLength: CGFloat = showsDirectionCue
-                ? 22
+                ? 16 + 20 * edgeCGFloat
                 : 4 + 5 * edgeCGFloat
             let end = CGPoint(
                 x: start.x + inward.dx * calibrationLength,
@@ -403,7 +636,7 @@ enum SkyRenderer {
                 calibration,
                 with: .color(Palette.signal.opacity(
                     (showsDirectionCue ? 0.68 : 0.4)
-                        * edge * visibility * (1 - 0.5 * release)
+                        * edge * visibility * breath * (1 - 0.5 * release)
                 )),
                 style: StrokeStyle(
                     lineWidth: showsDirectionCue ? 0.85 : 0.55,

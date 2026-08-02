@@ -11,119 +11,144 @@ struct PrivacyStatementView: View {
             Palette.voidBlack.ignoresSafeArea()
             StaticDustBackdrop()
                 .ignoresSafeArea()
-                .opacity(0.24)
+                .opacity(0.20)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 34) {
-                    header
+                VStack(alignment: .leading, spacing: 28) {
+                    PrivacySummary()
 
-                    statement(
-                        "位置与姿态",
-                        "定位只用于在设备上计算观察者坐标与真北方向；陀螺仪只用于确定设备指向。位置和姿态不会离开设备。拒绝定位后，应用使用北京作为明确标注的假定坐标。"
+                    PrivacySection(
+                        title: "位置与姿态",
+                        text: "定位默认请求近似精度，只用于在设备上计算观察者坐标与真北方向；陀螺仪只用于确定设备指向。位置和姿态不会离开设备。拒绝定位后，应用使用北京作为明确标注的假定坐标。"
                     )
-                    statement(
-                        "本地记录",
-                        "观测记录、手册阅读状态和显示偏好仅保存在本机，用于恢复你的仪器状态。你可以在仪器面板中清除观测记录。"
+                    PrivacySection(
+                        title: "本地记录",
+                        text: "观测记录、手册阅读状态和显示偏好仅保存在本机，用于恢复你的仪器状态。你可以在设置中清除观测记录。"
                     )
-                    statement(
-                        "网络与第三方",
-                        "当前版本不创建账户，不包含广告、分析或跟踪代码，也不会向开发者或第三方传输个人数据。SatelliteKit 仅在本机执行轨道计算。"
+                    PrivacySection(
+                        title: "网络与第三方",
+                        text: "当前版本不创建账户，不包含广告、分析或跟踪代码，也不会向开发者或第三方传输个人数据。SatelliteKit 仅在本机执行轨道计算。"
                     )
-                    statement(
-                        "你的选择",
-                        "你可以在系统设置中撤销定位权限，也可以随时删除应用以移除全部本地数据。"
+                    PrivacySection(
+                        title: "你的选择",
+                        text: "你可以在系统设置中撤销定位权限，也可以随时删除应用以移除全部本地数据。"
                     )
 
                     VStack(spacing: 0) {
-                        externalLink(
+                        DocumentLinkRow(
                             title: "查看公开隐私政策",
-                            eyebrow: "PUBLIC POLICY",
-                            url: AppLinks.privacyPolicy
+                            label: "PUBLIC POLICY",
+                            action: { openURL(AppLinks.privacyPolicy) }
                         )
-                        externalLink(
+                        DocumentLinkRow(
                             title: "反馈隐私或支持问题",
-                            eyebrow: "SUPPORT",
-                            url: AppLinks.support
+                            label: "SUPPORT",
+                            action: { openURL(AppLinks.support) }
                         )
                     }
-                    .overlay(alignment: .top) { hairline }
+                    .overlay(alignment: .top) { ContentHairline() }
+
+                    Text("PRIVACY · ON DEVICE · 2026-08-01")
+                        .font(Typography.statusTag)
+                        .tracking(Typography.statusTagTracking)
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
                 }
-                .padding(.horizontal, 36)
-                .padding(.top, 28)
+                .padding(.horizontal, 30)
+                .padding(.top, 18)
                 .padding(.bottom, 36)
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             ArchiveTopBar(
-                backTitle: "仪器",
-                trailingTitle: "PRIVACY · ON DEVICE",
+                backTitle: "设置",
+                title: "隐私",
                 onBack: onFinished
             )
         }
+        .appEdgeBackGesture(action: onFinished)
     }
+}
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("PRIVACY")
-                .font(Typography.objectName)
-                .tracking(Typography.objectNameTracking + 1)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-            Text("隐私说明 · 2026-07-17")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-            Rectangle()
-                .fill(Palette.signal.opacity(0.62))
-                .frame(width: 64, height: 0.75)
-                .padding(.top, 10)
-        }
-    }
+private struct PrivacySummary: View {
+    private let conclusions = [
+        "不创建账户",
+        "不上传位置",
+        "不进行追踪",
+        "所有计算均在设备上完成",
+    ]
 
-    private func statement(_ title: String, _ body: String) -> some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            ForEach(conclusions, id: \.self) { conclusion in
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Palette.signal.opacity(0.62))
+                        .frame(width: 3.5, height: 3.5)
+                    Text(conclusion)
+                        .font(Typography.readingCompact)
+                        .tracking(Typography.readingCompactTracking)
+                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                }
+            }
+        }
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .top) { ContentHairline() }
+        .overlay(alignment: .bottom) { ContentHairline() }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct PrivacySection: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
             Text(title)
-                .font(Typography.fieldLabel)
-                .tracking(Typography.fieldLabelTracking)
+                .font(Typography.guide.weight(.medium))
+                .tracking(0.35)
                 .foregroundStyle(Palette.signal.opacity(Palette.Level.present))
-            Text(body)
-                .font(Typography.poetic)
-                .tracking(Typography.poeticTracking)
-                .lineSpacing(Typography.poeticLineSpacing)
+            Text(text)
+                .font(Typography.readingBody)
+                .tracking(Typography.readingBodyTracking)
+                .lineSpacing(Typography.readingBodyLineSpacing)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
+}
 
-    private func externalLink(title: String, eyebrow: String, url: URL) -> some View {
-        Button { openURL(url) } label: {
+private struct DocumentLinkRow: View {
+    let title: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             HStack(spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                    Text(eyebrow)
+                    Text(label)
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.up.right")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 34, height: 44)
             }
-            .frame(minHeight: 54)
+            .frame(minHeight: 58)
             .contentShape(Rectangle())
-            .overlay(alignment: .bottom) { hairline }
+            .overlay(alignment: .bottom) { ContentHairline() }
         }
         .buttonStyle(.plain)
         .accessibilityHint("在浏览器中打开")
-    }
-
-    private var hairline: some View {
-        Rectangle()
-            .fill(Palette.inkFaint.opacity(0.34))
-            .frame(height: 0.5)
     }
 }
 

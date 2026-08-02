@@ -20,7 +20,8 @@ final class SkySession: ObservableObject {
     @Published private(set) var pointing: Pointing = .initial
     @Published private(set) var confidence: HeadingConfidence = .manual
     @Published private(set) var pointingAvailability: PointingAvailability = .idle
-    @Published private(set) var catalogFilter: CatalogFilter = .all
+    @Published private(set) var catalogScope: CatalogScope = .all
+    @Published private(set) var catalogFilters: Set<CatalogFilter> = []
     @Published private(set) var visibleObjects: [CatalogObject] = []
     @Published private(set) var displayObjects: [CatalogObject] = []
     @Published private(set) var overviewObjects: [CatalogObject] = []
@@ -152,11 +153,49 @@ final class SkySession: ObservableObject {
         status == .authorizedAlways || status == .authorizedWhenInUse
     }
 
-    /// 默认保留完整目录；用户选择的类别只改变当前天空，不改写观测历史。
-    func setCatalogFilter(_ filter: CatalogFilter) {
-        guard filter != catalogFilter else { return }
-        catalogFilter = filter
-        let objects = catalog.objects(matching: filter)
+    var activeCatalogFilterCount: Int {
+        catalogFilters.count + (catalogScope == .all ? 0 : 1)
+    }
+
+    /// 显示范围互斥；改变后立即作用于天空。
+    func setCatalogScope(_ scope: CatalogScope) {
+        guard scope != catalogScope else { return }
+        catalogScope = scope
+        applyCatalogSelection()
+    }
+
+    /// 任务、运营方和轨道网络可多选。同组取并集，不同组取交集。
+    func toggleCatalogFilter(_ filter: CatalogFilter) {
+        guard filter.group != .overview else { return }
+        if catalogFilters.contains(filter) {
+            catalogFilters.remove(filter)
+        } else {
+            catalogFilters.insert(filter)
+        }
+        applyCatalogSelection()
+    }
+
+    func resetCatalogFilters() {
+        guard catalogScope != .all || !catalogFilters.isEmpty else { return }
+        catalogScope = .all
+        catalogFilters.removeAll()
+        applyCatalogSelection()
+    }
+
+    private func applyCatalogSelection() {
+        let grouped = Dictionary(grouping: catalogFilters, by: \.group)
+        let objects = catalog.objects.filter { object in
+            guard catalogScope.includes(object) else { return false }
+            for group in [
+                CatalogFilterGroup.mission,
+                CatalogFilterGroup.authority,
+                CatalogFilterGroup.constellation,
+            ] {
+                guard let filters = grouped[group], !filters.isEmpty else { continue }
+                guard filters.contains(where: { $0.includes(object) }) else { return false }
+            }
+            return true
+        }
         visibleObjects = objects
         displayObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 8)
         overviewObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 14)

@@ -169,10 +169,10 @@ final class EphemerisEngine: ObservableObject {
 
     /// 单颗目标的精确入口：用于档案、观测记录和锁定瞬间。
     func ephemeris(_ objectId: String, at observationTime: Date, live: Bool) -> Ephemeris? {
-        let cacheInterval = live ? interval : frozenBucketInterval
-        let key = PreciseKey(
+        let key = preciseKey(
             objectId: objectId,
-            timeBucket: Int64((observationTime.timeIntervalSince1970 / cacheInterval).rounded())
+            observationTime: observationTime,
+            live: live
         )
         if let cached = preciseCache[key] { return cached }
         guard let satellite = store.satellites[objectId] else { return nil }
@@ -182,6 +182,55 @@ final class EphemerisEngine: ObservableObject {
             date: observationTime,
             observer: observer
         )
+        if preciseCache.count > 192 {
+            preciseCache.removeAll(keepingCapacity: true)
+        }
+        preciseCache[key] = result
+        return result
+    }
+
+    /// 视图渲染只能读取已经准备好的精确遥测，绝不在 `body` 首次出现时同步传播。
+    func cachedPreciseEphemeris(
+        _ objectId: String,
+        at observationTime: Date,
+        live: Bool
+    ) -> Ephemeris? {
+        preciseCache[
+            preciseKey(
+                objectId: objectId,
+                observationTime: observationTime,
+                live: live
+            )
+        ]
+    }
+
+    /// 目标进入感应阶段便在后台精算遥测。通常比底部摘要出现早约一秒，从而把
+    /// SatelliteKit 的首次 position/velocity 成本移出锁定动画帧。
+    func preparePreciseEphemeris(
+        _ objectId: String,
+        at observationTime: Date,
+        live: Bool
+    ) async -> Ephemeris? {
+        let key = preciseKey(
+            objectId: objectId,
+            observationTime: observationTime,
+            live: live
+        )
+        if let cached = preciseCache[key] { return cached }
+        guard let satellite = store.satellites[objectId] else { return nil }
+        let capturedObserver = observer
+        let result = await Task.detached(priority: .userInitiated) {
+            Self.preciseEphemeris(
+                objectId: objectId,
+                satellite: satellite,
+                date: observationTime,
+                observer: capturedObserver
+            )
+        }.value
+        guard !Task.isCancelled,
+              observer == capturedObserver,
+              let result
+        else { return nil }
         if preciseCache.count > 192 {
             preciseCache.removeAll(keepingCapacity: true)
         }
@@ -371,6 +420,20 @@ final class EphemerisEngine: ObservableObject {
 
     private func bucket(for date: Date) -> Int64 {
         Int64((date.timeIntervalSince1970 / frozenBucketInterval).rounded())
+    }
+
+    private func preciseKey(
+        objectId: String,
+        observationTime: Date,
+        live: Bool
+    ) -> PreciseKey {
+        let cacheInterval = live ? interval : frozenBucketInterval
+        return PreciseKey(
+            objectId: objectId,
+            timeBucket: Int64(
+                (observationTime.timeIntervalSince1970 / cacheInterval).rounded()
+            )
+        )
     }
 
     /// 角度插值（处理 ±π 回绕）。

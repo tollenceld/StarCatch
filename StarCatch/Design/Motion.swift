@@ -20,32 +20,20 @@ enum Motion {
     static let manualReveal = Animation.timingCurve(0.32, 0, 0.2, 1, duration: 0.44)
     static let manualRevealStagger: Double = 0.035
 
-    /// 档案文字浮现：每行 1.2s，纯 fade + 2pt 上浮。不做打字机/乱码解算。
-    static let archiveLine = Animation.timingCurve(0.4, 0, 0.2, 1, duration: 1.2)
-    /// 上浮距离。
+    /// 手册段落上浮距离。
     static let archiveRise: CGFloat = 2
 
     /// 锁定确认先在目标处完成，再把视觉关系交给档案。外扩回声只出现一次。
     static let lockConfirmationDuration: Double = 0.72
+    /// 顶部“目标锁定”只承担瞬时确认，随后收敛为锁定图标和目标编号。
+    static let lockStatusHoldDuration: Double = 1.15
 
-    /// 档案外壳先建立边界，正文随后快速、逐层显影。
-    static let archiveContentDelay: Double = 0.10
-    static let archiveRevealLine = Animation.timingCurve(0.2, 0.68, 0.2, 1, duration: 0.62)
-    static let archiveRevealDuration: Double = 0.62
-    static let archiveRevealStagger: Double = 0.045
-
-    /// 档案消隐：从末行向首行果断收束，必须早于 releasing 结束。
-    static let archiveDismissLine = Animation.timingCurve(0.42, 0, 0.78, 0.22, duration: 0.34)
-    static let archiveDismissDuration: Double = 0.34
-    static let archiveDismissStagger: Double = 0.012
-    static let archiveLineCount = 11
+    /// 启动准星与主天空第一帧的交接。启动层和天空层在同一中心点短暂共存。
+    static let bootHandoff = Animation.timingCurve(0.2, 0.72, 0.2, 1, duration: 0.45)
 
     /// 呼吸周期（锁定点位、signal 元素）：透明度 ±12%，仅此而已。
     static let breathPeriod: Double = 3.6
     static let breathAmplitude: Double = 0.12
-
-    /// 星尘漂移速度（pt/s），持续线性。
-    static let dustDrift: CGFloat = 0.8
 
     /// 主动归还：文字先收束，联系线向目标回撤，锁定结构最后松开。
     static let release = Animation.timingCurve(0.36, 0, 0.72, 0.24, duration: 0.86)
@@ -57,6 +45,10 @@ enum Motion {
     /// 独立全局星图是一次空间尺度切换，比时间轴预览更从容；显隐共用同一进度反向播放。
     static let skyOverviewMode = Animation.timingCurve(0.24, 0.06, 0.18, 1, duration: 1.02)
     static let skyOverviewModeDuration: Double = 1.02
+
+    /// 用户没有越过尺度门槛时，天空穹顶带一点阻力退回最广局部视野。
+    static let scaleThresholdReturn = Animation.timingCurve(0.3, 0, 0.22, 1, duration: 0.34)
+    static let scaleThresholdReturnDuration: Double = 0.34
 
     /// 扫描（进入捕捉态一次性）：2.4s 单次。
     static let scanDuration: Double = 2.4
@@ -74,5 +66,68 @@ enum Motion {
     /// 呼吸调制系数：sin 波 → 透明度乘数。
     static func breath(at time: TimeInterval, phase: Double = 0) -> Double {
         1.0 + breathAmplitude * sin((time / breathPeriod) * 2 * .pi + phase)
+    }
+}
+
+/// 局部天空、三维地球和视场复位共用的空间阻尼参数。
+///
+/// 速度统一使用“每秒”单位；衰减采用指数模型，因此不同刷新率下的运动距离一致。
+/// 边界只衰减朝外的速度，不产生反弹，保持仪器而非游戏镜头的质量感。
+enum SpatialMotion {
+    static let frameInterval: TimeInterval = 1.0 / 30.0
+    static let rotationDecay: Double = 4.8
+    static let scaleDecay: Double = 6.2
+    static let minimumAngularVelocity: Double = 0.014
+    static let minimumScaleVelocity: Double = 0.012
+
+    nonisolated static func decayFactor(
+        rate: Double,
+        deltaTime: TimeInterval
+    ) -> Double {
+        exp(-rate * max(0, deltaTime))
+    }
+
+    nonisolated static func limitedAngularVelocity(
+        pointsPerSecond: CGFloat,
+        sensitivity: Double
+    ) -> Double {
+        min(3.4, max(-3.4, Double(pointsPerSecond) * sensitivity))
+    }
+
+    nonisolated static func boundaryVelocityScale(
+        value: Double,
+        velocity: Double,
+        lowerBound: Double,
+        upperBound: Double,
+        slowZone: Double
+    ) -> Double {
+        let distance: Double
+        if velocity > 0 {
+            distance = upperBound - value
+        } else if velocity < 0 {
+            distance = value - lowerBound
+        } else {
+            return 1
+        }
+        let progress = min(1, max(0, distance / max(0.0001, slowZone)))
+        let eased = progress * progress * (3 - 2 * progress)
+        return 0.12 + 0.88 * eased
+    }
+
+    nonisolated static func projectedScale(
+        current: CGFloat,
+        logarithmicVelocity: Double,
+        lowerBound: CGFloat,
+        upperBound: CGFloat
+    ) -> CGFloat {
+        let velocity = min(1.4, max(-1.4, logarithmicVelocity))
+        let projected = current * CGFloat(exp(velocity / scaleDecay))
+        return min(upperBound, max(lowerBound, projected))
+    }
+
+    nonisolated static func scaleSettleDuration(
+        logarithmicVelocity: Double
+    ) -> TimeInterval {
+        min(0.46, max(0.18, abs(logarithmicVelocity) * 0.16 + 0.18))
     }
 }

@@ -108,6 +108,11 @@ final class ObservationLog: ObservableObject {
         defaults.removeObject(forKey: Self.storageKey)
     }
 
+    func remove(objectId: String) {
+        entries.removeAll { $0.objectId == objectId }
+        save()
+    }
+
     private func load() {
         guard let data = defaults.data(forKey: Self.storageKey),
               let decoded = try? JSONDecoder().decode([Entry].self, from: data)

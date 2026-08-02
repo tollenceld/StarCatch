@@ -7,7 +7,7 @@ import SatelliteKit
 final class TimeTests: XCTestCase {
     private static let store = CatalogStore()
 
-    func testObservationLogPersistsRealSnapshotAndClears() throws {
+    func testObservationLogPersistsRealSnapshotRemovesAndClears() throws {
         let suiteName = "StarCatchTests.ObservationLog.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -41,19 +41,229 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(entry.altitudeKm, snapshot.altitudeKm)
         XCTAssertEqual(entry.poetic, object.poetic)
 
+        restored.remove(objectId: object.id)
+        XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
+
+        restored.record(objectId: object.id, catalog: Self.store)
         restored.clear()
         XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
     }
 
-    func testArchiveAnimationFitsCaptureLifecycle() {
-        let revealTotal = Motion.archiveRevealDuration
-            + Double(Motion.archiveLineCount - 1) * Motion.archiveRevealStagger
-        let dismissTotal = Motion.archiveDismissDuration
-            + Double(Motion.archiveLineCount - 1) * Motion.archiveDismissStagger
-
-        XCTAssertLessThan(revealTotal, 1.75, "档案显影应保持从容但不拖沓")
-        XCTAssertLessThan(dismissTotal, Motion.releaseDuration)
+    func testReleaseAnimationFitsCaptureLifecycle() {
         XCTAssertLessThan(Motion.releaseDuration, 1.2, "主动释放应清晰但不拖延")
+    }
+
+    func testBootTimelineWakesLettersAndReportsRealSystemState() {
+        let silent = BootVisualTimeline(
+            elapsed: 0,
+            isReady: false,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(silent.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertEqual(silent.systemPhase, .initializing)
+        XCTAssertLessThan(silent.letterActivation(at: 8), 0.25)
+
+        let syncing = BootVisualTimeline(
+            elapsed: 1.6,
+            isReady: false,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(syncing.systemPhase, .catalogSync)
+        XCTAssertGreaterThan(syncing.signalProgress, 0)
+        XCTAssertGreaterThan(
+            syncing.letterActivation(at: 0),
+            syncing.letterActivation(at: 8)
+        )
+
+        let fastReady = BootVisualTimeline(
+            elapsed: 1.6,
+            isReady: true,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(fastReady.systemPhase, .ready)
+
+        let calibrating = BootVisualTimeline(
+            elapsed: 2.5,
+            isReady: false,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(calibrating.systemPhase, .calibrating)
+
+        let ready = BootVisualTimeline(
+            elapsed: 3.2,
+            isReady: true,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(ready.systemPhase, .ready)
+        XCTAssertGreaterThan(ready.readyEmphasis, 0.7)
+
+        let final = BootVisualTimeline(
+            elapsed: 3.5,
+            isReady: true,
+            handoffProgress: 1
+        )
+        XCTAssertEqual(final.finalFrame, 1, accuracy: 0.0001)
+        XCTAssertEqual(final.wordmarkOpacity, 0, accuracy: 0.0001)
+    }
+
+    func testBootTimelineLoopsWithoutReturningToBlack() {
+        let waiting = BootVisualTimeline(
+            elapsed: 6.95,
+            isReady: false,
+            handoffProgress: 0
+        )
+        XCTAssertGreaterThanOrEqual(waiting.phaseTime, BootVisualTimeline.loopStart)
+        XCTAssertLessThan(waiting.phaseTime, BootVisualTimeline.loopEnd)
+        XCTAssertEqual(waiting.loopStrength, 0.38, accuracy: 0.0001)
+        XCTAssertGreaterThan(waiting.wordmarkOpacity, 0.99)
+    }
+
+    func testSatelliteVisualTreatmentIsStableForTargetID() {
+        XCTAssertEqual(
+            SkyRenderer.satelliteSignatureAngle(seed: 25_544),
+            SkyRenderer.satelliteSignatureAngle(seed: 25_544),
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            SkyRenderer.keepsFullDensityOpacity(seed: 25_544, cellCount: 7),
+            SkyRenderer.keepsFullDensityOpacity(seed: 25_544, cellCount: 7)
+        )
+        XCTAssertTrue(SkyRenderer.keepsFullDensityOpacity(seed: 25_544, cellCount: 3))
+    }
+
+    func testDynamicIslandWingProfilesFollowIPhone17DisplayFamilies() {
+        let regular = DynamicIslandWingMetrics(
+            viewportSize: CGSize(width: 402, height: 874),
+            nativePixelSize: CGSize(width: 1_206, height: 2_622)
+        )
+        XCTAssertEqual(regular.family, .regular)
+        XCTAssertEqual(regular.topPadding, 9)
+        XCTAssertEqual(regular.wingHeight, 30)
+        XCTAssertEqual(regular.directionWingWidth, regular.statusWingWidth)
+        XCTAssertEqual(regular.islandCenterY, 31)
+
+        let air = DynamicIslandWingMetrics(
+            viewportSize: CGSize(width: 420, height: 912),
+            nativePixelSize: CGSize(width: 1_260, height: 2_736)
+        )
+        XCTAssertEqual(air.family, .air)
+        XCTAssertGreaterThan(air.wingWidth, regular.wingWidth)
+        XCTAssertEqual(air.directionWingWidth, air.statusWingWidth)
+        XCTAssertEqual(air.islandCenterY, 32)
+
+        let proMax = DynamicIslandWingMetrics(
+            viewportSize: CGSize(width: 440, height: 956),
+            nativePixelSize: CGSize(width: 1_320, height: 2_868)
+        )
+        XCTAssertEqual(proMax.family, .proMax)
+        XCTAssertGreaterThan(proMax.topPadding, air.topPadding)
+        XCTAssertEqual(proMax.directionWingWidth, proMax.statusWingWidth)
+        XCTAssertEqual(proMax.islandCenterY, 33)
+
+        let unsupported = DynamicIslandWingMetrics(
+            viewportSize: CGSize(width: 375, height: 812),
+            nativePixelSize: CGSize(width: 1_125, height: 2_436)
+        )
+        XCTAssertFalse(unsupported.usesIslandLayout)
+        XCTAssertEqual(unsupported.directionWingWidth, unsupported.statusWingWidth)
+    }
+
+    func testObservationScaleSeparatesWideFieldFromOverviewThreshold() {
+        let wideField = ObservationScale.localMagnification(
+            settled: 1,
+            gestureScale: 0.7
+        )
+        XCTAssertEqual(wideField, 0.7, accuracy: 0.0001)
+        XCTAssertEqual(
+            ObservationScale.overviewProgress(settled: 1, gestureScale: 0.7),
+            0,
+            accuracy: 0.0001
+        )
+        XCTAssertGreaterThan(
+            Projection.verticalFOV(forMagnification: wideField),
+            Projection.verticalFOV(forMagnification: 1)
+        )
+
+        let threshold = ObservationScale.overviewProgress(
+            settled: ObservationScale.minimumLocalMagnification,
+            gestureScale: 0.56
+        )
+        XCTAssertTrue(ObservationScale.shouldCommit(threshold))
+    }
+
+    func testObservationScaleRequiresOverviewZoomOvershootToReturn() {
+        XCTAssertEqual(
+            ObservationScale.overviewReturnProgress(
+                rawZoom: ObservationScale.maximumOverviewZoom
+            ),
+            0,
+            accuracy: 0.0001
+        )
+        let returnProgress = ObservationScale.overviewReturnProgress(
+            rawZoom: ObservationScale.maximumOverviewZoom
+                + ObservationScale.overviewReturnTravel
+        )
+        XCTAssertEqual(returnProgress, 1, accuracy: 0.0001)
+        XCTAssertTrue(ObservationScale.shouldCommit(returnProgress))
+    }
+
+    func testObservationScaleCrossfadeHandsVisualPriorityToGlobe() {
+        XCTAssertEqual(
+            ObservationScale.localSkyPresence(progress: 0),
+            1,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            ObservationScale.globePresence(progress: 0),
+            0,
+            accuracy: 0.0001
+        )
+
+        let samples = stride(from: 0.0, through: 1.0, by: 0.1)
+            .map { (
+                ObservationScale.localSkyPresence(progress: $0),
+                ObservationScale.globePresence(progress: $0)
+            ) }
+        for pair in zip(samples, samples.dropFirst()) {
+            XCTAssertGreaterThanOrEqual(pair.0.0, pair.1.0)
+            XCTAssertLessThanOrEqual(pair.0.1, pair.1.1)
+        }
+
+        XCTAssertGreaterThan(
+            ObservationScale.globePresence(progress: 0.58),
+            ObservationScale.localSkyPresence(progress: 0.58)
+        )
+        XCTAssertEqual(
+            ObservationScale.localSkyPresence(progress: 1),
+            0,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            ObservationScale.globePresence(progress: 1),
+            1,
+            accuracy: 0.0001
+        )
+    }
+
+    func testLeftEdgeBackGestureRequiresDecisiveRightwardMotion() {
+        XCTAssertTrue(
+            AppEdgeBackGestureModifier.shouldNavigateBack(
+                translation: CGSize(width: 72, height: 8),
+                predictedEndTranslation: CGSize(width: 104, height: 10)
+            )
+        )
+        XCTAssertFalse(
+            AppEdgeBackGestureModifier.shouldNavigateBack(
+                translation: CGSize(width: 24, height: -90),
+                predictedEndTranslation: CGSize(width: 38, height: -124)
+            )
+        )
+        XCTAssertFalse(
+            AppEdgeBackGestureModifier.shouldNavigateBack(
+                translation: CGSize(width: -84, height: 3),
+                predictedEndTranslation: CGSize(width: -120, height: 4)
+            )
+        )
     }
 
     func testSessionPublishesLatestManualPointingSample() async throws {
@@ -317,6 +527,45 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(capture.phase, .exploring, "释放后的短暂抑制应避免立即重新捕获")
     }
 
+    func testAutomaticRecognitionUsesTheSameExplicitReleasePath() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 4_100)
+        let core = 1.0 * Double.pi / 180
+
+        capture.update(
+            nearest: ("iss", core),
+            captureEnabled: false,
+            now: start
+        )
+        for step in 1 ... 11 {
+            capture.update(
+                nearest: ("iss", core),
+                trackedDistance: core,
+                captureEnabled: false,
+                now: start.addingTimeInterval(Double(step) * 0.1)
+            )
+        }
+        XCTAssertTrue(capture.recognitionReady)
+
+        capture.releaseSignal(now: start.addingTimeInterval(1.2))
+        XCTAssertTrue(capture.phase.isReleasing)
+        XCTAssertFalse(capture.recognitionReady)
+
+        capture.update(
+            nearest: ("iss", core),
+            trackedDistance: core,
+            captureEnabled: false,
+            now: start.addingTimeInterval(1.2 + Motion.releaseDuration + 0.01)
+        )
+        XCTAssertEqual(capture.phase, .exploring)
+        capture.update(
+            nearest: ("iss", core),
+            captureEnabled: false,
+            now: start.addingTimeInterval(2)
+        )
+        XCTAssertEqual(capture.phase, .exploring)
+    }
+
     func testLockedTargetCanSwitchByExplicitSelection() {
         let capture = CaptureStateMachine()
         let start = Date(timeIntervalSince1970: 5_000)
@@ -529,6 +778,96 @@ final class TimeTests: XCTestCase {
         )
     }
 
+    func testOverviewRenderDetailTiersAreStableDuringInteraction() {
+        XCTAssertEqual(
+            SkyOverviewView.renderSampleDivisor(zoom: 1.4, interactionActive: true),
+            4
+        )
+        XCTAssertEqual(
+            SkyOverviewView.renderSampleDivisor(zoom: 0.8, interactionActive: false),
+            3
+        )
+        XCTAssertEqual(
+            SkyOverviewView.renderSampleDivisor(zoom: 1, interactionActive: false),
+            2
+        )
+        XCTAssertEqual(
+            SkyOverviewView.renderSampleDivisor(zoom: 1.2, interactionActive: false),
+            1
+        )
+    }
+
+    func testSpatialMotionUsesFrameRateIndependentDecayAndSoftBoundaries() {
+        let oneFrame = SpatialMotion.decayFactor(
+            rate: SpatialMotion.rotationDecay,
+            deltaTime: 1.0 / 60.0
+        )
+        let twoFrames = SpatialMotion.decayFactor(
+            rate: SpatialMotion.rotationDecay,
+            deltaTime: 2.0 / 60.0
+        )
+        XCTAssertEqual(twoFrames, oneFrame * oneFrame, accuracy: 0.000_001)
+
+        let freeVelocity = SpatialMotion.boundaryVelocityScale(
+            value: 0,
+            velocity: 1,
+            lowerBound: -1,
+            upperBound: 1,
+            slowZone: 0.25
+        )
+        let edgeVelocity = SpatialMotion.boundaryVelocityScale(
+            value: 0.98,
+            velocity: 1,
+            lowerBound: -1,
+            upperBound: 1,
+            slowZone: 0.25
+        )
+        XCTAssertEqual(freeVelocity, 1, accuracy: 0.000_001)
+        XCTAssertLessThan(edgeVelocity, 0.25)
+    }
+
+    func testSpatialScaleProjectionRespectsBothViewBoundaries() {
+        XCTAssertEqual(
+            SpatialMotion.projectedScale(
+                current: 1.7,
+                logarithmicVelocity: 8,
+                lowerBound: 0.78,
+                upperBound: 1.72
+            ),
+            1.72,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            SpatialMotion.projectedScale(
+                current: 0.8,
+                logarithmicVelocity: -8,
+                lowerBound: 0.78,
+                upperBound: 1.72
+            ),
+            0.78,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testEarthSurfaceDirectionUsesSiderealRotation() {
+        let primeMeridian = SkyOverviewView.sphericalSurfaceDirection(
+            latitude: 0,
+            longitude: 0,
+            siderealRadians: 0
+        )
+        XCTAssertEqual(primeMeridian.x, 1, accuracy: 0.000_001)
+        XCTAssertEqual(primeMeridian.y, 0, accuracy: 0.000_001)
+        XCTAssertEqual(primeMeridian.z, 0, accuracy: 0.000_001)
+
+        let quarterTurn = SkyOverviewView.sphericalSurfaceDirection(
+            latitude: 0,
+            longitude: 0,
+            siderealRadians: .pi / 2
+        )
+        XCTAssertEqual(quarterTurn.x, 0, accuracy: 0.000_001)
+        XCTAssertEqual(quarterTurn.y, 1, accuracy: 0.000_001)
+    }
+
     func testOffsetLabelFormat() {
         let clock = SkyClock()
         clock.scrub(by: 2 * 3600 + 14 * 60 + 36)
@@ -582,6 +921,30 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(a["iss"]?.azimuth, b["iss"]?.azimuth)
     }
 
+    func testPreciseEphemerisCanWarmBeforeTheSummaryRenders() async throws {
+        let engine = EphemerisEngine(
+            store: Self.store,
+            observer: ObserverLocation.fallback
+        )
+        let observation = Date()
+        let preparedResult = await engine.preparePreciseEphemeris(
+            "iss",
+            at: observation,
+            live: true
+        )
+        let prepared = try XCTUnwrap(preparedResult)
+        let cached = try XCTUnwrap(
+            engine.cachedPreciseEphemeris(
+                "iss",
+                at: observation,
+                live: true
+            )
+        )
+        XCTAssertEqual(cached.objectId, prepared.objectId)
+        XCTAssertEqual(cached.velocityKmS, prepared.velocityKmS, accuracy: 1e-12)
+        XCTAssertGreaterThan(cached.velocityKmS, 0)
+    }
+
     func testTimeTravelMovesLEO() {
         let store = Self.store
         let engine = EphemerisEngine(store: store, observer: ObserverLocation.fallback)
@@ -632,5 +995,54 @@ final class TimeTests: XCTestCase {
         let label = PassPredictor.label(for: .rises(at: inOneHour))
         XCTAssertEqual(label?.label, "NEXT PASS")
         XCTAssert(label?.value.hasPrefix("T−1H") == true, "1h+ 应显示小时，得 \(label?.value ?? "nil")")
+    }
+
+    func testTargetDetailWaitsThreeSecondsAfterFocusLeaves() {
+        let focusLeftAt = Date(timeIntervalSince1970: 1_750_000_000)
+        let deadline = TargetDetailRetentionPolicy.deadline(after: focusLeftAt)
+
+        XCTAssertEqual(
+            deadline.timeIntervalSince(focusLeftAt),
+            TargetDetailRetentionPolicy.graceDuration,
+            accuracy: 0.0001
+        )
+        XCTAssertFalse(
+            TargetDetailRetentionPolicy.shouldDismiss(
+                now: focusLeftAt.addingTimeInterval(2.99),
+                deadline: deadline,
+                isPinned: false,
+                isCaptureActive: false
+            )
+        )
+        XCTAssertTrue(
+            TargetDetailRetentionPolicy.shouldDismiss(
+                now: focusLeftAt.addingTimeInterval(3),
+                deadline: deadline,
+                isPinned: false,
+                isCaptureActive: false
+            )
+        )
+    }
+
+    func testTargetDetailDoesNotExpireWhileTappedOrRecaptured() {
+        let deadline = Date(timeIntervalSince1970: 1_750_000_000)
+        let afterDeadline = deadline.addingTimeInterval(10)
+
+        XCTAssertFalse(
+            TargetDetailRetentionPolicy.shouldDismiss(
+                now: afterDeadline,
+                deadline: deadline,
+                isPinned: true,
+                isCaptureActive: false
+            )
+        )
+        XCTAssertFalse(
+            TargetDetailRetentionPolicy.shouldDismiss(
+                now: afterDeadline,
+                deadline: deadline,
+                isPinned: false,
+                isCaptureActive: true
+            )
+        )
     }
 }

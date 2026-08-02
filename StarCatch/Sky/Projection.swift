@@ -2,20 +2,111 @@ import CoreGraphics
 import Foundation
 import simd
 
+/// 局部天空与全局轨道场共享的连续尺度规则。
+///
+/// 1× 以上是局部长焦；1× 到 `minimumLocalMagnification` 是扩展天空；
+/// 再继续缩小只积累带阻力的全局转场进度，不继续扩大平面投影。
+enum ObservationScale {
+    static let minimumLocalMagnification: CGFloat = 0.52
+    static let maximumLocalMagnification: CGFloat = 4
+    static let overviewTransitionTravel: CGFloat = 0.22
+    static let overviewCommitProgress: Double = 0.72
+    static let maximumOverviewZoom: CGFloat = 1.72
+    static let overviewReturnTravel: CGFloat = 0.34
+
+    nonisolated static func localMagnification(
+        settled: CGFloat,
+        gestureScale: CGFloat
+    ) -> CGFloat {
+        min(
+            maximumLocalMagnification,
+            max(minimumLocalMagnification, settled * gestureScale)
+        )
+    }
+
+    nonisolated static func overviewProgress(
+        settled: CGFloat,
+        gestureScale: CGFloat
+    ) -> Double {
+        let raw = settled * gestureScale
+        guard raw < minimumLocalMagnification else { return 0 }
+        return eased(
+            Double((minimumLocalMagnification - raw) / overviewTransitionTravel)
+        )
+    }
+
+    nonisolated static func overviewReturnProgress(rawZoom: CGFloat) -> Double {
+        let overshoot = max(0, rawZoom - maximumOverviewZoom)
+        return eased(Double(overshoot / overviewReturnTravel))
+    }
+
+    nonisolated static func wideFieldProgress(magnification: CGFloat) -> Double {
+        let span = 1 - minimumLocalMagnification
+        guard span > 0 else { return 0 }
+        return eased(Double((1 - magnification) / span))
+    }
+
+    nonisolated static func shouldCommit(_ progress: Double) -> Bool {
+        progress >= overviewCommitProgress
+    }
+
+    /// 局部天空和地球使用错开的单一交叉溶解曲线：中段只允许一个空间成为
+    /// 视觉主体，避免两个完整页面以高不透明度叠在一起。
+    nonisolated static func globePresence(progress: Double) -> Double {
+        eased((progress - 0.08) / 0.58)
+    }
+
+    nonisolated static func localSkyPresence(progress: Double) -> Double {
+        1 - eased((progress - 0.08) / 0.64)
+    }
+
+    nonisolated static func eased(_ value: Double) -> Double {
+        let p = min(1, max(0, value))
+        return p * p * (3 - 2 * p)
+    }
+}
+
 /// 天球 → 屏幕投影。
 ///
 /// gnomonic 切平面投影：把天球方向投到以设备视轴为法线的切平面上，
 /// 按屏幕 roll 旋转对齐，线性映射到屏幕坐标。竖直 FOV ≈ 55°。
 struct Projection {
-    var pointing: Pointing
-    var screenSize: CGSize
+    let pointing: Pointing
+    let screenSize: CGSize
     /// 竖直视场角（弧度）。55° 贴近举起手机"取景"的直觉。
     static let baseVerticalFOV: Double = 55 * .pi / 180
-    var verticalFOV: Double = Self.baseVerticalFOV
+    let verticalFOV: Double
+
+    /// 同一帧会投影数千个目标。相机基向量、滚转三角函数和像素比例只与
+    /// 当前指向及画布有关，因此在初始化时计算一次，不再为每颗目标重复计算。
+    private let bore: simd_double3
+    private let right: simd_double3
+    private let up: simd_double3
+    private let rollCos: Double
+    private let rollSin: Double
+    private let pixelScale: Double
+
+    init(
+        pointing: Pointing,
+        screenSize: CGSize,
+        verticalFOV: Double = Self.baseVerticalFOV
+    ) {
+        self.pointing = pointing
+        self.screenSize = screenSize
+        self.verticalFOV = verticalFOV
+        bore = pointing.unitVector
+        (right, up) = Self.screenBasis(for: bore)
+        rollCos = cos(-pointing.roll)
+        rollSin = sin(-pointing.roll)
+        pixelScale = Double(screenSize.height) / 2 / tan(verticalFOV / 2)
+    }
 
     /// 相机式倍率转视场角。使用正切关系而非直接除角度，保持真实透视比例。
     static func verticalFOV(forMagnification magnification: CGFloat) -> Double {
-        let value = max(1, Double(magnification))
+        let value = max(
+            Double(ObservationScale.minimumLocalMagnification),
+            Double(magnification)
+        )
         return 2 * atan(tan(baseVerticalFOV / 2) / value)
     }
 
@@ -51,12 +142,9 @@ struct Projection {
     /// 把一个 az/el 方向投到屏幕。返回 nil 表示在渐隐区之外。
     func project(azimuth: Double, elevation: Double) -> Projected? {
         let target = targetVector(azimuth: azimuth, elevation: elevation)
-        let bore = pointing.unitVector
         let cosAngle = simd_dot(target, bore)
         let angle = acos(max(-1, min(1, cosAngle)))
         guard angle < Self.fadeEnd else { return nil }
-
-        let (right, up) = screenBasis(for: bore)
 
         // gnomonic：切平面坐标 = 分量 / 沿视轴分量
         guard cosAngle > 1e-6 else { return nil } // 背向不投
@@ -64,15 +152,12 @@ struct Projection {
         let y = simd_dot(target, up) / cosAngle
 
         // 屏幕 roll 旋转
-        let cr = cos(-pointing.roll)
-        let sr = sin(-pointing.roll)
-        let rx = x * cr - y * sr
-        let ry = x * sr + y * cr
+        let rx = x * rollCos - y * rollSin
+        let ry = x * rollSin + y * rollCos
 
         // 线性映射：tan(FOV/2) 对应半屏高
-        let scale = Double(screenSize.height) / 2 / tan(verticalFOV / 2)
-        let px = Double(screenSize.width) / 2 + rx * scale
-        let py = Double(screenSize.height) / 2 - ry * scale
+        let px = Double(screenSize.width) / 2 + rx * pixelScale
+        let py = Double(screenSize.height) / 2 - ry * pixelScale
 
         let visibility: Double
         if angle < Self.fadeStart {
@@ -91,16 +176,12 @@ struct Projection {
     /// 返回朝向任意目标的屏幕方向，不受 70° 点位投影视场限制。
     func screenDirection(azimuth: Double, elevation: Double) -> ScreenDirection? {
         let target = targetVector(azimuth: azimuth, elevation: elevation)
-        let bore = pointing.unitVector
         let angle = acos(max(-1, min(1, simd_dot(target, bore))))
-        let (right, up) = screenBasis(for: bore)
 
         let x = simd_dot(target, right)
         let y = simd_dot(target, up)
-        let cr = cos(-pointing.roll)
-        let sr = sin(-pointing.roll)
-        let rx = x * cr - y * sr
-        let ry = x * sr + y * cr
+        let rx = x * rollCos - y * rollSin
+        let ry = x * rollSin + y * rollCos
         let length = hypot(rx, ry)
 
         // 完全正对或完全背对时没有唯一的屏幕转向，交给中心点/继续转动处理。
@@ -109,6 +190,13 @@ struct Projection {
             vector: CGVector(dx: CGFloat(rx / length), dy: CGFloat(-ry / length)),
             angularDistance: angle
         )
+    }
+
+    /// 捕获状态机只需要目标与准星的球面角距，不需要完整屏幕坐标。单独入口避免
+    /// 10fps 捕获扫描重复执行透视映射和可见度计算。
+    func angularDistance(azimuth: Double, elevation: Double) -> Double {
+        let target = targetVector(azimuth: azimuth, elevation: elevation)
+        return acos(max(-1, min(1, simd_dot(target, bore))))
     }
 
     private func targetVector(azimuth: Double, elevation: Double) -> simd_double3 {
@@ -120,7 +208,9 @@ struct Projection {
     }
 
     /// 切平面基向量：right = bore × worldUp，up = right × bore。
-    private func screenBasis(for bore: simd_double3) -> (right: simd_double3, up: simd_double3) {
+    private static func screenBasis(
+        for bore: simd_double3
+    ) -> (right: simd_double3, up: simd_double3) {
         let worldUp = simd_double3(0, 0, 1)
         var right = simd_cross(bore, worldUp)
         if simd_length(right) < 1e-6 {

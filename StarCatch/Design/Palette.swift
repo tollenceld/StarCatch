@@ -74,6 +74,12 @@ enum Palette {
     enum Level {
         static let ghost: Double = 0.22
         static let faint: Double = 0.58
+        /// 功能性次级文字。它比装饰层清晰，但仍明显退后于正文与实时数据。
+        static let secondary: Double = 0.70
+        /// 需要被读懂、但不应与核心数据竞争的说明文字。
+        static let readableSecondary: Double = 0.78
+        /// 承担分组和导航边界的功能性细线；装饰线仍使用更低透明度。
+        static let functionalDivider: Double = 0.42
         static let present: Double = 0.84
         static let full: Double = 0.98
     }

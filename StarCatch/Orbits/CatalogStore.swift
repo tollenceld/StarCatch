@@ -133,6 +133,8 @@ final class CatalogStore: @unchecked Sendable {
     let snapshotEpoch: Date
     let generatedAt: Date?
     let source: String
+    /// 仅在随包资源损坏或 schema 不兼容时存在，供用户可见的恢复页使用。
+    let loadFailureDescription: String?
     let categoryCounts: [CatalogCategory: Int]
     let familyCounts: [CatalogFamily: Int]
     let filterCounts: [CatalogFilter: Int]
@@ -151,6 +153,7 @@ final class CatalogStore: @unchecked Sendable {
             snapshotEpoch = .distantPast
             generatedAt = nil
             source = "—"
+            loadFailureDescription = Self.describe(error)
             categoryCounts = [:]
             familyCounts = [:]
             filterCounts = [:]
@@ -178,6 +181,7 @@ final class CatalogStore: @unchecked Sendable {
         snapshotEpoch = catalog.snapshotEpoch
         generatedAt = catalog.generatedAt
         source = catalog.source
+        loadFailureDescription = nil
         categoryCounts = objectsByCategory.mapValues(\.count)
         familyCounts = objectsByFamily.mapValues(\.count)
         filterCounts = Dictionary(

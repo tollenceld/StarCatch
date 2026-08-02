@@ -21,7 +21,6 @@
 		352EAAF4270E9334DC47F26E /* Grain.metal in Sources */ = {isa = PBXBuildFile; fileRef = 54D43B6181117F9B6935B886 /* Grain.metal */; };
 		39A138A742BE73310774170E /* satellite_profiles.json in Resources */ = {isa = PBXBuildFile; fileRef = 7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */; };
 		41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343FF92394A7814FD1DE6EFA /* PointingProvider.swift */; };
-		4523B094EC9EE4E1793C7D24 /* ArchiveField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 632683082A137E5178D42060 /* ArchiveField.swift */; };
 		47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15874937BFB5C04ABF07F03A /* BootSequenceView.swift */; };
 		489F2384F2AEF996008F6118 /* SatelliteStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */; };
 		5D275617161364BBE646062E /* ObservationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE08D9AC749129724E543DB0 /* ObservationLog.swift */; };
@@ -89,7 +88,6 @@
 		553B0A3ED35132FE1D5AFC9C /* MotionPointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionPointingProvider.swift; sourceTree = "<group>"; };
 		5AF4AD5A77F90459147777B6 /* StarCatch.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StarCatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyStatementView.swift; sourceTree = "<group>"; };
-		632683082A137E5178D42060 /* ArchiveField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveField.swift; sourceTree = "<group>"; };
 		66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarMagnitudeScale.swift; sourceTree = "<group>"; };
 		68DA121A3B77B11BF915A698 /* ManualPointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualPointingProvider.swift; sourceTree = "<group>"; };
 		790DFD44DB0F129F096490F9 /* TrackSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSampler.swift; sourceTree = "<group>"; };
@@ -239,7 +237,6 @@
 		AA31A32BEC8E70D538B0A4E2 /* Archive */ = {
 			isa = PBXGroup;
 			children = (
-				632683082A137E5178D42060 /* ArchiveField.swift */,
 				CAED47075CCD0A05E34BD0F4 /* ArchiveOverlay.swift */,
 				8E2E05D9DE4E02C4A53A4729 /* ArchiveTopBar.swift */,
 				BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */,
@@ -412,7 +409,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "python3 \"$SRCROOT/Scripts/satellite_knowledge.py\" compile\n";
+			shellScript = "python3 \"$SRCROOT/Scripts/satellite_knowledge.py\" compile\nif [ \"${ACTION:-}\" = \"install\" ]; then\n  python3 \"$SRCROOT/Scripts/release_check.py\"\nfi\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
@@ -432,7 +429,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				8EB6D29AA68FEBA9A4DB181D /* AppLinks.swift in Sources */,
-				4523B094EC9EE4E1793C7D24 /* ArchiveField.swift in Sources */,
 				1730FED9CCFF915878B1C857 /* ArchiveOverlay.swift in Sources */,
 				0D43A8E52081657EA908BB87 /* ArchiveTopBar.swift in Sources */,
 				9C6F502C1BCEB4A05156F06F /* BootFieldView.swift in Sources */,
@@ -679,6 +675,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 5.10;
 				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};

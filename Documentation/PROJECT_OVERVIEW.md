@@ -716,20 +716,24 @@ python3 Scripts/update_catalog.py --output StarCatch/Resources/catalog.json
 - 真实版本号显示。
 - 非豁免加密声明为 false。
 - MIT License、第三方许可与 CelesTrak 归属。
+- Archive 前自动校验 14 天目录时效、隐私清单、图标、版本来源和依赖锁定。
+- 6.9 英寸简体中文原始商店截图与可直接填写的元数据、审核说明和答卷草案。
 
 ### 11.2 仍需开发者账号持有人完成
 
-- 确认正式应用名、副标题、分类与关键词。
+- 确认正式应用名、副标题、分类与已准备的关键词。
 - 建立 App Store Connect App Record。
 - 配置分发证书与 Provisioning Profile。
 - 填写新版年龄分级问卷。
 - 填写 App Privacy 问卷。
 - 确认支持 URL、隐私政策 URL、版权主体和联系邮箱。
-- 制作并上传 App Store 截图。
-- 编写审核备注，说明真机使用姿态和定位，模拟器使用拖拽。
+- 复核并上传 `AppStore/Screenshots` 中已准备的 App Store 截图。
+- 复核并提交已准备的审核备注；它已说明真机使用姿态和定位，模拟器使用拖拽。
 - 建立 TestFlight 内部和外部测试流程。
 - 在真实设备、不同地区和不同磁场环境中完成最终指向验收。
 - 确定轨道快照的发布更新周期。
+- 确认 DSA 商家身份、销售地区、税务/银行、出口合规与适用地区许可。
+- 提供满足商店和当地法规的公开支持联系方式，并确认 CelesTrak 数据的商用分发权利。
 
 ### 11.3 当前判断
 
@@ -737,7 +741,7 @@ python3 Scripts/update_catalog.py --output StarCatch/Resources/catalog.json
 
 1. 真机方向精度需要在多台设备和多种磁环境中验证。
 2. 离线轨道快照需要明确长期更新机制。
-3. App Store Connect、签名、截图和审核材料仍属于人工发布工作。
+3. App Store Connect、签名、商家身份、法律确认与真机验收仍属于账号持有人工作。
 
 ## 12. 当前明确不包含的能力
 
@@ -784,4 +788,4 @@ python3 Scripts/update_catalog.py --output StarCatch/Resources/catalog.json
 
 ---
 
-这份文档描述的是 2026-07-23 当前工程中真实存在的功能。后续新增页面、修改捕获逻辑、改变轨道来源或增加数据上传时，应同步更新本文件、隐私说明、架构边界和 App Store 清单。
+这份文档描述的是 2026-08-01 当前工程中真实存在的功能。后续新增页面、修改捕获逻辑、改变轨道来源或增加数据上传时，应同步更新本文件、隐私说明、架构边界和 App Store 清单。

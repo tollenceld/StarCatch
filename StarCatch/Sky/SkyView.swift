@@ -4,22 +4,22 @@ import UIKit
 #endif
 
 /// 主渲染视图：TimelineView + Canvas，30fps。
-/// 完整层序：星尘 → 拖影 → 轨迹弧 → 点位/刻度环/扫描 → vignette → 边缘信标 → 十字丝 → 档案层 → 颗粒 shader。
+/// 完整层序：星尘 → 拖影 → 轨迹弧 → 点位/刻度环/扫描 → vignette → 锁定信标 → 十字丝 → 微型标签 → 颗粒 shader。
 ///
 /// 两个观测维度：主天空负责指向与明确捕获，全局星图中的 TimeDial 负责选择观测时刻。
 /// 非 LIVE 时全部对象按观测时刻推算；拨动时间时点位留下拖影 —— 时间方向的视觉痕迹。
 struct SkyView: View {
-    private enum ArchivePlacementSide {
-        case leading
-        case trailing
-    }
-
     @ObservedObject var session: SkySession
     @ObservedObject var capture: CaptureStateMachine
     @ObservedObject var clock: SkyClock
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
-    /// 设置入口与视野切换同属底部控制轨，因此由天空页统一排布，由上层负责呈现面板。
+    /// 设置与观测档案由上层负责呈现；档案的常驻入口统一收进设置页，
+    /// 目标卡仍可按内容直接进入深度档案。
     var onOpenInstrument: () -> Void = {}
+    var onOpenSystemStatus: () -> Void = {}
+    var onOpenArchive: () -> Void = {}
+    var initialOverviewPresented: Bool = false
+    var onInitialOverviewHandled: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
@@ -36,38 +36,80 @@ struct SkyView: View {
         minimumPointDistance: 0.08
     )
     @State private var viewportSize: CGSize = .zero
+    /// `presented` 表示全局图层已经插入；`committed` 表示控制权已经完成交接。
+    /// 临界区只改变同一个图层的进度，不交换两棵页面树。
     @State private var persistentOverviewPresented = false
+    @State private var overviewCommitted = false
     @State private var persistentOverviewProgress: Double = 0
     @State private var overviewTransitioning = false
+    @State private var overviewReturnGestureActive = false
+    @State private var overviewThresholdHapticSent = false
+    @State private var overviewEntryPointing: Pointing?
+    /// 进入全局前的局部倍率。返回时同步恢复，避免地球淡出后突然落在 0.52× 广角。
+    @State private var overviewEntryMagnification: CGFloat?
     @State private var filterExpanded = false
+    @State private var topPanel: TopPanel?
+    /// 锁定事实与详情可见性相互独立：收起摘要不会释放目标。
+    @State private var lockedDetailPresented = true
+    /// 阅读面板拥有独立于准星捕获状态的短期记忆。默认识别离开阈值后，状态机可以
+    /// 立即恢复探索，但卡片仍保留一小段时间，避免手持抖动打断阅读。
+    @State private var retainedDetailObjectID: String?
+    @State private var detailGraceDeadline: Date?
+    @State private var detailPinnedByInteraction = false
     /// 设置关闭时只做随准星出现/消失的即时识别；开启后才呈现底部确认控件。
     @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
     @State private var lastOverviewTrailSample: TimeInterval = -.infinity
     @State private var lastCaptureSample: TimeInterval = -.infinity
-    @State private var measuredArchiveFrame: CGRect = .zero
-    @State private var archivePlacementSide: ArchivePlacementSide = .leading
-    @State private var lastRelationshipPoint: CGPoint?
-    @State private var relationshipMotionEmphasis: Double = 1
-    @State private var lastRelationshipSample: Date?
     @State private var lastAcquisitionPulse: Date?
     @State private var fieldMagnification: CGFloat = 1
     @State private var settledFieldMagnification: CGFloat = 1
     @State private var fieldMagnificationActive = false
+    @State private var fieldScaleGestureSample: CGFloat = 1
+    @State private var fieldScaleGestureSampleDate = Date.distantPast
+    @State private var fieldScaleLogarithmicVelocity: Double = 0
     @State private var overviewScaleModified = false
     @State private var overviewResetRequest = 0
     @State private var presentedStoryObjectID: String?
+    @State private var engagedPreciseEphemeris: Ephemeris?
 
-    private static let maximumFieldMagnification: CGFloat = 4
+    private enum TopPanel: Equatable {
+        case observation
+        case direction
+    }
 
     private var suppressMotion: Bool { reducedMotion || systemReducedMotion }
     private var fieldVerticalFOV: Double {
         Projection.verticalFOV(forMagnification: fieldMagnification)
     }
+    private var wideFieldProgress: Double {
+        ObservationScale.wideFieldProgress(magnification: fieldMagnification)
+    }
+    private var localChromePresence: Double {
+        let wideReduction = 1 - 0.46 * wideFieldProgress
+        return wideReduction * (1 - overviewPresentationProgress)
+    }
+    private var localBottomPresence: Double {
+        ObservationScale.eased(
+            (0.72 - overviewPresentationProgress) / 0.5
+        )
+    }
+    private var localSkyPresence: Double {
+        ObservationScale.localSkyPresence(
+            progress: overviewPresentationProgress
+        )
+    }
     private var scaleResetAvailable: Bool {
-        if persistentOverviewPresented {
+        if overviewCommitted {
             return overviewScaleModified && !overviewTransitioning
         }
-        return !clock.isScrubbing && fieldMagnification > 1.015
+        return !clock.isScrubbing
+            && !fieldMagnificationActive
+            && abs(fieldMagnification - 1) > 0.015
+    }
+    /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
+    /// 避免按钮先切换、地球随后才出现。
+    private var overviewChromeVisible: Bool {
+        overviewCommitted && overviewPresentationProgress > 0.58
     }
 
     var body: some View {
@@ -79,18 +121,27 @@ struct SkyView: View {
                 ZStack(alignment: .topLeading) {
                     canvasLayer(time: time, observation: obsTime)
                         .contentShape(Rectangle())
-                        .scaleEffect(suppressMotion ? 1 : 1 - 0.07 * overviewPresentationProgress)
-                        .blur(radius: suppressMotion ? 0 : 2.4 * overviewPresentationProgress)
-                        .opacity(1 - 0.48 * overviewPresentationProgress)
-                    archiveLayer(observation: obsTime, frameDate: timeline.date)
-                        .opacity(1 - overviewPresentationProgress)
-                    crosshairLayer(frameDate: timeline.date)
-                        .opacity(1 - overviewPresentationProgress)
+                        .scaleEffect(
+                            suppressMotion
+                                ? 1
+                                : 0.94 + 0.06 * localSkyPresence
+                        )
+                        .blur(
+                            radius: suppressMotion
+                                ? 0
+                                : 2.8 * (1 - localSkyPresence)
+                        )
+                        .opacity(localSkyPresence)
+                    crosshairLayer
+                        .opacity(localChromePresence)
+                    targetMicroLabelLayer(observation: obsTime)
+                        .opacity(localChromePresence)
                     if clock.isLive {
                         guideLayer
-                            .opacity(1 - overviewPresentationProgress)
+                            .opacity(localChromePresence)
                     }
                     timeOverviewLayer(time: time, observation: obsTime)
+                    scaleTransitionCueLayer
                 }
                 .colorEffect(
                     ShaderLibrary.grain(
@@ -117,7 +168,7 @@ struct SkyView: View {
                     // 状态机在视图更新之后驱动，不在 Canvas 绘制闭包里发布状态。
                     // 全览拖动中冻结捕捉；镜头回到天空后，无论 LIVE 或历史时刻都恢复观测。
                     if !clock.isScrubbing,
-                       !persistentOverviewPresented,
+                       !overviewCommitted,
                        frameTime - lastCaptureSample >= 0.1 {
                         lastCaptureSample = frameTime
                         let sample = captureSample(at: obsTime, in: geo.size)
@@ -126,11 +177,6 @@ struct SkyView: View {
                             trackedDistance: sample.trackedDistance,
                             captureEnabled: captureConfirmationEnabled,
                             now: frameDate
-                        )
-                        updateRelationshipMotion(
-                            at: frameDate,
-                            observation: obsTime,
-                            in: geo.size
                         )
                     }
                 }
@@ -143,26 +189,35 @@ struct SkyView: View {
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .simultaneousGesture(fieldMagnificationGesture)
-        .overlay(alignment: .top) { pointingReadout }
-        .overlay { filterLayer }
+        .simultaneousGesture(lockedTargetTapGesture)
+        .overlay { transientDismissLayer }
+        .overlay(alignment: .top) {
+            pointingReadout
+                // 顶部功能翼必须和灵动岛共享同一条水平轴；默认 overlay 会从
+                // 安全区下缘开始布局，结果看起来仍是一条岛下工具栏。
+                .ignoresSafeArea(edges: .top)
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomControlBand
         }
-        .coordinateSpace(name: "sky-interface")
         .overlay {
             satelliteStoryLayer
         }
-        .onPreferenceChange(ArchiveBoundsPreferenceKey.self) { frame in
-            // 面板离场后保留最后一次真实高度，回到视野时不会先按估算尺寸跳一帧。
-            guard frame.width > 0, frame.height > 0 else { return }
-            if abs(frame.minX - measuredArchiveFrame.minX) > 0.5
-                || abs(frame.minY - measuredArchiveFrame.minY) > 0.5
-                || abs(frame.width - measuredArchiveFrame.width) > 0.5
-                || abs(frame.height - measuredArchiveFrame.height) > 0.5 {
-                measuredArchiveFrame = frame
-            }
+        .appEdgeBackGesture(
+            enabled: overviewChromeVisible
+                && presentedStoryObjectID == nil
+        ) {
+            exitOverviewToLocal()
         }
         .onAppear {
+            if initialOverviewPresented {
+                persistentOverviewPresented = true
+                overviewCommitted = true
+                persistentOverviewProgress = 1
+                overviewEntryPointing = session.pointing
+                overviewEntryMagnification = 1
+                onInitialOverviewHandled()
+            }
             if !captureConfirmationEnabled {
                 if capture.isLocked {
                     requestRelease()
@@ -172,18 +227,60 @@ struct SkyView: View {
             }
             #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--previewFocusStage") {
+                captureConfirmationEnabled = true
+                capture.returnToExploring()
+            }
             if arguments.contains("--openFilter") {
                 // 镜片只属于探索层。模拟器默认指向常常正好落在目标上，
-                // 不先解锁的话这个开关看起来毫无效果。
+                // 先让自动识别完成，再展开镜片，避免 acquiring / locked 的
+                // 正常收拢逻辑在调试截图前把它立刻关回去。
                 capture.returnToExploring()
-                filterExpanded = true
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1800))
+                    filterExpanded = true
+                }
+            }
+            if arguments.contains("--openObservationWing") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1600))
+                    topPanel = .observation
+                }
+            } else if arguments.contains("--openDirectionWing") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1600))
+                    topPanel = .direction
+                }
             }
             if arguments.contains("--filterObservation") {
-                session.setCatalogFilter(.featured)
+                session.toggleCatalogFilter(.humanScience)
+            }
+            if arguments.contains("--previewLockedTarget") {
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(1400))
+                    if capture.isAcquiring {
+                        _ = capture.confirmAcquisition()
+                    }
+                }
             }
             if arguments.contains("--openOverview") {
                 persistentOverviewPresented = true
+                overviewCommitted = true
                 persistentOverviewProgress = 1
+                overviewEntryPointing = session.pointing
+                overviewEntryMagnification = 1
+            } else if arguments.contains("--previewWideField") {
+                fieldMagnification = 0.66
+                settledFieldMagnification = fieldMagnification
+            } else if arguments.contains("--previewScaleThreshold") {
+                fieldMagnification = ObservationScale.minimumLocalMagnification
+                settledFieldMagnification = fieldMagnification
+                fieldMagnificationActive = true
+                persistentOverviewPresented = true
+                overviewCommitted = false
+                persistentOverviewProgress = 0.58
+                overviewEntryPointing = session.pointing
+                overviewEntryMagnification = 1
             } else if arguments.contains("--previewOverviewMode") {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(550))
@@ -200,48 +297,51 @@ struct SkyView: View {
             }
             #endif
         }
+        .task(id: capture.engagedObjectId) {
+            await prepareEngagedTargetData(for: capture.engagedObjectId)
+        }
+        .task(id: detailGraceDeadline) {
+            guard let deadline = detailGraceDeadline else { return }
+            let remaining = deadline.timeIntervalSinceNow
+            if remaining > 0 {
+                try? await Task.sleep(
+                    nanoseconds: UInt64(remaining * 1_000_000_000)
+                )
+            }
+            guard !Task.isCancelled,
+                  TargetDetailRetentionPolicy.shouldDismiss(
+                      now: Date(),
+                      deadline: detailGraceDeadline,
+                      isPinned: detailPinnedByInteraction,
+                      isCaptureActive: archivePresentationReady
+                  )
+            else { return }
+            dismissRetainedDetail()
+        }
         .onChange(of: capture.phase) { oldPhase, newPhase in
             switch newPhase {
-            case .acquiring(let objectId):
-                if filterExpanded { setFilterExpanded(false) }
+            case .acquiring:
+                withAnimation(Motion.interfaceCollapse) { topPanel = nil }
                 lastAcquisitionPulse = Date()
                 acquisitionEntryHaptic()
-                let observation = clock.observationTime()
-                if viewportSize != .zero,
-                   let projected = relationshipTarget(
-                    objectID: objectId,
-                    observation: observation,
-                    in: viewportSize
-                   )?.projected?.point {
-                    archivePlacementSide = projected.x < viewportSize.width / 2
-                        ? .trailing
-                        : .leading
-                }
             case .locked(let objectId):
-                if filterExpanded { setFilterExpanded(false) }
                 lockedAt = Date()
+                presentDetail(for: objectId)
                 hasEverLocked = true
                 lastAcquisitionPulse = nil
-                lastRelationshipPoint = nil
-                lastRelationshipSample = nil
-                relationshipMotionEmphasis = 1
                 lockHaptic()
                 let observation = clock.observationTime()
-                if viewportSize != .zero,
-                   let projected = relationshipTarget(
-                    objectID: objectId,
-                    observation: observation,
-                    in: viewportSize
-                   )?.projected?.point {
-                    archivePlacementSide = projected.x < viewportSize.width / 2
-                        ? .trailing
-                        : .leading
-                }
-                let ephemeris = session.ephemeris.ephemeris(
-                    objectId,
-                    at: observation,
-                    live: clock.isLive
-                )
+                let ephemeris = engagedPreciseEphemeris
+                    ?? session.ephemeris.cachedPreciseEphemeris(
+                        objectId,
+                        at: observation,
+                        live: clock.isLive
+                    )
+                    ?? session.ephemeris.cachedEphemeris(
+                        objectId,
+                        at: observation,
+                        live: clock.isLive
+                    )
                 session.log.record(
                     objectId: objectId,
                     catalog: session.catalog,
@@ -251,9 +351,12 @@ struct SkyView: View {
             case .exploring:
                 lockedAt = nil
                 lastAcquisitionPulse = nil
-                lastRelationshipPoint = nil
-                lastRelationshipSample = nil
-                relationshipMotionEmphasis = 0
+                if oldPhase.isReleasing {
+                    // 主动解除锁定是明确退出，不保留已经失效的摘要。
+                    dismissRetainedDetail()
+                } else {
+                    beginDetailGracePeriod()
+                }
             case .releasing:
                 lastAcquisitionPulse = nil
                 releaseHintVisible = false
@@ -263,9 +366,12 @@ struct SkyView: View {
             updateAcquisitionHaptic(progress: progress)
         }
         .onChange(of: capture.recognitionReady) { _, ready in
-            guard ready else { return }
-            hasEverLocked = true
-            recognitionCompleteHaptic()
+            if ready, let objectID = capture.engagedObjectId {
+                lockedAt = Date()
+                presentDetail(for: objectID)
+                hasEverLocked = true
+                recognitionCompleteHaptic()
+            }
         }
         .onChange(of: capture.replacementObjectId) { _, objectID in
             guard objectID != nil else { return }
@@ -296,7 +402,12 @@ struct SkyView: View {
                 lastOverviewTrailSample = -.infinity
             }
         }
-        .onChange(of: session.catalogFilter) { _, _ in
+        .onChange(of: session.catalogScope) { _, _ in
+            capture.returnToExploring()
+            screenTrails.clear()
+            overviewTrails.clear()
+        }
+        .onChange(of: session.catalogFilters) { _, _ in
             capture.returnToExploring()
             screenTrails.clear()
             overviewTrails.clear()
@@ -358,7 +469,7 @@ struct SkyView: View {
 
     /// 所有主动退出入口汇入同一个动作：先给一次极轻的“松开”触觉，再启动统一回收序列。
     private func requestRelease() {
-        guard capture.isLocked else { return }
+        guard capture.isLocked || capture.recognitionReady else { return }
         releaseHintVisible = false
         #if !targetEnvironment(simulator)
         let generator = UIImpactFeedbackGenerator(style: .soft)
@@ -368,107 +479,227 @@ struct SkyView: View {
         capture.releaseSignal()
     }
 
+    private func hideLockedDetail() {
+        guard retainedDetailObjectID != nil else { return }
+        withAnimation(
+            suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceCollapse
+        ) {
+            lockedDetailPresented = false
+            detailGraceDeadline = nil
+            detailPinnedByInteraction = false
+            // 已确认锁定仍需允许用户点目标或顶部状态重新展开；即时识别已经失效时
+            // 则不保留一个无法再访问的旧对象引用。
+            if !archivePresentationReady {
+                retainedDetailObjectID = nil
+            }
+        }
+    }
+
+    private func showLockedDetail() {
+        guard retainedDetailObjectID != nil else { return }
+        withAnimation(
+            suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceExpand
+        ) {
+            filterExpanded = false
+            topPanel = nil
+            lockedDetailPresented = true
+        }
+    }
+
+    /// 捕获完成时建立新的阅读对象。重新对准同一对象只取消离焦倒计时，不会撤销
+    /// 用户通过点按建立的保持态；明确捕获另一对象时才开始一张新卡片。
+    private func presentDetail(for objectID: String) {
+        let isNewObject = retainedDetailObjectID != objectID
+        retainedDetailObjectID = objectID
+        detailGraceDeadline = nil
+        if isNewObject {
+            detailPinnedByInteraction = false
+        }
+        lockedDetailPresented = true
+    }
+
+    /// 准星移开只启动阅读宽限，不延长对焦状态机本身。这样新目标仍能即时感应，
+    /// 当前卡片则有足够时间承受一次正常的手部晃动。
+    private func beginDetailGracePeriod(now: Date = Date()) {
+        guard retainedDetailObjectID != nil else { return }
+        guard lockedDetailPresented else {
+            dismissRetainedDetail()
+            return
+        }
+        guard !detailPinnedByInteraction else { return }
+        detailGraceDeadline = TargetDetailRetentionPolicy.deadline(after: now)
+    }
+
+    /// 点按卡片代表用户已经从“观测”进入“阅读”，此时不再依据准星位置自动收起。
+    /// 关闭、下滑或主动解除锁定仍然是明确退出入口。
+    private func keepDetailVisible() {
+        guard retainedDetailObjectID != nil,
+              lockedDetailPresented
+        else { return }
+        detailPinnedByInteraction = true
+        detailGraceDeadline = nil
+    }
+
+    private func dismissRetainedDetail() {
+        lockedDetailPresented = false
+        retainedDetailObjectID = nil
+        detailGraceDeadline = nil
+        detailPinnedByInteraction = false
+    }
+
+    private func handleStatusWingTap() {
+        guard !overviewCommitted else { return }
+        if archivePresentationReady {
+            showLockedDetail()
+        } else {
+            toggleTopPanel(.observation)
+        }
+    }
+
     // MARK: - 底部观测动作 / 全局时间标尺
 
     /// 主天空与全局星图共享同一个底部槽位，但职责不混合：主天空只表达捕获意图，
     /// 全局星图才提供时间旅行。这样主页面不会在无全局语境时意外停留于过去/未来。
     private var bottomControlBand: some View {
         Group {
-            if persistentOverviewPresented {
+            if overviewChromeVisible {
                 overviewControlColumn
+                    .opacity(overviewPresentationProgress)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else if lockedDetailPresented,
+                      let id = retainedDetailObjectID,
+                      let object = session.catalog.objectsByID[id] {
+                lockedSummaryCard(object: object, objectID: id)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {
                 skyControlRow
                     .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottom)))
             }
         }
-        .animation(Motion.interfaceCollapse, value: persistentOverviewPresented)
+        .animation(Motion.interfaceCollapse, value: overviewCommitted)
+        .animation(Motion.interfaceExpand, value: archivePresentationReady)
         .zIndex(2)
     }
 
-    /// 全局星图只提供时间旅行与返回：镜片属于指向观测，这里不出现。
-    private var overviewControlColumn: some View {
-        VStack(spacing: 10) {
-            timeDial
-
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
-                overviewEntry
-                instrumentEntry
-            }
-            .padding(.horizontal, 16)
-        }
-        .padding(.bottom, 8)
-    }
-
-    /// 主天空的底部秩序：动作行与仪器轨叠放而不是上下堆叠，动作行因此能真正
-    /// 贴住下缘 —— 这是“深入档案”过去悬在半空的原因：它被整条仪器轨顶高了。
-    ///
-    /// 单枚动作（深入档案、复位视场）与仪器轨并排，各自留出对方的宽度；
-    /// 开启确认捕获后的动作行本身就接近满宽，此时改为让它升到轨道上方一行。
-    private var skyControlRow: some View {
-        ZStack(alignment: .bottom) {
-            focusDock
-                .padding(
-                    .horizontal,
-                    dockNeedsFullWidth ? 0 : CatalogFilterControl.collapsedSize + 20
-                )
-                .padding(.bottom, dockNeedsFullWidth ? utilityRailHeight + 10 : 0)
-
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                utilityRail
-            }
-        }
+    private func lockedSummaryCard(
+        object: CatalogObject,
+        objectID: String
+    ) -> some View {
+        ArchiveOverlay(
+            object: object,
+            ephemeris: engagedDisplayEphemeris(for: objectID),
+            revealed: lockedDetailPresented,
+            captured: detailRepresentsCapturedTarget(objectID) && !isReleasing,
+            retainedByInteraction: detailPinnedByInteraction,
+            releaseProgress: releasePresentationProgress(at: Date()),
+            onOpenArchive: {
+                if object.deepArchiveStory != nil {
+                    presentDeepArchive(for: object)
+                } else {
+                    onOpenArchive()
+                }
+            },
+            onInteraction: keepDetailVisible,
+            onDismiss: hideLockedDetail,
+            onRelease: requestRelease
+        )
+        .id(objectID)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
-        .animation(Motion.interfaceCollapse, value: dockNeedsFullWidth)
     }
 
-    /// 确认捕获的主动作加取消按钮并排后接近满宽，无法再与右侧仪器轨共处一行。
-    private var dockNeedsFullWidth: Bool {
-        captureConfirmationEnabled && !filterExpanded
-    }
+    /// 全局星图底部只承担时间旅行、视场操作和设置；返回统一移到左上角。
+    private var overviewControlColumn: some View {
+        VStack(spacing: 0) {
+            timeDial
 
-    private var utilityRailHeight: CGFloat {
-        SkyTopBarMetrics.controlHeight + 8 + CatalogFilterControl.collapsedSize
-    }
+            ZStack {
+                HStack {
+                    Spacer(minLength: 0)
+                    instrumentEntry
+                }
 
-    /// 竖向仪器轨：视野切换与系统设置成对在上，常驻镜片端口坐在右下角末端。
-    /// 镜片展开后的长面板由端口自身以覆盖层向上生长，不参与这里的布局，
-    /// 因此展开时不会把动作行顶离拇指区。
-    private var utilityRail: some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            HStack(spacing: 8) {
-                overviewEntry
-                instrumentEntry
+                if !clock.isLive {
+                    ReturnToLiveControl(
+                        returning: clock.isReturningToLive,
+                        action: returnToLiveFromCapsule
+                    )
+                } else if scaleResetAvailable {
+                    FieldOfViewResetControl(action: resetActiveFieldOfView)
+                }
             }
-            .animation(
-                suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceCollapse,
-                value: capture.phase
-            )
-
-            filterPort
+            .frame(height: AppChromeMetrics.controlHeight)
+            .padding(.horizontal, AppChromeMetrics.edgeInset)
+            .padding(.top, 7)
         }
+        .background(Palette.voidBlack.opacity(0.97))
+        .padding(.bottom, 8)
     }
 
-    /// 轨道末端始终只占收起态的尺寸；镜片作为覆盖层锚在这个槽位的右下角，
-    /// 展开后向左上生长。这样展开不会改变轨道高度，也不会挤动动作行。
+    /// 探索态只保留筛选和设置；观测记录由设置页的摘要进入。
+    /// 锁定后这一整组退出，由目标摘要接管底部。
+    ///
+    /// 左侧范围、中间主动作和右侧设置永远共用一条基线。中间没有当前动作时保持
+    /// 为空，不再用无效按钮补齐构图。
+    private var skyControlRow: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                GlassEffectContainer(spacing: AppChromeMetrics.itemSpacing) {
+                    skyControlRowContent
+                }
+            } else {
+                skyControlRowContent
+            }
+        }
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .padding(.bottom, 8)
+        .opacity(filterExpanded ? 1 : localBottomPresence)
+        .animation(Motion.interfaceCollapse, value: filterExpanded)
+        .animation(Motion.interfaceExpand, value: focusActionMode)
+        .animation(Motion.interfaceCollapse, value: scaleResetAvailable)
+    }
+
+    private var skyControlRowContent: some View {
+        HStack(spacing: 0) {
+            filterPort
+
+            Spacer(minLength: AppChromeMetrics.itemSpacing)
+
+            if !filterExpanded {
+                primaryBottomAction
+                    .transition(
+                        .opacity.combined(
+                            with: .scale(scale: 0.94, anchor: .bottom)
+                        )
+                    )
+
+                Spacer(minLength: AppChromeMetrics.itemSpacing)
+
+                instrumentEntry
+                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .trailing)))
+            }
+        }
+        .frame(height: AppChromeMetrics.controlHeight, alignment: .bottom)
+    }
+
+    /// 紧凑入口只占一枚横向胶囊；展开内容由同一外壳向上生长。
     private var filterPort: some View {
         Color.clear
             .frame(
                 width: CatalogFilterControl.collapsedSize,
-                height: CatalogFilterControl.collapsedSize
+                height: SkyTopBarMetrics.controlHeight
             )
-            .overlay(alignment: .bottomTrailing) {
+            .overlay(alignment: .bottomLeading) {
                 CatalogFilterControl(
-                    selection: session.catalogFilter,
+                    scope: session.catalogScope,
+                    selections: session.catalogFilters,
+                    resultCount: session.visibleObjects.count,
                     expanded: filterExpanded,
                     onToggle: { setFilterExpanded(!filterExpanded) },
-                    onSelect: { filter in
-                        session.setCatalogFilter(filter)
-                        setFilterExpanded(false)
-                    },
+                    onSelectScope: session.setCatalogScope,
+                    onToggleFilter: session.toggleCatalogFilter,
+                    onReset: session.resetCatalogFilters,
+                    onClose: { setFilterExpanded(false) },
                     presence: filterChromeOpacity
                 )
                 .fixedSize()
@@ -476,98 +707,68 @@ struct SkyView: View {
             }
     }
 
-    /// 系统设置入口。与视野切换共用同一枚圆形端口造型，形成成对的工具轨。
+    /// 主天空和全局星图唯一的右下常驻入口。
     private var instrumentEntry: some View {
-        Button(action: onOpenInstrument) {
-            ZStack {
-                Circle()
-                    .fill(Palette.voidBlack.opacity(0.9))
-                Circle()
-                    .stroke(Palette.inkFaint.opacity(0.72), lineWidth: 0.65)
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-            }
-            .frame(width: 30, height: 30)
-            .frame(
-                width: SkyTopBarMetrics.controlHeight,
-                height: SkyTopBarMetrics.controlHeight
-            )
-            .contentShape(Circle())
-        }
-        .buttonStyle(.plain)
+        utilityButton(symbol: "slider.horizontal.3", action: onOpenInstrument)
         .opacity(observationChromeOpacity)
         .accessibilityLabel("打开仪器状态与设置")
         .accessibilityHint("进入设置、观测记录与帮助")
     }
 
     @ViewBuilder
-    private var focusDock: some View {
-        VStack(spacing: 8) {
-            if !filterExpanded {
-                if captureConfirmationEnabled || scaleResetAvailable {
-                    HStack(spacing: 8) {
-                        if captureConfirmationEnabled {
-                            FocusActionControl(
-                                mode: focusActionMode,
-                                action: performFocusAction
-                            )
-                            if capture.isLocked || isReleasing {
-                                CaptureSecondaryControl(
-                                    mode: captureSecondaryMode,
-                                    action: performSecondaryCaptureAction
-                                )
-                            }
-                        }
-                        if scaleResetAvailable {
-                            FieldOfViewResetControl(action: resetActiveFieldOfView)
-                        }
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.9)))
-                }
+    private func utilityButton(symbol: String, action: @escaping () -> Void) -> some View {
+        let shape = RoundedRectangle(
+            cornerRadius: AppChromeMetrics.compactCornerRadius,
+            style: .continuous
+        )
+        let button = Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.inkMid.opacity(0.9))
+                .frame(
+                    width: AppChromeMetrics.controlHeight,
+                    height: AppChromeMetrics.controlHeight
+                )
+                .contentShape(shape)
+        }
+        .buttonStyle(.plain)
 
-                if let object = deepArchiveActionObject {
-                    SatelliteStoryEntryControl(tint: object.identityTint) {
-                        presentDeepArchive(for: object)
-                    }
-                    .id(object.id)
-                    .transition(
-                        .opacity.combined(
-                            with: .scale(scale: 0.92, anchor: .bottom)
-                        )
+        if #available(iOS 26.0, *) {
+            button
+                .glassEffect(
+                    .regular
+                        .tint(Palette.voidBlack.opacity(0.1))
+                        .interactive(),
+                    in: .rect(cornerRadius: AppChromeMetrics.compactCornerRadius)
+                )
+                .overlay {
+                    shape.stroke(
+                        Palette.inkFaint.opacity(0.29),
+                        lineWidth: AppChromeMetrics.strokeWidth
                     )
                 }
-            }
+        } else {
+            button
+                .background(.ultraThinMaterial, in: shape)
+                .background(Palette.voidBlack.opacity(0.72), in: shape)
+                .overlay {
+                    shape.stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.6)
+                }
         }
-        .frame(maxWidth: .infinity)
-        .animation(Motion.interfaceExpand, value: focusActionMode)
-        .animation(Motion.interfaceExpand, value: captureConfirmationEnabled)
-        .animation(Motion.interfaceCollapse, value: filterExpanded)
-        .animation(Motion.interfaceCollapse, value: scaleResetAvailable)
-        .animation(Motion.interfaceExpand, value: deepArchiveActionObject?.id)
     }
 
-    /// 深入档案只在完整即时信息已经建立时出现。它与空间面板共享目标状态，
-    /// 但不共享面板坐标，因此设备移动时不会跟着正文漂移。
-    private var deepArchiveActionObject: CatalogObject? {
-        guard archivePresentationReady,
-              !isReleasing,
-              let id = capture.engagedObjectId,
-              let object = session.catalog.objectsByID[id],
-              object.deepArchiveStory != nil,
-              viewportSize != .zero,
-              let target = relationshipTarget(
-                  objectID: id,
-                  observation: clock.observationTime(),
-                  in: viewportSize
-              ),
-              let frame = spatialArchiveFrame(for: target, in: viewportSize),
-              spatialArchiveVisibility(
-                  target: target,
-                  frame: frame,
-                  in: viewportSize
-              ) > 0.42 else { return nil }
-        return object
+    @ViewBuilder
+    private var primaryBottomAction: some View {
+        if persistentOverviewProgress < 0.05 {
+            if captureConfirmationEnabled, focusActionMode.isInteractive {
+                FocusActionControl(
+                    mode: focusActionMode,
+                    action: performFocusAction
+                )
+            } else if scaleResetAvailable {
+                FieldOfViewResetControl(action: resetActiveFieldOfView)
+            }
+        }
     }
 
     private func presentDeepArchive(for object: CatalogObject) {
@@ -613,33 +814,13 @@ struct SkyView: View {
     }
 
     private func performSecondaryCaptureAction() {
-        if capture.isLocked {
+        if capture.isLocked || capture.recognitionReady {
             requestRelease()
         }
     }
 
     private var timeDial: some View {
         TimeDial(clock: clock)
-            .overlay(alignment: .top) {
-                if !filterExpanded, !clock.isLive || scaleResetAvailable {
-                    HStack(spacing: 8) {
-                        if !clock.isLive {
-                            ReturnToLiveControl(
-                                returning: clock.isReturningToLive,
-                                action: returnToLiveFromCapsule
-                            )
-                        }
-                        if scaleResetAvailable {
-                            FieldOfViewResetControl(action: resetActiveFieldOfView)
-                        }
-                    }
-                    .offset(y: -52)
-                    .transition(
-                        .scale(scale: 0.9, anchor: .bottom)
-                            .combined(with: .opacity)
-                    )
-                }
-            }
             .overlay {
                 if filterExpanded {
                     Color.black.opacity(0.001)
@@ -673,189 +854,484 @@ struct SkyView: View {
         generator.impactOccurred(intensity: 0.68)
         #endif
 
-        if persistentOverviewPresented {
+        if overviewCommitted {
             overviewResetRequest &+= 1
         } else {
             fieldMagnificationActive = false
             settledFieldMagnification = 1
+            persistentOverviewProgress = 0
+            persistentOverviewPresented = false
+            overviewEntryPointing = nil
+            overviewEntryMagnification = nil
             withAnimation(Motion.fieldReset) {
                 fieldMagnification = 1
             }
         }
     }
 
-    /// 镜片展开后天空只承担一件事：点画面任意处收起。镜片本体常驻在仪器轨末端，
-    /// 因此这一层不再持有控件，只提供收拢用的透明捕获面。
+    /// 顶部详情和筛选共享同一块空白区域关闭层；实际控件绘制在它上方。
     @ViewBuilder
-    private var filterLayer: some View {
-        if filterExpanded {
+    private var transientDismissLayer: some View {
+        if filterExpanded || topPanel != nil {
             Color.black.opacity(0.001)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
-                .onTapGesture { setFilterExpanded(false) }
+                .onTapGesture {
+                    withAnimation(Motion.interfaceCollapse) {
+                        filterExpanded = false
+                        topPanel = nil
+                    }
+                }
                 .accessibilityHidden(true)
         }
     }
 
     /// 捕获中镜片仍然可用，但退到背景层：它不与目标身份争夺第一视觉权重。
     private var filterChromeOpacity: Double {
-        if capture.isLocked || isReleasing { return 0.4 }
-        if capture.isAcquiring { return 0.58 }
-        return session.catalogFilter == .all ? 0.88 : 1
+        let stateOpacity: Double
+        if capture.isLocked || isReleasing {
+            stateOpacity = 0.4
+        } else if capture.isAcquiring {
+            stateOpacity = 0.58
+        } else {
+            stateOpacity = session.activeCatalogFilterCount == 0 ? 0.88 : 1
+        }
+        return stateOpacity * max(0.46, localChromePresence)
     }
 
     private func setFilterExpanded(_ expanded: Bool) {
         let animation: Animation = suppressMotion
             ? .easeOut(duration: 0.14)
             : (expanded ? Motion.interfaceExpand : Motion.interfaceCollapse)
-        withAnimation(animation) { filterExpanded = expanded }
-    }
-
-    /// 左上角与右上角设置端口形成一对：一个切换空间尺度，一个进入系统设置。
-    private var overviewEntry: some View {
-        Button(action: togglePersistentOverview) {
-            ZStack {
-                Circle()
-                    .fill(Palette.voidBlack.opacity(0.9))
-                Circle()
-                    .stroke(Palette.inkFaint.opacity(0.72), lineWidth: 0.65)
-
-                if persistentOverviewPresented {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Palette.signal.opacity(0.9))
-                } else {
-                    Capsule()
-                        .stroke(Palette.inkMid.opacity(0.7), lineWidth: 0.6)
-                        .frame(width: 17, height: 8)
-                        .rotationEffect(.degrees(-24))
-                    Circle()
-                        .fill(Palette.signal.opacity(0.92))
-                        .frame(width: 3, height: 3)
-                        .offset(x: 6, y: -4)
-                    Circle()
-                        .fill(Palette.inkMid.opacity(0.82))
-                        .frame(width: 2.5, height: 2.5)
-                }
-            }
-            .frame(width: 30, height: 30)
-            .frame(
-                width: SkyTopBarMetrics.controlHeight,
-                height: SkyTopBarMetrics.controlHeight
-            )
-            .contentShape(Circle())
+        withAnimation(animation) {
+            if expanded { topPanel = nil }
+            filterExpanded = expanded
         }
-        .buttonStyle(.plain)
-        .opacity(observationChromeOpacity)
-        .opacity(clock.isScrubbing && !persistentOverviewPresented ? 0 : 1)
-        .allowsHitTesting(!clock.isScrubbing || persistentOverviewPresented)
-        .disabled(overviewTransitioning)
-        .accessibilityLabel(persistentOverviewPresented ? "返回捕获视野" : "打开全局星图")
-        .accessibilityHint(
-            persistentOverviewPresented
-                ? "关闭全局星图并恢复准星观测"
-                : "查看你周围的人造天体与实时轨迹"
-        )
     }
 
     /// 两侧入口常驻，但在感应与锁定时主动降到背景层。入口仍可用，不与目标信息
     /// 争夺第一视觉权重。
     private var observationChromeOpacity: Double {
-        if persistentOverviewPresented { return 1 }
+        if overviewCommitted { return 1 }
         if capture.isLocked || isReleasing { return 0.28 }
         if capture.isAcquiring { return 0.46 }
-        return 1
+        return max(0.42, localChromePresence)
     }
 
     private func togglePersistentOverview() {
         guard !overviewTransitioning else { return }
-        let duration = suppressMotion ? 0.16 : Motion.skyOverviewModeDuration
-        let animation: Animation = suppressMotion
-            ? .easeOut(duration: duration)
-            : Motion.skyOverviewMode
+        if overviewCommitted {
+            exitOverviewToLocal()
+        } else {
+            commitOverview()
+        }
+    }
 
-        if persistentOverviewPresented {
-            overviewTransitioning = true
-            // 时间轴只存在于全局星图。离开这一空间前先启动回归，主天空不会保留一个
-            // 缺少时间控制入口的历史/未来状态。
-            if !clock.isLive {
-                returnToLiveFromCapsule()
+    private var overviewModeAnimation: Animation {
+        suppressMotion ? .easeOut(duration: 0.16) : Motion.skyOverviewMode
+    }
+
+    private var overviewModeDuration: Double {
+        suppressMotion ? 0.16 : Motion.skyOverviewModeDuration
+    }
+
+    private func prepareOverviewLayer() {
+        guard !persistentOverviewPresented else { return }
+        overviewEntryPointing = session.pointing
+        overviewEntryMagnification = settledFieldMagnification
+        persistentOverviewProgress = 0
+        persistentOverviewPresented = true
+        withAnimation(Motion.interfaceCollapse) {
+            filterExpanded = false
+            topPanel = nil
+        }
+    }
+
+    private func commitOverview() {
+        prepareOverviewLayer()
+        overviewCommitted = true
+        overviewTransitioning = true
+        overviewReturnGestureActive = false
+        DispatchQueue.main.async {
+            withAnimation(overviewModeAnimation) {
+                persistentOverviewProgress = 1
             }
-            withAnimation(animation) {
-                persistentOverviewProgress = 0
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                guard persistentOverviewProgress < 0.001 else { return }
-                persistentOverviewPresented = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
+                guard overviewCommitted else { return }
                 overviewTransitioning = false
             }
-        } else {
-            persistentOverviewPresented = true
+        }
+    }
+
+    private func exitOverviewToLocal() {
+        guard persistentOverviewPresented else { return }
+        let returnMagnification = overviewEntryMagnification ?? 1
+        overviewTransitioning = true
+        overviewReturnGestureActive = false
+        if !clock.isLive {
+            returnToLiveFromCapsule()
+        }
+        settledFieldMagnification = returnMagnification
+        withAnimation(overviewModeAnimation) {
             persistentOverviewProgress = 0
-            overviewTransitioning = true
-            // 先把零进度星图插入层级，下一帧再让同一组属性连续显影。
-            DispatchQueue.main.async {
-                withAnimation(animation) {
-                    persistentOverviewProgress = 1
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-                    overviewTransitioning = false
-                }
+            fieldMagnification = returnMagnification
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
+            guard persistentOverviewProgress < 0.001 else { return }
+            overviewCommitted = false
+            persistentOverviewPresented = false
+            overviewTransitioning = false
+            overviewEntryPointing = nil
+            overviewEntryMagnification = nil
+        }
+    }
+
+    private func updateOverviewScaleGesture(progress: Double) {
+        guard !overviewCommitted else { return }
+        if progress > 0.001 {
+            prepareOverviewLayer()
+        }
+        persistentOverviewProgress = progress
+        if ObservationScale.shouldCommit(progress), !overviewThresholdHapticSent {
+            overviewThresholdHapticSent = true
+            scaleThresholdHaptic()
+        }
+    }
+
+    private func finishOverviewScaleGesture() {
+        if ObservationScale.shouldCommit(persistentOverviewProgress) {
+            commitOverview()
+        } else {
+            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : Motion.scaleThresholdReturn) {
+                persistentOverviewProgress = 0
+            }
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + (suppressMotion ? 0.12 : Motion.scaleThresholdReturnDuration)
+            ) {
+                guard !overviewCommitted, persistentOverviewProgress < 0.001 else { return }
+                persistentOverviewPresented = false
+                overviewEntryPointing = nil
+                overviewEntryMagnification = nil
             }
         }
+    }
+
+    private func updateOverviewReturnGesture(progress: Double) {
+        guard overviewCommitted else { return }
+        if progress <= 0.001, !overviewReturnGestureActive {
+            overviewThresholdHapticSent = false
+        }
+        overviewReturnGestureActive = progress > 0.001
+        persistentOverviewProgress = 1 - progress
+        if ObservationScale.shouldCommit(progress), !overviewThresholdHapticSent {
+            overviewThresholdHapticSent = true
+            scaleThresholdHaptic()
+        }
+    }
+
+    private func finishOverviewReturnGesture(commit: Bool) {
+        let hadReturnProgress = overviewReturnGestureActive
+            || persistentOverviewProgress < 0.999
+        overviewReturnGestureActive = false
+        guard hadReturnProgress else { return }
+        if commit {
+            exitOverviewToLocal()
+        } else {
+            overviewTransitioning = true
+            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : Motion.scaleThresholdReturn) {
+                persistentOverviewProgress = 1
+            }
+            DispatchQueue.main.asyncAfter(
+                deadline: .now() + (suppressMotion ? 0.12 : Motion.scaleThresholdReturnDuration)
+            ) {
+                overviewTransitioning = false
+            }
+        }
+    }
+
+    private func scaleThresholdHaptic() {
+        #if !targetEnvironment(simulator)
+        let generator = UIImpactFeedbackGenerator(style: .rigid)
+        generator.prepare()
+        generator.impactOccurred(intensity: 0.38)
+        #endif
     }
 
     // MARK: - 指向读数
 
-    /// 顶部中央的方位/仰角读数始终只是弱方向参考；感应和锁定时继续后退，
-    /// 不与目标身份和档案正文竞争。
+    /// 顶部信息围绕灵动岛分成状态翼与姿态翼；展开内容仍留在观测空间内。
     private var pointingReadout: some View {
-        SkyStatusIndicator(
-            mode: statusMode,
-            coordinates: statusCoordinates,
-            presence: statusPresence
-        )
-        .frame(height: SkyTopBarMetrics.controlHeight, alignment: .center)
-        .safeAreaPadding(.top, SkyTopBarMetrics.safeAreaSpacing)
-        .allowsHitTesting(false)
+        GeometryReader { geo in
+            let islandMetrics = DynamicIslandWingMetrics(viewportSize: geo.size)
+            let islandLayout = islandMetrics.usesIslandLayout
+            ZStack(alignment: .topLeading) {
+                SkyStatusIndicator(
+                    mode: statusMode,
+                    azimuth: statusAzimuth,
+                    elevation: statusElevation,
+                    presence: statusPresence,
+                    activation: statusActivation,
+                    islandLayout: islandLayout,
+                    islandGapWidth: islandMetrics.islandGapWidth,
+                    islandStatusWingWidth: islandMetrics.statusWingWidth,
+                    islandDirectionWingWidth: islandMetrics.directionWingWidth,
+                    wingHeight: islandMetrics.wingHeight,
+                    wingCornerRadius: islandMetrics.wingCornerRadius,
+                    backTitle: overviewChromeVisible ? "天空" : nil,
+                    onBack: overviewChromeVisible ? exitOverviewToLocal : nil,
+                    onStatusTap: {
+                        handleStatusWingTap()
+                    },
+                    onDirectionTap: { toggleTopPanel(.direction) }
+                )
+                .frame(
+                    width: geo.size.width,
+                    height: SkyTopBarMetrics.controlHeight
+                )
+
+                if let topPanel {
+                    let panelWidth = topPanel == .observation
+                        ? islandMetrics.statusWingWidth
+                        : islandMetrics.directionWingWidth
+                    let centerX = topPanelCenterX(
+                        topPanel,
+                        viewportWidth: geo.size.width,
+                        metrics: islandMetrics
+                    )
+                    topDetailPanel(
+                        topPanel,
+                        width: panelWidth,
+                        cornerRadius: islandMetrics.wingCornerRadius
+                    )
+                        .offset(
+                            x: centerX - panelWidth / 2,
+                            y: SkyTopBarMetrics.controlHeight + SkyTopBarMetrics.expandedGap
+                        )
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+            }
+            .padding(
+                .top,
+                islandLayout ? islandMetrics.topPadding : max(4, geo.safeAreaInsets.top)
+            )
+            .animation(
+                suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand,
+                value: topPanel
+            )
+        }
     }
 
-    /// 状态判定顺序即优先级：降级 → 全局星图 → 捕获 → 感应 → 常规观测。
-    /// 这样"点位方向是否可信"永远是用户最先读到的信息。
+    private func topPanelCenterX(
+        _ panel: TopPanel,
+        viewportWidth: CGFloat,
+        metrics: DynamicIslandWingMetrics
+    ) -> CGFloat {
+        let width = panel == .observation
+            ? metrics.statusWingWidth
+            : metrics.directionWingWidth
+        if metrics.usesIslandLayout {
+            let offset = metrics.islandGapWidth / 2 + width / 2
+            return viewportWidth / 2 + (panel == .observation ? -offset : offset)
+        }
+        return panel == .observation
+            ? SkyTopBarMetrics.outerMargin + width / 2
+            : viewportWidth - SkyTopBarMetrics.outerMargin - width / 2
+    }
+
+    /// 捕获中的事件状态优先于非阻断式环境提示，确保顶部与准星、卡片说同一种语言。
     private var statusMode: SkyStatusIndicator.Mode {
+        if session.pointingAvailability == .unavailable {
+            return .degraded(reason: "姿态不可用 · 方向仅供参考")
+        }
+        if overviewChromeVisible {
+            return .field(timeLabel: clock.isLive ? "全局星图 · 此刻" : "全局星图 · \(clock.offsetLabel)")
+        }
+        if archivePresentationReady,
+           let id = capture.engagedObjectId,
+           let object = session.catalog.objectsByID[id] {
+            if isReleasing {
+                return .releasing(identifier: object.cosparId)
+            }
+            return .locked(identifier: object.cosparId, confirmedAt: lockedAt)
+        }
+        if capture.isAcquiring {
+            return capture.acquisitionProgress < 0.28 ? .sensing : .focusing
+        }
         if let reason = pointingStatusLabel {
             return .degraded(reason: reason)
         }
-        if persistentOverviewPresented {
-            return .field(timeLabel: clock.isLive ? "全局星图 · 此刻" : "全局星图 · \(clock.offsetLabel)")
-        }
-        if capture.isLocked || isReleasing,
-           let id = capture.engagedObjectId,
-           let object = session.catalog.objectsByID[id] {
-            return .locked(name: object.name)
-        }
-        if capture.isAcquiring { return .acquiring }
         return .observing
     }
 
-    /// 坐标只在主天空出现；全局星图里方位角没有对应含义。
-    private var statusCoordinates: String? {
-        guard !persistentOverviewPresented else { return nil }
+    private var statusAzimuth: String {
         let az = session.pointing.azimuth * 180 / .pi
-        let el = session.pointing.elevation * 180 / .pi
         let azNorm = az < 0 ? az + 360 : az
-        let magnification = fieldMagnification > 1.01
-            ? String(format: " · %.1f×", Double(fieldMagnification))
-            : ""
-        return String(format: "AZ %03.0f° EL %+03.0f°%@", azNorm, el, magnification)
+        return String(format: "AZ %03.0f°", azNorm)
+    }
+
+    private var statusElevation: String {
+        let el = session.pointing.elevation * 180 / .pi
+        return String(format: "EL %+03.0f°", el)
     }
 
     /// 锁定后指示器后退，把第一视觉权重让给目标档案；但绝不完全消失。
     private var statusPresence: Double {
-        if persistentOverviewPresented { return 1 }
-        if capture.isLocked || isReleasing { return 0.42 }
-        if capture.isAcquiring { return 0.62 }
-        return 0.92
+        if overviewCommitted { return 1 }
+        if archivePresentationReady { return 0.72 }
+        if capture.isAcquiring { return 0.9 }
+        return max(0.54, 0.86 - 0.32 * overviewPresentationProgress)
+    }
+
+    private var statusActivation: Double {
+        if archivePresentationReady { return 1 }
+        if capture.isAcquiring { return capture.acquisitionProgress }
+        return 0
+    }
+
+    private func toggleTopPanel(_ panel: TopPanel) {
+        #if !targetEnvironment(simulator)
+        let generator = UISelectionFeedbackGenerator()
+        generator.selectionChanged()
+        #endif
+        withAnimation(
+            suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand
+        ) {
+            filterExpanded = false
+            topPanel = topPanel == panel ? nil : panel
+        }
+    }
+
+    private func topDetailPanel(
+        _ panel: TopPanel,
+        width: CGFloat,
+        cornerRadius: CGFloat
+    ) -> some View {
+        let metrics = topPanelMetrics(for: panel)
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(panel == .observation ? "观测状态" : "方向与精度")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Palette.inkHigh.opacity(0.94))
+                Text(panel == .observation ? "SYSTEM" : "ATTITUDE")
+                    .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                    .tracking(0.7)
+                    .foregroundStyle(Palette.inkLow.opacity(0.68))
+            }
+            .padding(.bottom, 8)
+
+            ForEach(Array(metrics.enumerated()), id: \.offset) { index, metric in
+                topMetric(metric.0, metric.1)
+                if index < metrics.count - 1 {
+                    Rectangle()
+                        .fill(Palette.inkFaint.opacity(0.18))
+                        .frame(height: 0.5)
+                }
+            }
+
+            if panel == .direction {
+                Text(directionGuidance)
+                    .font(.system(size: 8, weight: .regular))
+                    .foregroundStyle(Palette.inkLow.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 8)
+            }
+
+            Button(action: openFullInstrumentStatus) {
+                HStack(spacing: 5) {
+                    Text(panel == .observation ? "完整状态" : "查看校准")
+                        .font(.system(size: 8.5, weight: .medium))
+                    Spacer(minLength: 2)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 7.5, weight: .semibold))
+                }
+                .foregroundStyle(Palette.inkHigh.opacity(0.86))
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .overlay(alignment: .top) {
+                Rectangle()
+                    .fill(Palette.inkFaint.opacity(0.2))
+                    .frame(height: 0.5)
+            }
+            .padding(.top, 8)
+        }
+        .padding(.horizontal, 9)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .frame(width: width, alignment: .leading)
+        .background(
+            Palette.voidBlack.opacity(0.12),
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        )
+        .modifier(
+            SkyWingSurfaceModifier(
+                cornerRadius: cornerRadius,
+                interactive: true
+            )
+        )
+    }
+
+    private func topPanelMetrics(for panel: TopPanel) -> [(String, String)] {
+        switch panel {
+        case .observation:
+            [
+                ("姿态", pointingAvailabilityText),
+                ("方位参考", headingConfidenceText),
+                ("定位", session.observer.coordinates.assumed ? "估算" : "实时"),
+                ("轨道龄期", "\(session.tleAgeDays) 天"),
+            ]
+        case .direction:
+            [
+                ("方位", statusAzimuth.replacingOccurrences(of: "AZ ", with: "")),
+                ("仰角", statusElevation.replacingOccurrences(of: "EL ", with: "")),
+                ("视场", String(format: "%.1f×", Double(fieldMagnification))),
+                ("精度", headingConfidenceText),
+            ]
+        }
+    }
+
+    private func topMetric(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(label)
+                .font(.system(size: 7.5, weight: .regular))
+                .foregroundStyle(Palette.inkLow.opacity(0.72))
+                .lineLimit(1)
+            Spacer(minLength: 2)
+            Text(value)
+                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .frame(height: 26)
+    }
+
+    private func openFullInstrumentStatus() {
+        withAnimation(Motion.interfaceCollapse) { topPanel = nil }
+        onOpenSystemStatus()
+    }
+
+    private var pointingAvailabilityText: String {
+        switch session.pointingAvailability {
+        case .idle: "空闲"
+        case .starting: "启动中"
+        case .tracking: "追踪中"
+        case .manual: "手动"
+        case .unavailable: "不可用"
+        }
+    }
+
+    private var headingConfidenceText: String {
+        switch session.confidence {
+        case .trueNorth: "真北"
+        case .uncalibrated: "待校准"
+        case .manual: "模拟"
+        }
+    }
+
+    private var directionGuidance: String {
+        session.confidence == .uncalibrated ? "画 8 字校准并查看详情" : "查看完整姿态信息"
     }
 
     /// 只有会影响“这些点是否真的在你所指天空中”的降级才常驻提示；正常真北、
@@ -867,7 +1343,7 @@ struct SkyView: View {
         case .unavailable:
             return "姿态不可用 · 方向仅供参考"
         case .manual:
-            return "手动指向"
+            return nil
         case .idle, .starting, .tracking:
             if session.confidence == .uncalibrated {
                 return "指向未校准 · 画 8 字校准"
@@ -905,12 +1381,15 @@ struct SkyView: View {
                 at: observation,
                 live: clock.isLive
             ),
-                  eph.elevation > 0,
-                  let proj = projection.project(
-                      azimuth: eph.azimuth, elevation: eph.elevation
-                  ) else { return }
+                  eph.elevation > 0
+            else { return }
+            let angularDistance = projection.angularDistance(
+                azimuth: eph.azimuth,
+                elevation: eph.elevation
+            )
+            guard angularDistance < Projection.fadeEnd else { return }
             let captureAngle = Projection.captureAngle(
-                for: proj.angularDistance,
+                for: angularDistance,
                 magnification: fieldMagnification
             )
             if object.id == trackedID {
@@ -994,160 +1473,6 @@ struct SkyView: View {
         return RelationshipTarget(projected: projected, marker: marker)
     }
 
-    private func relationshipMarker(
-        objectID: String,
-        observation: Date,
-        in size: CGSize
-    ) -> TargetRelationshipGeometry.Marker? {
-        relationshipTarget(
-            objectID: objectID,
-            observation: observation,
-            in: size
-        )?.marker
-    }
-
-    /// 档案与卫星共享同一个屏幕位移。这里刻意不钳制位置：设备转动时档案会像
-    /// 空间注释一样自然离开屏幕，而不是重新吸附到固定 UI 坐标。
-    private func spatialArchiveFrame(
-        for target: RelationshipTarget,
-        in size: CGSize
-    ) -> CGRect? {
-        guard let projected = target.projected?.point else { return nil }
-        // 铭牌是定宽器件：遥测栅格需要两列可读的中文标签，宽度必须由面板自身的
-        // 排版决定，而不是屏幕比例。窄屏时才等比收窄。
-        let width = min(ArchiveOverlay.plateWidth, size.width - 32)
-        let rememberedHeight = measuredArchiveFrame.height
-        let height = rememberedHeight > 100 && rememberedHeight < size.height * 0.62
-            ? rememberedHeight
-            : min(280, size.height * 0.42)
-        let gap: CGFloat = 14
-        let minX: CGFloat = 12
-        let maxX = max(minX, size.width - width - 12)
-        // 先按目标所在的一侧摆放；那一侧放不下时改用另一侧，避免定宽铭牌被钳回
-        // 目标身上。窄屏两侧都放不下时才接受钳制，由下面的准星让位继续处理。
-        let preferred: CGFloat = archivePlacementSide == .leading
-            ? projected.x - width - gap
-            : projected.x + gap
-        let alternate: CGFloat = archivePlacementSide == .leading
-            ? projected.x + gap
-            : projected.x - width - gap
-        let x: CGFloat
-        if preferred >= minX, preferred <= maxX {
-            x = preferred
-        } else if alternate >= minX, alternate <= maxX {
-            x = alternate
-        } else {
-            x = min(max(preferred, minX), maxX)
-        }
-        let y = projected.y - height * 0.52
-        return archiveFrameAvoidingCrosshair(
-            CGRect(x: x, y: y, width: width, height: height),
-            in: size
-        )
-    }
-
-    /// 准星是这台仪器的取景中心，任何情况下都不该被读物盖住。铭牌与准星重叠时
-    /// 整体沿纵向让开 —— 联系线继续指回目标，因此空间关系不会因为这一次让位而断开。
-    private func archiveFrameAvoidingCrosshair(
-        _ frame: CGRect,
-        in size: CGSize
-    ) -> CGRect {
-        // 准星的四条刻线延伸到中心 15pt；再留 9pt 呼吸，让铭牌边框不与刻线相切。
-        let center = CGPoint(x: size.width / 2, y: size.height / 2)
-        let keepOutRadius: CGFloat = 24
-        let keepOut = CGRect(
-            x: center.x - keepOutRadius,
-            y: center.y - keepOutRadius,
-            width: keepOutRadius * 2,
-            height: keepOutRadius * 2
-        )
-        guard frame.intersects(keepOut) else { return frame }
-
-        // 上缘让给顶部指向读数：那一行是"这些点是否可信"的答案，不能被铭牌压住。
-        let topLimit = SkyTopBarMetrics.safeAreaSpacing
-            + SkyTopBarMetrics.controlHeight
-            + 76
-        // 下缘让给整条底部控制带：仪器轨两行加动作行，铭牌不覆盖任何可点区域。
-        let bottomLimit = size.height - utilityRailHeight - 62
-        let above = keepOut.minY - 10 - frame.height
-        let below = keepOut.maxY + 10
-        let fitsAbove = above >= topLimit
-        let fitsBelow = below + frame.height <= bottomLimit
-
-        let y: CGFloat
-        if fitsAbove, fitsBelow {
-            // 两侧都放得下时走位移更小的一侧，铭牌不会为了让位跨过整块画面。
-            y = abs(above - frame.minY) <= abs(below - frame.minY) ? above : below
-        } else if fitsAbove {
-            y = above
-        } else if fitsBelow {
-            y = below
-        } else {
-            // 窄屏上定宽铭牌比中心两侧的剩余空间都高，完全避开无解。这时贴住下缘：
-            // 准星因此落在铭牌顶部的留白与状态标签上，而不是名称、叙述或读数上。
-            // 准星本身画在档案之上，所以取景中心始终可见。
-            y = max(topLimit, bottomLimit - frame.height)
-        }
-        return CGRect(x: frame.minX, y: y, width: frame.width, height: frame.height)
-    }
-
-    /// 面板接近屏幕边缘时随自身裁切比例和目标边缘进度共同淡出；返回同一方向后
-    /// 使用完全相同的函数反向出现，不需要额外的“重新打开”状态。
-    private func spatialArchiveVisibility(
-        target: RelationshipTarget,
-        frame: CGRect,
-        in size: CGSize
-    ) -> Double {
-        let viewport = CGRect(
-            x: 4,
-            y: 70,
-            width: max(1, size.width - 8),
-            height: max(1, size.height - 70 - 112)
-        )
-        let intersection = frame.intersection(viewport)
-        guard !intersection.isNull, frame.width > 0, frame.height > 0 else { return 0 }
-        let visibleFraction = Double(
-            (intersection.width * intersection.height) / (frame.width * frame.height)
-        )
-        let panelPresence = unitSmoothstep((visibleFraction - 0.08) / 0.55)
-        let targetPresence = 1 - unitSmoothstep((target.marker.edgeProgress - 0.08) / 0.78)
-        return panelPresence * targetPresence
-    }
-
-    /// 连线静止时回落为低存在感；目标位置在相邻采样间明显变化时快速增强，
-    /// 让用户重新建立空间关系，然后以较慢时间常数淡回阅读层。
-    private func updateRelationshipMotion(
-        at date: Date,
-        observation: Date,
-        in size: CGSize
-    ) {
-        guard let objectID = capture.engagedObjectId,
-              capture.isLocked || isReleasing,
-              let marker = relationshipMarker(
-                objectID: objectID,
-                observation: observation,
-                in: size
-              ) else {
-            lastRelationshipPoint = nil
-            lastRelationshipSample = nil
-            relationshipMotionEmphasis = 0
-            return
-        }
-
-        let dt = min(0.25, max(1.0 / 60.0, lastRelationshipSample.map {
-            date.timeIntervalSince($0)
-        } ?? 0.1))
-        let distance = lastRelationshipPoint.map {
-            hypot(marker.point.x - $0.x, marker.point.y - $0.y)
-        } ?? 18
-        let target = min(1, Double(distance / 16))
-        let timeConstant = target > relationshipMotionEmphasis ? 0.1 : 0.82
-        let alpha = 1 - exp(-dt / timeConstant)
-        relationshipMotionEmphasis += (target - relationshipMotionEmphasis) * alpha
-        lastRelationshipPoint = marker.point
-        lastRelationshipSample = date
-    }
-
     /// 时间采样属于帧更新，不属于 Canvas 绘制副作用。
     private func updateOverviewTrails(
         at frameDate: Date,
@@ -1190,6 +1515,10 @@ struct SkyView: View {
     @ViewBuilder
     private func timeOverviewLayer(time: TimeInterval, observation: Date) -> some View {
         if persistentOverviewPresented {
+            let progress = overviewPresentationProgress
+            let globePresence = ObservationScale.globePresence(
+                progress: progress
+            )
             SkyOverviewView(
                 session: session,
                 clock: clock,
@@ -1200,18 +1529,20 @@ struct SkyView: View {
                 focusedObjectId: capture.engagedObjectId,
                 scaleModified: $overviewScaleModified,
                 resetRequest: overviewResetRequest,
-                interactive: persistentOverviewPresented
-                    && persistentOverviewProgress > 0.98
-                    && !overviewTransitioning
+                transitionProgress: progress,
+                entryPointing: overviewEntryPointing,
+                transitionMotionEnabled: !suppressMotion,
+                interactive: overviewCommitted
+                    && (!overviewTransitioning || overviewReturnGestureActive),
+                onScaleReturnChanged: updateOverviewReturnGesture,
+                onScaleReturnEnded: finishOverviewReturnGesture
             )
-            .opacity(overviewPresentationProgress)
-            .scaleEffect(suppressMotion ? 1 : 0.84 + 0.16 * overviewPresentationProgress)
-            .rotationEffect(
-                suppressMotion
-                    ? .zero
-                    : .degrees(-1.6 * (1 - overviewPresentationProgress))
+            .opacity(globePresence)
+            .blur(
+                radius: suppressMotion
+                    ? 0
+                    : 1.6 * (1 - globePresence)
             )
-            .blur(radius: suppressMotion ? 0 : 4 * (1 - overviewPresentationProgress))
             .transition(
                 suppressMotion
                     ? .opacity
@@ -1221,10 +1552,43 @@ struct SkyView: View {
                     )
             )
             .allowsHitTesting(
-                persistentOverviewPresented
-                    && persistentOverviewProgress > 0.98
-                    && !overviewTransitioning
+                overviewCommitted
+                    && (!overviewTransitioning || overviewReturnGestureActive)
             )
+        }
+    }
+
+    @ViewBuilder
+    private var scaleTransitionCueLayer: some View {
+        if persistentOverviewPresented,
+           !overviewCommitted,
+           persistentOverviewProgress > 0.04 {
+            let p = persistentOverviewProgress
+            VStack(spacing: 8) {
+                Spacer()
+                Text("继续缩小 · 查看完整轨道")
+                    .font(Typography.statusTag)
+                    .tracking(0.8)
+                    .foregroundStyle(Palette.inkMid.opacity(0.48 + 0.4 * p))
+
+                HStack(spacing: 7) {
+                    Rectangle()
+                        .frame(width: 28, height: 0.5)
+                    Circle()
+                        .frame(width: 4, height: 4)
+                    Rectangle()
+                        .frame(width: 28, height: 0.5)
+                    Text("±24H")
+                        .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                        .tracking(0.7)
+                }
+                .foregroundStyle(Palette.signal.opacity(0.26 + 0.38 * p))
+            }
+            .padding(.bottom, 164)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(ObservationScale.eased((p - 0.08) / 0.42))
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 
@@ -1244,11 +1608,17 @@ struct SkyView: View {
             )
 
             let pointing = session.pointing
-            let parallax = CGPoint(
-                x: CGFloat(-pointing.azimuth) * 40,
-                y: CGFloat(pointing.elevation) * 40
+            let dustTransform = StarDust.skyTransform(
+                pointing: pointing,
+                canvasSize: size,
+                verticalFOV: fieldVerticalFOV
             )
-            SkyRenderer.drawDust(context, dust: dust, time: motionTime, size: size, parallax: parallax)
+            SkyRenderer.drawDust(
+                context,
+                dust: dust,
+                size: size,
+                transform: dustTransform
+            )
 
             // 全景已完全覆盖屏幕时，底层只保留可用于退场交叉溶解的介质背景；
             // 不再重复投影同一批 16k 目标。进出动画的中间区间仍完整绘制主天空。
@@ -1272,8 +1642,14 @@ struct SkyView: View {
                 proj: Projection.Projected,
                 magnitude: SkyRenderer.StarMagnitude
             )] = []
+            let recordsScreenPositions = clock.isReturningToLive
             var screenPositions: [String: CGPoint] = [:]
-            var edgeCandidates: [Projection.ScreenDirection] = []
+            projected.reserveCapacity(max(64, session.displayObjects.count / 3))
+            if recordsScreenPositions {
+                screenPositions.reserveCapacity(
+                    max(64, session.displayObjects.count / 3)
+                )
+            }
             // 避开灵动岛/顶部读数与底部时间坐标仪。
             let cueBounds = relationshipBounds(in: size)
             let relationship: RelationshipTarget?
@@ -1287,18 +1663,6 @@ struct SkyView: View {
             } else {
                 relationship = nil
             }
-            let spatialFrame = relationship.flatMap { spatialArchiveFrame(for: $0, in: size) }
-            let archivePresence: Double
-            if let relationship, let spatialFrame {
-                archivePresence = spatialArchiveVisibility(
-                    target: relationship,
-                    frame: spatialFrame,
-                    in: size
-                )
-            } else {
-                archivePresence = 0
-            }
-            let archiveBounds = archivePresence > 0.01 ? spatialFrame ?? .null : .null
             let replacementId = capture.replacementObjectId
             @MainActor func projectObject(_ object: CatalogObject) {
                 guard let eph = session.ephemeris.cachedEphemeris(object.id, at: observation, live: live),
@@ -1311,14 +1675,9 @@ struct SkyView: View {
                         isCurated: object.isCurated || object.isFeatured
                     )
                     projected.append((object, proj, magnitude))
-                    screenPositions[object.id] = proj.point
-                    if cueBounds.contains(proj.point) { return }
-                }
-
-                if let direction = projection.screenDirection(
-                    azimuth: eph.azimuth, elevation: eph.elevation
-                ), direction.angularDistance < 165 * .pi / 180 {
-                    edgeCandidates.append(direction)
+                    if recordsScreenPositions {
+                        screenPositions[object.id] = proj.point
+                    }
                 }
             }
             for object in session.displayObjects {
@@ -1326,7 +1685,8 @@ struct SkyView: View {
             }
 
             // 时间拖影：offset 变化时记录，停止后消散
-            if !clock.isScrubbing {
+            if !clock.isScrubbing,
+               recordsScreenPositions || !screenTrails.isEmpty {
                 screenTrails.update(
                     offset: clock.offset,
                     positions: screenPositions,
@@ -1349,9 +1709,11 @@ struct SkyView: View {
             }
 
             let strength = capture.strength
+            let widePointScale = CGFloat(1 - 0.28 * wideFieldProgress)
+            let widePointOpacity = 1 - 0.14 * wideFieldProgress
 
             // 轨迹弧（锁定/释放中的对象；观测时刻为中心 ±3min）
-            if let id = engagedId, capture.isLocked || isReleasing {
+            if let id = engagedId, archivePresentationReady {
                 let points = session.tracks.track(
                     for: id, observer: session.observer.coordinates, at: observation
                 )
@@ -1365,14 +1727,28 @@ struct SkyView: View {
                     if tp.offset >= 0 { future.append(proj.point) }
                 }
                 SkyRenderer.drawTrack(
-                    context, pastPoints: past, futurePoints: future, alpha: strength
+                    context,
+                    pastPoints: past,
+                    futurePoints: future,
+                    alpha: strength * (1 - 0.42 * wideFieldProgress)
                 )
             }
 
             // 星野按星等分档批量绘制：亮度差建立深度，类别色只留在最亮档的外晕。
             // 图层数由档位数决定，与目标数量无关。
-            var categoryTiers: [CatalogCategory: [SkyRenderer.StarMagnitude: [CGPoint]]] = [:]
-            var familyTiers: [CatalogFamily: [SkyRenderer.StarMagnitude: [CGPoint]]] = [:]
+            let localFocusPoint = relationship?.projected?.point
+            let localFocusProgress = archivePresentationReady
+                ? 1
+                : (capture.isAcquiring ? capture.acquisitionProgress : 0)
+            var categoryTiers: [
+                CatalogCategory: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]
+            ] = [:]
+            var familyTiers: [
+                CatalogFamily: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]
+            ] = [:]
+            var focusedNeighborTiers: [
+                SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]
+            ] = [:]
             categoryTiers.reserveCapacity(CatalogCategory.allCases.count)
             familyTiers.reserveCapacity(CatalogFamily.allCases.count)
             for (object, proj, magnitude) in projected
@@ -1380,11 +1756,23 @@ struct SkyView: View {
                 && object.id != replacementId
                 && !object.isCurated
                 && !object.isFeatured {
+                let sample = SkyRenderer.SatellitePoint(
+                    point: proj.point,
+                    seed: object.noradId
+                )
+                if capture.isAcquiring,
+                   !archivePresentationReady,
+                   let localFocusPoint,
+                   pow(proj.point.x - localFocusPoint.x, 2)
+                    + pow(proj.point.y - localFocusPoint.y, 2) < 72 * 72 {
+                    focusedNeighborTiers[magnitude, default: []].append(sample)
+                    continue
+                }
                 if let family = object.family {
-                    familyTiers[family, default: [:]][magnitude, default: []].append(proj.point)
+                    familyTiers[family, default: [:]][magnitude, default: []].append(sample)
                 } else {
                     categoryTiers[object.category, default: [:]][magnitude, default: []]
-                        .append(proj.point)
+                        .append(sample)
                 }
             }
             for category in CatalogCategory.allCases {
@@ -1392,7 +1780,9 @@ struct SkyView: View {
                 SkyRenderer.drawStarField(
                     context,
                     tiers: tiers,
-                    tint: category.tint
+                    tint: category.tint,
+                    opacity: widePointOpacity,
+                    visualScale: widePointScale
                 )
             }
             // 大型星座整体后退一档；锁定其中一颗时，同网络的其他节点轻微前移，
@@ -1404,10 +1794,16 @@ struct SkyView: View {
                     context,
                     tiers: tiers,
                     tint: family.tint,
-                    opacity: emphasized ? 0.92 : 0.62,
-                    emphasis: emphasized ? 1.08 : 0.86
+                    opacity: (emphasized ? 0.92 : 0.62) * widePointOpacity,
+                    emphasis: emphasized ? 1.08 : 0.86,
+                    visualScale: widePointScale
                 )
             }
+            SkyRenderer.drawFocusedNeighbors(
+                context,
+                tiers: focusedNeighborTiers,
+                progress: localFocusProgress
+            )
 
             // 精选与当前捕捉对象保留呼吸、光晕和刻度细节。
             for (object, proj, magnitude) in projected {
@@ -1430,21 +1826,25 @@ struct SkyView: View {
                 } else {
                     brightness = magnitudeFloor * proj.visibility
                 }
-                let targetBehindArchive = isEngaged
-                    && (capture.isLocked || isReleasing)
-                    && archiveBounds.contains(proj.point)
-                if !targetBehindArchive {
-                    SkyRenderer.drawTarget(
-                        context,
-                        at: proj.point,
-                        brightness: brightness,
-                        tint: tint,
-                        time: motionTime,
-                        breathPhase: Double(object.id.hashValue % 628) / 100.0
-                    )
-                }
+                SkyRenderer.drawTarget(
+                    context,
+                    at: proj.point,
+                    brightness: brightness * (1 - 0.22 * wideFieldProgress),
+                    tint: tint,
+                    time: motionTime,
+                    breathPhase: Double(object.id.hashValue % 628) / 100.0,
+                    focusProgress: isEngaged
+                        ? (archivePresentationReady ? 1 : capture.acquisitionProgress)
+                        : (isReplacement ? capture.replacementProgress : 0),
+                    locked: isEngaged && archivePresentationReady,
+                    breathes: isEngaged || isReplacement,
+                    haloStrength: (isEngaged || isReplacement ? 1 : 0.34)
+                        * (1 - 0.38 * wideFieldProgress),
+                    visualScale: widePointScale
+                )
 
-                if (isEngaged && capture.isAcquiring) || isReplacement {
+                if (isEngaged && capture.isAcquiring && !archivePresentationReady)
+                    || isReplacement {
                     let progress = isReplacement
                         ? capture.replacementProgress
                         : capture.acquisitionProgress
@@ -1456,142 +1856,77 @@ struct SkyView: View {
                         at: proj.point,
                         progress: progress,
                         presence: presence,
+                        inward: CGVector(
+                            dx: size.width / 2 - proj.point.x,
+                            dy: size.height / 2 - proj.point.y
+                        ),
                         tint: tint
                     )
-                    let scanStart = isReplacement
-                        ? capture.replacementTriggeredAt
-                        : capture.scanTriggeredAt
-                    if let scanStart,
-                       !clock.isScrubbing, !suppressMotion {
-                        let scanProgress = frameDate.timeIntervalSince(scanStart) / Motion.scanDuration
-                        SkyRenderer.drawScanBand(
-                            context, around: proj.point, width: 160, progress: scanProgress
-                        )
-                    }
-
+                    SkyRenderer.drawFocusField(
+                        context,
+                        around: proj.point,
+                        progress: progress,
+                        tint: tint
+                    )
                 }
             }
 
-            // 稳定阅读关系：不依赖目标是否仍在正常投影视野。画面内标记、边缘裁切
-            // 信标和档案联系线全部由同一个 marker 连续派生，因此出入边缘不会换轨。
+            // 锁定目标离开视野后只保留这一枚暖色信标；浏览态不再显示候选箭头。
             if let id = engagedId,
-               capture.isLocked || isReleasing,
+               archivePresentationReady,
                let object = session.catalog.objectsByID[id],
-               let relationship,
-               let lockTime = lockedAt {
+               let relationship {
                 let marker = relationship.marker
-                let rawGrowth = min(1, max(
-                    0,
-                    (frameDate.timeIntervalSince(lockTime) - 0.08)
-                        / Motion.signalLineGrowDuration
-                ))
-                let grownLine = 1 - pow(1 - rawGrowth, 3)
-                // 归还开始时先让正文消隐，再把联系线从档案边界收回目标。
-                let lineRetraction = unitSmoothstep((releaseProgress - 0.14) / 0.68)
-                let lineProgress = grownLine * (1 - lineRetraction)
                 let releaseVisibility = 1 - unitSmoothstep((releaseProgress - 0.46) / 0.54)
-                let readingAlpha = 0.46 + 0.54 * relationshipMotionEmphasis
-                let connection = archivePresence > 0.01
-                    ? TargetRelationshipGeometry.connection(
-                        from: marker.point,
-                        to: archiveBounds
-                    )
-                    : nil
-                if let connection {
-                    SkyRenderer.drawSignalLine(
-                        context,
-                        from: connection.start,
-                        to: connection.archiveAnchor,
-                        progress: lineProgress,
-                        alpha: (capture.isLocked ? max(0.72, strength) : releaseVisibility)
-                            * readingAlpha * archivePresence
-                    )
-                }
-
-                if connection?.targetOccludedByArchive != true {
-                    SkyRenderer.drawLockedMarker(
-                        context,
-                        at: marker.point,
-                        edgeProgress: marker.edgeProgress,
-                        inward: marker.inward,
-                        clippedTo: cueBounds,
-                        tint: object.identityTint,
-                        time: motionTime,
-                        confirmationProgress: lockProgress,
-                        releaseProgress: releaseProgress,
-                        showsDirectionCue: marker.isOffscreen,
-                        alpha: capture.isLocked ? max(0.72, strength) : releaseVisibility
-                    )
-                }
+                SkyRenderer.drawLockedMarker(
+                    context,
+                    at: marker.point,
+                    edgeProgress: marker.edgeProgress,
+                    inward: marker.inward,
+                    clippedTo: cueBounds,
+                    tint: object.identityTint,
+                    time: motionTime,
+                    confirmationProgress: lockProgress,
+                    releaseProgress: releaseProgress,
+                    showsDirectionCue: marker.isOffscreen,
+                    alpha: isReleasing ? releaseVisibility : max(0.76, strength)
+                )
             }
 
             SkyRenderer.drawVignette(context, size: size)
-
-            // 任意观测时刻的探索态都给出方向提示；进入捕捉后让信标退场。
-            if !clock.isScrubbing, engagedId == nil {
-                let cues = Self.selectedEdgeCues(from: edgeCandidates, limit: 3)
-                for (rank, cue) in cues.enumerated() {
-                    SkyRenderer.drawEdgeCue(
-                        context,
-                        direction: cue.vector,
-                        inside: cueBounds,
-                        rank: rank,
-                        time: motionTime
-                    )
-                }
-            }
         }
     }
 
-    /// 准星是这台仪器的取景中心，它单独成层画在档案之上。
-    ///
-    /// 定宽铭牌加上纵向让位仍无法在窄屏上完全避开画面中心 —— 面板本身就有
-    /// 屏高三分之一。所以最后一道保证放在层序上：无论档案落在哪里，对焦框都不会
-    /// 被盖住。锁定后它已经降到半强度，穿过正文的两根细线不会干扰阅读。
-    @ViewBuilder
-    private func crosshairLayer(frameDate: Date) -> some View {
+    /// 准星始终保持在观测层，不因底部摘要出现而降权或失焦。
+    private var crosshairLayer: some View {
         Canvas { context, size in
-            let lockProgress = lockPresentationProgress(at: frameDate)
-            let releaseProgress = releasePresentationProgress(at: frameDate)
+            let center = CGPoint(x: size.width / 2, y: size.height / 2)
+            let targetPoint = capture.engagedObjectId.flatMap { id in
+                relationshipTarget(
+                    objectID: id,
+                    observation: clock.observationTime(),
+                    in: size
+                )?.projected?.point
+            }
+            let response = targetPoint.map {
+                CGVector(dx: $0.x - center.x, dy: $0.y - center.y)
+            } ?? .zero
+            let focusProgress = archivePresentationReady
+                ? 1
+                : (capture.isAcquiring ? capture.acquisitionProgress : 0)
             SkyRenderer.drawCrosshair(
                 context,
-                center: CGPoint(x: size.width / 2, y: size.height / 2),
+                center: center,
                 emphasis: capture.isAcquiring
                     ? capture.strength
                     : capture.replacementProgress,
-                presence: 1 - 0.48 * (
-                    capture.isLocked
-                        ? lockProgress
-                        : (isReleasing ? 1 - releaseProgress : 0)
-                )
+                focusProgress: focusProgress,
+                response: response,
+                locked: archivePresentationReady,
+                presence: 1
             )
         }
         .allowsHitTesting(false)
-    }
-
-    /// 按角距选最近目标，并合并屏幕方向相差不足 16° 的拥挤信标。
-    private nonisolated static func selectedEdgeCues(
-        from candidates: [Projection.ScreenDirection],
-        limit: Int
-    ) -> [Projection.ScreenDirection] {
-        var selected: [Projection.ScreenDirection] = []
-        let minimumSeparation: CGFloat = cos(16 * .pi / 180)
-
-        for candidate in candidates {
-            if let overlapIndex = selected.firstIndex(where: { existing in
-                candidate.vector.dx * existing.vector.dx
-                    + candidate.vector.dy * existing.vector.dy > minimumSeparation
-            }) {
-                if candidate.angularDistance < selected[overlapIndex].angularDistance {
-                    selected[overlapIndex] = candidate
-                }
-                continue
-            }
-            selected.append(candidate)
-            selected.sort { $0.angularDistance < $1.angularDistance }
-            if selected.count > limit { selected.removeLast() }
-        }
-        return selected
     }
 
     // MARK: - 档案层
@@ -1601,14 +1936,10 @@ struct SkyView: View {
         if let id = presentedStoryObjectID,
            let object = session.catalog.objectsByID[id],
            let story = object.deepArchiveStory {
-            SatelliteStoryView(
+           SatelliteStoryView(
                 object: object,
                 story: story,
-                ephemeris: session.ephemeris.ephemeris(
-                    id,
-                    at: clock.observationTime(),
-                    live: clock.isLive
-                ),
+                ephemeris: engagedDisplayEphemeris(for: id),
                 onDismiss: {
                     withAnimation(
                         suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.22)
@@ -1618,68 +1949,132 @@ struct SkyView: View {
                     }
                 }
             )
-            .transition(.opacity)
+            .transition(
+                suppressMotion
+                    ? .opacity
+                    : .asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .trailing).combined(with: .opacity)
+                    )
+            )
             .zIndex(20)
         }
     }
 
+    /// 感应阶段只在目标附近放一条识别信息；完成识别或锁定后让位给底部摘要。
     @ViewBuilder
-    private func archiveLayer(observation: Date, frameDate: Date) -> some View {
+    private func targetMicroLabelLayer(observation: Date) -> some View {
         GeometryReader { geo in
-            if archivePresentationReady,
+            if capture.isAcquiring,
+               !filterExpanded,
+               !archivePresentationReady,
                let id = capture.engagedObjectId,
                let object = session.catalog.objectsByID[id],
-               let target = relationshipTarget(
+               let point = relationshipTarget(
                     objectID: id,
                     observation: observation,
                     in: geo.size
-               ),
-               let frame = spatialArchiveFrame(for: target, in: geo.size) {
-                let presence = spatialArchiveVisibility(target: target, frame: frame, in: geo.size)
-                if presence > 0.001 {
-                    ArchiveOverlay(
+                )?.projected?.point {
+                let labelWidth: CGFloat = 188
+                // 标签从目标朝屏幕内侧展开：左半边向右，右半边向左。
+                let placeOnRight = point.x < geo.size.width / 2
+                let horizontalGap: CGFloat = 20
+                let proposedX = placeOnRight
+                    ? point.x + horizontalGap
+                    : point.x - labelWidth - horizontalGap
+                let x = min(max(12, proposedX), geo.size.width - labelWidth - 12)
+                let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+                let nearCrosshair = hypot(point.x - center.x, point.y - center.y) < 48
+                let proposedY: CGFloat = {
+                    if point.y < 132 { return point.y + 12 }
+                    if point.y > geo.size.height - 205 { return point.y - 39 }
+                    if nearCrosshair { return point.y + 20 }
+                    return point.y - 14
+                }()
+                let y = min(max(96, proposedY), geo.size.height - 184)
+                let labelEdgeX = placeOnRight ? x : x + labelWidth
+                let labelEdgeY = y + 13.5
+                let targetEdgeX = point.x + (placeOnRight ? 6 : -6)
+
+                ZStack(alignment: .topLeading) {
+                    Path { path in
+                        path.move(to: CGPoint(x: targetEdgeX, y: point.y))
+                        path.addLine(
+                            to: CGPoint(
+                                x: targetEdgeX + (placeOnRight ? 7 : -7),
+                                y: point.y
+                            )
+                        )
+                        path.addLine(to: CGPoint(x: labelEdgeX, y: labelEdgeY))
+                    }
+                    .stroke(
+                        object.identityTint.opacity(0.54),
+                        style: StrokeStyle(lineWidth: 0.55, lineCap: .round, lineJoin: .round)
+                    )
+
+                    TargetMicroLabel(
                         object: object,
-                        ephemeris: session.ephemeris.ephemeris(
+                        ephemeris: session.ephemeris.cachedEphemeris(
                             id,
                             at: observation,
                             live: clock.isLive
-                        ),
-                        revealed: archivePresentationReady,
-                        captured: capture.isLocked || isReleasing,
-                        lockProgress: 1,
-                        releaseProgress: releasePresentationProgress(at: frameDate),
-                        nextPass: clock.isLive
-                            ? session.passes.nextPass(
-                                for: id,
-                                observer: session.observer.coordinates,
-                                after: observation
-                            )
-                            : .none,
-                        observationTimeLabel: clock.isLive ? nil : clock.offsetLabel
+                        )
                     )
-                    .allowsHitTesting(false)
-                    .id(id)
-                    .transition(.opacity)
-                    .frame(width: frame.width, alignment: .leading)
-                    .offset(x: frame.minX, y: frame.minY)
-                    .opacity(presence)
-                    .accessibilityHidden(presence < 0.35)
-                    .background {
-                        GeometryReader { proxy in
-                            Color.clear.preference(
-                                key: ArchiveBoundsPreferenceKey.self,
-                                value: proxy.frame(in: .named("sky-interface"))
-                            )
-                        }
-                    }
+                    .frame(width: labelWidth)
+                    .offset(x: x, y: y)
                 }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
+                .opacity(0.36 + 0.64 * capture.acquisitionProgress)
+                .id(id)
+                .transition(.opacity.combined(with: .scale(scale: 0.94)))
             }
         }
-        // 空间正文不截获天空手势；“深入档案”已独立放在底部操作区。
+        .allowsHitTesting(false)
         .animation(
-            suppressMotion ? .easeOut(duration: 0.1) : .easeOut(duration: 0.18),
-            value: capture.phase
+            suppressMotion ? .easeOut(duration: 0.1) : Motion.interfaceExpand,
+            value: capture.engagedObjectId
         )
+    }
+
+    /// 感应阶段在后台准备锁定后才需要的精确速度和轨迹。任务 id 随目标变化，
+    /// 用户移开准星后旧结果不会写回新目标。
+    private func prepareEngagedTargetData(for objectID: String?) async {
+        engagedPreciseEphemeris = nil
+        guard let objectID else { return }
+        let observation = clock.observationTime()
+        let live = clock.isLive
+        session.tracks.prepareTrack(
+            for: objectID,
+            observer: session.observer.coordinates,
+            at: observation
+        )
+        let precise = await session.ephemeris.preparePreciseEphemeris(
+            objectID,
+            at: observation,
+            live: live
+        )
+        guard !Task.isCancelled,
+              capture.engagedObjectId == objectID
+        else { return }
+        engagedPreciseEphemeris = precise
+    }
+
+    /// 方位、距离和高度跟随批量 LIVE 帧平滑更新；精确速度使用感应阶段的后台
+    /// 结果。这样卡片既保持实时，也不会每个 4 秒缓存桶在主线程重新传播。
+    private func engagedDisplayEphemeris(for objectID: String) -> Ephemeris? {
+        let observation = clock.observationTime()
+        guard var current = session.ephemeris.cachedEphemeris(
+            objectID,
+            at: observation,
+            live: clock.isLive
+        ) else {
+            return engagedPreciseEphemeris
+        }
+        if let precise = engagedPreciseEphemeris,
+           precise.objectId == objectID {
+            current.velocityKmS = precise.velocityKmS
+        }
+        return current
     }
 
     private var isReleasing: Bool {
@@ -1693,6 +2088,13 @@ struct SkyView: View {
         capture.isLocked
             || isReleasing
             || (!captureConfirmationEnabled && capture.recognitionReady)
+    }
+
+    private func detailRepresentsCapturedTarget(_ objectID: String) -> Bool {
+        capture.lockedObjectId == objectID
+            || (!captureConfirmationEnabled
+                && capture.engagedObjectId == objectID
+                && capture.recognitionReady)
     }
 
     // MARK: - 引导层
@@ -1756,13 +2158,40 @@ struct SkyView: View {
 
     @State private var lastTranslation = CGSize.zero
 
+    private var lockedTargetTapGesture: some Gesture {
+        SpatialTapGesture()
+            .onEnded { value in
+                guard archivePresentationReady,
+                      !lockedDetailPresented,
+                      !overviewCommitted,
+                      let objectID = capture.engagedObjectId,
+                      viewportSize != .zero,
+                      let projected = relationshipTarget(
+                          objectID: objectID,
+                          observation: clock.observationTime(),
+                          in: viewportSize
+                      )?.projected?.point
+                else { return }
+
+                let distance = hypot(
+                    value.location.x - projected.x,
+                    value.location.y - projected.y
+                )
+                guard distance <= 36 else { return }
+                showLockedDetail()
+            }
+    }
+
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 1)
             .onChanged { value in
-                guard !persistentOverviewPresented else { return }
+                guard !overviewCommitted else { return }
                 guard !fieldMagnificationActive else { return }
                 guard let manual = session.manualProvider else { return }
-                let scale = max(1, fieldMagnification)
+                let scale = max(
+                    ObservationScale.minimumLocalMagnification,
+                    fieldMagnification
+                )
                 let delta = CGSize(
                     width: (value.translation.width - lastTranslation.width) / scale,
                     height: (value.translation.height - lastTranslation.height) / scale
@@ -1771,13 +2200,16 @@ struct SkyView: View {
                 manual.drag(translation: delta)
             }
             .onEnded { value in
-                guard !persistentOverviewPresented else {
+                guard !overviewCommitted else {
                     lastTranslation = .zero
                     return
                 }
                 lastTranslation = .zero
                 guard !fieldMagnificationActive else { return }
-                let scale = max(1, fieldMagnification)
+                let scale = max(
+                    ObservationScale.minimumLocalMagnification,
+                    fieldMagnification
+                )
                 session.manualProvider?.endDrag(velocity: CGSize(
                     width: value.velocity.width / scale,
                     height: value.velocity.height / scale
@@ -1785,36 +2217,104 @@ struct SkyView: View {
             }
     }
 
-    /// 主天空的相机式长焦：围绕固定准星收窄视场，手机姿态仍决定镜头朝向。
-    /// 全局星图出现时由其自身的三维手势接管，避免父子层同时缩放。
+    /// 统一尺度手势：先在局部天空 0.52×…4× 内连续缩放；越过最广视场后，
+    /// 多余行程转换为带阻力的全局转场进度。松手未越阈值会退回局部天空。
     private var fieldMagnificationGesture: some Gesture {
         MagnificationGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
-                guard !persistentOverviewPresented, !clock.isScrubbing else { return }
+                guard !overviewCommitted, !clock.isScrubbing else { return }
+                if !fieldMagnificationActive {
+                    overviewThresholdHapticSent = false
+                    if filterExpanded {
+                        withAnimation(Motion.interfaceCollapse) {
+                            filterExpanded = false
+                        }
+                    }
+                    fieldScaleGestureSample = value
+                    fieldScaleGestureSampleDate = Date()
+                    fieldScaleLogarithmicVelocity = 0
+                } else {
+                    let now = Date()
+                    let deltaTime = now.timeIntervalSince(
+                        fieldScaleGestureSampleDate
+                    )
+                    if deltaTime > 0.008,
+                       fieldScaleGestureSample > 0,
+                       value > 0 {
+                        let instantaneous = log(
+                            Double(value / fieldScaleGestureSample)
+                        ) / deltaTime
+                        fieldScaleLogarithmicVelocity =
+                            fieldScaleLogarithmicVelocity * 0.62
+                            + instantaneous * 0.38
+                        fieldScaleGestureSample = value
+                        fieldScaleGestureSampleDate = now
+                    }
+                }
                 fieldMagnificationActive = true
-                fieldMagnification = min(
-                    Self.maximumFieldMagnification,
-                    max(1, settledFieldMagnification * value)
+                fieldMagnification = ObservationScale.localMagnification(
+                    settled: settledFieldMagnification,
+                    gestureScale: value
+                )
+                updateOverviewScaleGesture(
+                    progress: ObservationScale.overviewProgress(
+                        settled: settledFieldMagnification,
+                        gestureScale: value
+                    )
                 )
             }
             .onEnded { _ in
                 guard fieldMagnificationActive else { return }
                 fieldMagnificationActive = false
-                let target: CGFloat = fieldMagnification < 1.08 ? 1 : fieldMagnification
+                let projected = SpatialMotion.projectedScale(
+                    current: fieldMagnification,
+                    logarithmicVelocity: fieldScaleLogarithmicVelocity,
+                    lowerBound: ObservationScale.minimumLocalMagnification,
+                    upperBound: ObservationScale.maximumLocalMagnification
+                )
+                let target: CGFloat = abs(projected - 1) < 0.055
+                    ? 1
+                    : projected
                 settledFieldMagnification = target
-                withAnimation(.easeOut(duration: 0.2)) {
+                withAnimation(
+                    suppressMotion
+                        ? .easeOut(duration: 0.12)
+                        : .timingCurve(
+                            0.18,
+                            0.72,
+                            0.2,
+                            1,
+                            duration: SpatialMotion.scaleSettleDuration(
+                                logarithmicVelocity: fieldScaleLogarithmicVelocity
+                            )
+                        )
+                ) {
                     fieldMagnification = target
                 }
+                finishOverviewScaleGesture()
             }
     }
 }
 
-private struct ArchiveBoundsPreferenceKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
+/// 详情阅读的短暂离焦容忍。它是纯值策略，避免把阅读寿命重新耦合到捕获阈值。
+enum TargetDetailRetentionPolicy {
+    static let graceDuration: TimeInterval = 3
 
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        let next = nextValue()
-        if next.width > 0, next.height > 0 { value = next }
+    static func deadline(after date: Date) -> Date {
+        date.addingTimeInterval(graceDuration)
+    }
+
+    static func shouldDismiss(
+        now: Date,
+        deadline: Date?,
+        isPinned: Bool,
+        isCaptureActive: Bool
+    ) -> Bool {
+        guard !isPinned,
+              !isCaptureActive,
+              let deadline
+        else { return false }
+        return now >= deadline
     }
 }
 

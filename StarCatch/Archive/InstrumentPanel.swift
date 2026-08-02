@@ -6,6 +6,12 @@ import UIKit
 /// 日常设置页。只保留会影响观测的偏好、观测进度与必要帮助。
 /// 标准字号下一屏完成；极小设备或放大字体时才降级为滚动，保证可访问性。
 struct InstrumentPanel: View {
+    enum Destination {
+        case settings
+        case systemStatus
+        case observations
+    }
+
     private enum Page: Equatable {
         case settings
         case systemStatus
@@ -14,7 +20,9 @@ struct InstrumentPanel: View {
     }
 
     @Binding var presented: Bool
-    @ObservedObject var session: SkySession
+    /// 内容页只读取会话的目录与低频状态快照；不要观察整颗 SkySession。
+    /// 否则主天空的高频 pointing 发布会让设置和长记录列表整页失效重算。
+    let session: SkySession
     @ObservedObject private var observer: ObserverLocation
     @ObservedObject private var log: ObservationLog
 
@@ -23,6 +31,7 @@ struct InstrumentPanel: View {
 
     let onOpenManual: () -> Void
     let onOpenPrivacy: () -> Void
+    let onOpenOverview: () -> Void
 
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
@@ -32,15 +41,41 @@ struct InstrumentPanel: View {
     @State private var dismissRequested = false
     @State private var confirmClearLog = false
     @State private var page: Page = .settings
+    @State private var historyScrollPosition: String?
+    @State private var navigationForward = true
+
+    private struct HistorySection: Identifiable {
+        let day: Date
+        let entries: [ObservationLog.Entry]
+        var id: Date { day }
+    }
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
     private var navigationAnimation: Animation {
         suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceExpand
     }
+    private var pageKey: String {
+        switch page {
+        case .settings: "settings"
+        case .systemStatus: "status"
+        case .observations: "observations"
+        case .observationDetail(let objectId): "observation-\(objectId)"
+        }
+    }
+    private var pageTransition: AnyTransition {
+        let insertionEdge: Edge = navigationForward ? .trailing : .leading
+        let removalEdge: Edge = navigationForward ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: insertionEdge).combined(with: .opacity),
+            removal: .move(edge: removalEdge).combined(with: .opacity)
+        )
+    }
 
     init(
         presented: Binding<Bool>,
         session: SkySession,
+        initialDestination: Destination = .settings,
+        onOpenOverview: @escaping () -> Void = {},
         onOpenManual: @escaping () -> Void = {},
         onOpenPrivacy: @escaping () -> Void = {}
     ) {
@@ -48,6 +83,13 @@ struct InstrumentPanel: View {
         self.session = session
         _observer = ObservedObject(wrappedValue: session.observer)
         _log = ObservedObject(wrappedValue: session.log)
+        let initialPage: Page = switch initialDestination {
+        case .settings: .settings
+        case .systemStatus: .systemStatus
+        case .observations: .observations
+        }
+        _page = State(initialValue: initialPage)
+        self.onOpenOverview = onOpenOverview
         self.onOpenManual = onOpenManual
         self.onOpenPrivacy = onOpenPrivacy
     }
@@ -74,25 +116,24 @@ struct InstrumentPanel: View {
                         panelContent
                     }
                     .scrollBounceBehavior(.basedOnSize)
-                    .transition(.opacity)
 
                 case .systemStatus:
                     systemStatus
-                        .transition(.opacity)
 
                 case .observations:
                     observationHistory
-                        .transition(.opacity)
 
                 case .observationDetail(let objectId):
                     observationDetail(objectId: objectId)
-                        .transition(.opacity)
                 }
             }
+            .id(pageKey)
+            .transition(pageTransition)
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             topNavigationBar
         }
+        .appEdgeBackGesture(action: navigateBack)
         .opacity(revealed ? 1 : 0)
         .onAppear {
             #if DEBUG
@@ -125,11 +166,8 @@ struct InstrumentPanel: View {
 
     private var panelContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header
-                .padding(.top, 22)
-                .padding(.bottom, 26)
-
             sectionLabel("显示")
+                .padding(.top, 18)
                 .padding(.bottom, 6)
             displayControls
                 .padding(.bottom, 24)
@@ -145,7 +183,7 @@ struct InstrumentPanel: View {
                 eyebrow: "STATUS & DATA",
                 title: "仪器状态与轨道数据"
             ) {
-                withAnimation(navigationAnimation) { page = .systemStatus }
+                push(.systemStatus)
             }
             actionRow(
                 eyebrow: "FIELD MANUAL",
@@ -160,49 +198,34 @@ struct InstrumentPanel: View {
             if observer.isDeniedOrRestricted {
                 openSettingsButton
             }
-        }
-        .padding(.horizontal, 34)
-        .padding(.bottom, 24)
-    }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("SETTINGS")
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking + 1.4)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.44))
-                    .frame(height: 0.5)
-            }
-            Text("显示、交互、记录与帮助")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
+            Text("STARCATCH · \(versionText)")
+                .font(Typography.statusTag)
+                .tracking(Typography.statusTagTracking)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .padding(.top, 22)
         }
+        .padding(.horizontal, 30)
+        .padding(.bottom, 24)
     }
 
     private var displayControls: some View {
         VStack(spacing: 0) {
             toggleRow(
-                eyebrow: "GRAIN",
                 title: "介质颗粒",
                 caption: "画面颗粒与扫描纹理。",
                 isOn: $grainEnabled
             )
             hairline
             toggleRow(
-                eyebrow: "REDUCED MOTION",
                 title: "抑制动效",
                 caption: "冻结漂移与呼吸，缩短转场。",
                 isOn: $reducedMotion
             )
             hairline
             toggleRow(
-                eyebrow: "CAPTURE CONFIRMATION",
                 title: "确认捕获",
-                caption: "在主视野底部显示确认、切换与取消捕获。",
+                caption: "在主视野显示确认、切换与取消操作。",
                 isOn: $captureConfirmationEnabled
             )
         }
@@ -212,37 +235,23 @@ struct InstrumentPanel: View {
 
     private var observationSummary: some View {
         Button {
-            withAnimation(navigationAnimation) {
-                page = .observations
-            }
+            push(.observations)
         } label: {
-            HStack(alignment: .center, spacing: 18) {
+            HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("已识别")
+                    Text("观测记录")
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                    Text("\(log.totalObjects) / \(session.catalog.objects.count)")
-                        .font(Typography.dataValue)
-                        .tracking(Typography.dataValueTracking)
-                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                }
-
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.38))
-                    .frame(width: 0.5, height: 34)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("最近观测")
+                    Text("已识别 \(log.totalObjects) 个 · 共锁定 \(totalLockCount) 次")
+                        .font(Typography.readingCompact)
+                        .tracking(Typography.readingCompactTracking)
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                    Text("最近：\(log.entries.first?.objectName ?? "尚无记录")")
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-                    Text(log.entries.first?.objectName ?? "尚无记录")
-                        .font(Typography.guide)
-                        .tracking(Typography.guideTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.82)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -251,7 +260,7 @@ struct InstrumentPanel: View {
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
                     .frame(width: 24, height: 34)
             }
-            .padding(.vertical, 13)
+            .padding(.vertical, 12)
             .contentShape(Rectangle())
             .overlay(alignment: .top) { hairline }
             .overlay(alignment: .bottom) { hairline }
@@ -268,10 +277,8 @@ struct InstrumentPanel: View {
     private var systemStatus: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                statusHeader
-                    .padding(.bottom, 26)
-
                 sectionLabel("设备")
+                    .padding(.top, 18)
                     .padding(.bottom, 8)
                 statusField("观察者", observerDescription)
                 statusField("定位权限", authorizationDescription)
@@ -298,6 +305,13 @@ struct InstrumentPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
 
+                Text("仅供教育与观测，不用于导航、碰撞规避或安全决策。")
+                    .font(Typography.statusTag)
+                    .tracking(0.35)
+                    .foregroundStyle(Palette.signal.opacity(Palette.Level.secondary))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 10)
+
                 sectionLabel("支持与归属")
                     .padding(.top, 28)
                     .padding(.bottom, 6)
@@ -319,27 +333,8 @@ struct InstrumentPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             }
-            .padding(.horizontal, 34)
-            .padding(.top, 22)
+            .padding(.horizontal, 30)
             .padding(.bottom, 30)
-        }
-    }
-
-    private var statusHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("INSTRUMENT STATUS")
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking + 1.0)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.44))
-                    .frame(height: 0.5)
-            }
-            Text("真机状态、离线目录与支持")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
         }
     }
 
@@ -411,7 +406,7 @@ struct InstrumentPanel: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
                 .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(Typography.archiveDataValue)
@@ -434,50 +429,72 @@ struct InstrumentPanel: View {
     // MARK: - 观测记录二级页
 
     private var observationHistory: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            historyHeader
-                .padding(.horizontal, 34)
-                .padding(.top, 22)
-                .padding(.bottom, 24)
+        ScrollView(showsIndicators: false) {
+            LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                historyMetrics
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
 
-            historyMetrics
-                .padding(.horizontal, 34)
-                .padding(.bottom, 16)
-
-            if log.entries.isEmpty {
-                emptyHistory
-                    .padding(.horizontal, 34)
-                Spacer()
-            } else {
-                ScrollView(showsIndicators: false) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(log.entries) { entry in
-                            historyRow(entry)
+                if log.entries.isEmpty {
+                    emptyHistory
+                        .padding(.top, 12)
+                } else {
+                    ForEach(Array(historySections.enumerated()), id: \.element.id) { index, section in
+                        Section {
+                            ForEach(section.entries) { entry in
+                                ObservationSwipeRow(
+                                    onDelete: { log.remove(objectId: entry.objectId) }
+                                ) {
+                                    historyRow(entry)
+                                }
+                                .id(entry.objectId)
+                            }
+                        } header: {
+                            historySectionLabel(
+                                for: section.day,
+                                isFirst: index == 0
+                            )
                         }
                     }
-                    .padding(.horizontal, 34)
-                    .padding(.bottom, 24)
                 }
             }
+            .padding(.horizontal, 30)
+            .padding(.bottom, 22)
+        }
+        .scrollPosition(id: $historyScrollPosition)
+    }
+
+    private var historySections: [HistorySection] {
+        let calendar = Calendar.current
+        let grouped = Dictionary(grouping: log.entries) {
+            calendar.startOfDay(for: $0.lastSeen)
+        }
+        return grouped.keys.sorted(by: >).map { day in
+            HistorySection(
+                day: day,
+                entries: grouped[day, default: []].sorted { $0.lastSeen > $1.lastSeen }
+            )
         }
     }
 
-    private var historyHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("OBSERVATIONS")
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking + 1.4)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.44))
-                    .frame(height: 0.5)
-            }
-            Text("观测记录 · 仅保存在此设备")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+    private func historySectionLabel(for day: Date, isFirst: Bool) -> some View {
+        let calendar = Calendar.current
+        let label: String
+        if calendar.isDateInToday(day) {
+            label = "今天"
+        } else if calendar.isDateInYesterday(day) {
+            label = "昨天"
+        } else {
+            label = Self.historyDayFormatter.string(from: day)
         }
+        return Text(label)
+            .font(Typography.statusTag)
+            .tracking(1.1)
+            .foregroundStyle(Palette.inkMid.opacity(Palette.Level.secondary))
+            .padding(.top, isFirst ? 16 : 14)
+            .padding(.bottom, 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.voidBlack.opacity(0.985))
     }
 
     private var historyMetrics: some View {
@@ -496,7 +513,7 @@ struct InstrumentPanel: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
             Text(value)
                 .font(Typography.dataValue)
                 .tracking(Typography.dataValueTracking)
@@ -510,33 +527,45 @@ struct InstrumentPanel: View {
 
     private func historyRow(_ entry: ObservationLog.Entry) -> some View {
         Button {
-            withAnimation(navigationAnimation) {
-                page = .observationDetail(entry.objectId)
-            }
+            push(.observationDetail(entry.objectId))
         } label: {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(entry.objectName)
-                        .font(Typography.guide)
-                        .tracking(Typography.guideTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                        .lineLimit(1)
-                    Text(historySubtitle(for: entry))
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                    HStack(spacing: 8) {
+                        Text(entry.objectName)
+                            .font(Typography.guide)
+                            .tracking(Typography.guideTracking)
+                            .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                            .layoutPriority(1)
+                        if entry.count > 1 {
+                            Text("×\(entry.count)")
+                                .font(Typography.statusTag)
+                                .tracking(Typography.statusTagTracking)
+                                .foregroundStyle(Palette.signal.opacity(Palette.Level.secondary))
+                                .fixedSize()
+                        }
+                    }
+                    if let category = historyCategory(for: entry) {
+                        Text(category)
+                            .font(Typography.statusTag)
+                            .tracking(Typography.statusTagTracking)
+                            .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                    }
                 }
                 Spacer(minLength: 8)
-                Text("×\(entry.count)")
+                Text(Self.historyTimeFormatter.string(from: entry.lastSeen))
                     .font(Typography.statusTag)
                     .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.secondary))
+                    .frame(width: 48, alignment: .trailing)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
                     .frame(width: 20, height: 34)
             }
-            .frame(minHeight: 56)
+            .frame(minHeight: 54)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) { hairline }
         }
@@ -547,12 +576,10 @@ struct InstrumentPanel: View {
         .accessibilityHint("查看该天体的观测详情")
     }
 
-    private func historySubtitle(for entry: ObservationLog.Entry) -> String {
-        let category = (
+    private func historyCategory(for entry: ObservationLog.Entry) -> String? {
+        (
             session.catalog.objectsByID[entry.objectId]?.category ?? entry.category
         )?.title
-        let date = Self.historyDateFormatter.string(from: entry.lastSeen)
-        return category.map { "\($0)  ·  \(date)" } ?? date
     }
 
     private var emptyHistory: some View {
@@ -564,7 +591,7 @@ struct InstrumentPanel: View {
             Text("将准星对准人造天体可即时阅读档案；开启“确认捕获”并确认目标后，观测会保存在这台设备上。")
                 .font(Typography.statusTag)
                 .tracking(0.45)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 18)
@@ -578,6 +605,19 @@ struct InstrumentPanel: View {
         return formatter
     }()
 
+    private static let historyTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    private static let historyDayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "M 月 d 日"
+        return formatter
+    }()
+
     // MARK: - 单条观测详情
 
     @ViewBuilder
@@ -586,9 +626,6 @@ struct InstrumentPanel: View {
            let object = session.catalog.objectsByID[objectId] ?? archivedObject(from: entry) {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    detailHeader
-                        .padding(.bottom, 26)
-
                     Text(object.name)
                         .font(Typography.archiveObjectName)
                         .tracking(Typography.objectNameTracking)
@@ -638,8 +675,8 @@ struct InstrumentPanel: View {
                     detailField("发射", object.launched)
                     detailField("状态", statusText(for: object.status))
                 }
-                .padding(.horizontal, 34)
-                .padding(.top, 22)
+                .padding(.horizontal, 30)
+                .padding(.top, 18)
                 .padding(.bottom, 28)
             }
         } else {
@@ -671,24 +708,6 @@ struct InstrumentPanel: View {
             elementEpoch: entry.observedAt ?? entry.lastSeen,
             isCurated: false
         )
-    }
-
-    private var detailHeader: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("OBSERVATION")
-                    .font(Typography.fieldLabel)
-                    .tracking(Typography.fieldLabelTracking + 1.4)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.44))
-                    .frame(height: 0.5)
-            }
-            Text("观测详情 · 记录于此设备")
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-        }
     }
 
     @ViewBuilder
@@ -729,7 +748,7 @@ struct InstrumentPanel: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
                 .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(Typography.archiveDataValue)
@@ -770,7 +789,6 @@ struct InstrumentPanel: View {
     // MARK: - 交互元件
 
     private func toggleRow(
-        eyebrow: String,
         title: String,
         caption: String,
         isOn: Binding<Bool>
@@ -780,30 +798,28 @@ struct InstrumentPanel: View {
                 isOn.wrappedValue.toggle()
             }
         } label: {
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                    Text("\(eyebrow) · \(caption)")
-                        .font(Typography.statusTag)
-                        .tracking(0.45)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
+                    Text(caption)
+                        .font(Typography.readingCompact)
+                        .tracking(Typography.readingCompactTracking)
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer(minLength: 8)
-                Text(isOn.wrappedValue ? "ON" : "OFF")
-                    .font(Typography.statusTag)
-                    .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(
-                        (isOn.wrappedValue ? Palette.signal : Palette.inkLow)
-                            .opacity(isOn.wrappedValue ? 0.82 : Palette.Level.present)
-                    )
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 switchIndicator(isOn: isOn.wrappedValue)
+                    .padding(.top, 1)
+                    .fixedSize()
             }
-            .frame(minHeight: 58)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 64)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -878,7 +894,7 @@ struct InstrumentPanel: View {
 
     private var hairline: some View {
         Rectangle()
-            .fill(Palette.inkFaint.opacity(0.34))
+            .fill(Palette.inkFaint.opacity(Palette.Level.functionalDivider))
             .frame(height: 0.5)
     }
 
@@ -897,35 +913,37 @@ struct InstrumentPanel: View {
         case .settings:
             ArchiveTopBar(
                 backTitle: "天空",
-                trailingTitle: "STARCATCH · \(versionText)",
+                title: "设置",
                 onBack: dismiss
             )
         case .systemStatus:
             ArchiveTopBar(
                 backTitle: "设置",
-                trailingTitle: "STATUS & DATA",
+                title: "仪器状态",
                 onBack: returnToSettings
             )
         case .observations:
             if !log.entries.isEmpty {
                 ArchiveTopBar(
                     backTitle: "设置",
-                    trailingTitle: "清除全部",
-                    trailingIcon: "trash",
+                    title: "观测记录",
+                    trailingTitle: "更多",
+                    trailingIcon: "ellipsis",
                     onBack: returnToSettings,
-                    onTrailingAction: { confirmClearLog = true }
+                    destructiveMenuTitle: "清除全部",
+                    onDestructiveMenuAction: { confirmClearLog = true }
                 )
             } else {
                 ArchiveTopBar(
                     backTitle: "设置",
-                    trailingTitle: "OBSERVATIONS",
+                    title: "观测记录",
                     onBack: returnToSettings
                 )
             }
         case .observationDetail(_):
             ArchiveTopBar(
                 backTitle: "观测记录",
-                trailingTitle: "OBSERVATION",
+                title: "记录详情",
                 onBack: returnToObservations
             )
         }
@@ -939,14 +957,34 @@ struct InstrumentPanel: View {
     }
 
     private func returnToSettings() {
+        navigationForward = false
         withAnimation(suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceCollapse) {
             page = .settings
         }
     }
 
     private func returnToObservations() {
+        navigationForward = false
         withAnimation(suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceCollapse) {
             page = .observations
+        }
+    }
+
+    private func push(_ destination: Page) {
+        navigationForward = true
+        withAnimation(navigationAnimation) {
+            page = destination
+        }
+    }
+
+    private func navigateBack() {
+        switch page {
+        case .settings:
+            dismiss()
+        case .systemStatus, .observations:
+            returnToSettings()
+        case .observationDetail:
+            returnToObservations()
         }
     }
 
@@ -960,5 +998,74 @@ struct InstrumentPanel: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
             presented = false
         }
+    }
+}
+
+/// `List` 的系统 Section 会注入不可控的标题边距和组间距；记录页改用自定义行，
+/// 同时保留明确、克制的单条左滑删除能力。
+private struct ObservationSwipeRow<Content: View>: View {
+    let onDelete: () -> Void
+    let content: Content
+
+    @State private var offset: CGFloat = 0
+    @State private var settledOffset: CGFloat = 0
+
+    init(
+        onDelete: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.onDelete = onDelete
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            Button(role: .destructive, action: delete) {
+                Text("删除")
+                    .font(Typography.statusTag)
+                    .tracking(Typography.statusTagTracking)
+                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                    .frame(width: 66)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(Color.red.opacity(0.22))
+
+            content
+                .background(Palette.voidBlack.opacity(0.985))
+                .offset(x: offset)
+        }
+        .clipped()
+        .simultaneousGesture(swipeGesture)
+        .accessibilityAction(named: "删除") { delete() }
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                offset = min(0, max(-88, settledOffset + value.translation.width))
+            }
+            .onEnded { value in
+                guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                let projected = settledOffset + value.predictedEndTranslation.width
+                if projected < -116 {
+                    delete()
+                    return
+                }
+                let target: CGFloat = offset < -34 ? -66 : 0
+                settledOffset = target
+                withAnimation(.easeOut(duration: 0.2)) {
+                    offset = target
+                }
+            }
+    }
+
+    private func delete() {
+        withAnimation(.easeOut(duration: 0.18)) {
+            offset = -88
+        }
+        onDelete()
     }
 }

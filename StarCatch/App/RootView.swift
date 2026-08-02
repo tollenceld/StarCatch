@@ -4,7 +4,10 @@ import SwiftUI
 /// 左右入口与中央指向读数共享同一触控行，避免各自用 padding 猜测位置。
 enum SkyTopBarMetrics {
     static let safeAreaSpacing: CGFloat = 4
-    static let controlHeight: CGFloat = 44
+    static let controlHeight = AppChromeMetrics.controlHeight
+    static let visualHeight = AppChromeMetrics.wingVisualHeight
+    static let outerMargin = AppChromeMetrics.topEdgeInset
+    static let expandedGap: CGFloat = 4
 }
 
 /// 顶层视图。核心流程：
@@ -34,6 +37,8 @@ struct RootView: View {
     /// 无论首启还是回访都先建立一个可立即绘制的启动层；目录完成后再进入业务页面。
     @State private var stage: Stage = .booting
     @State private var instrumentPresented = false
+    @State private var instrumentDestination: InstrumentPanel.Destination = .settings
+    @State private var overviewRequested = false
     @State private var manualReturnsToInstrument = false
     @State private var satelliteStoryPresented = false
     @AppStorage("manualSeen") private var manualSeen = false
@@ -41,6 +46,13 @@ struct RootView: View {
 
     private var sceneAnimation: Animation {
         reducedMotion || systemReducedMotion ? .easeOut(duration: 0.16) : Motion.sceneTransition
+    }
+    private var contentPageTransition: AnyTransition {
+        guard !reducedMotion, !systemReducedMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .move(edge: .trailing).combined(with: .opacity),
+            removal: .move(edge: .trailing).combined(with: .opacity)
+        )
     }
 
     var body: some View {
@@ -50,7 +62,7 @@ struct RootView: View {
             // 天空：只在 sky 阶段显示
             if stage == .sky, !instrumentPresented, let session {
                 if session.catalog.objects.isEmpty {
-                    CatalogUnavailableView()
+                    CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
                 } else {
                     SkyView(
                         session: session,
@@ -60,8 +72,19 @@ struct RootView: View {
                             satelliteStoryPresented = presented
                         },
                         onOpenInstrument: {
+                            instrumentDestination = .settings
                             withAnimation(sceneAnimation) { instrumentPresented = true }
-                        }
+                        },
+                        onOpenSystemStatus: {
+                            instrumentDestination = .systemStatus
+                            withAnimation(sceneAnimation) { instrumentPresented = true }
+                        },
+                        onOpenArchive: {
+                            instrumentDestination = .observations
+                            withAnimation(sceneAnimation) { instrumentPresented = true }
+                        },
+                        initialOverviewPresented: overviewRequested,
+                        onInitialOverviewHandled: { overviewRequested = false }
                     )
                         .transition(.opacity)
                 }
@@ -81,13 +104,21 @@ struct RootView: View {
                     }
                     manualReturnsToInstrument = false
                 }
-                .transition(.opacity)
+                .transition(contentPageTransition)
             }
 
             // 启动序列
             if stage == .booting {
                 if manualSeen {
-                    StartupLoadingView()
+                    StartupLoadingView(isReady: session != nil) {
+                        withAnimation(
+                            reducedMotion || systemReducedMotion
+                                ? .easeOut(duration: 0.16)
+                                : Motion.bootHandoff
+                        ) {
+                            stage = .sky
+                        }
+                    }
                         .transition(.opacity)
                 } else {
                     BootSequenceView(isReady: session != nil) { interrupted in
@@ -111,7 +142,7 @@ struct RootView: View {
                         instrumentPresented = true
                     }
                 }
-                .transition(.opacity)
+                .transition(contentPageTransition)
             }
 
             // 仪器参数面板
@@ -119,6 +150,11 @@ struct RootView: View {
                 InstrumentPanel(
                     presented: $instrumentPresented,
                     session: session,
+                    initialDestination: instrumentDestination,
+                    onOpenOverview: {
+                        overviewRequested = true
+                        withAnimation(sceneAnimation) { instrumentPresented = false }
+                    },
                     onOpenManual: {
                         withAnimation(sceneAnimation) {
                             manualReturnsToInstrument = true
@@ -133,7 +169,7 @@ struct RootView: View {
                         }
                     }
                 )
-                    .transition(.opacity)
+                    .transition(contentPageTransition)
             }
         }
         .task { await prepareSession() }
@@ -169,7 +205,12 @@ struct RootView: View {
     private func prepareSession() async {
         guard session == nil else { return }
         let catalog = await Task.detached(priority: .userInitiated) {
-            CatalogStore()
+            let catalog = CatalogStore()
+            // 深度档案索引约 5 MB；在启动叙事期间完成首次映射与解码，避免用户
+            // 第一次进入感应/筛选路径时触发静态库初始化。
+            _ = SatelliteStoryCatalog.storyCount
+            _ = SatelliteStoryCatalog.familyStoryCount
+            return catalog
         }.value
         guard !Task.isCancelled else { return }
 
@@ -179,10 +220,6 @@ struct RootView: View {
         applyDebugArgs()
         #endif
 
-        // 回访用户没有首启介绍需要停留：目录完成就直接进入天空。
-        if manualSeen, stage == .booting {
-            withAnimation(sceneAnimation) { stage = .sky }
-        }
     }
 
     #if DEBUG
@@ -293,6 +330,10 @@ struct RootView: View {
 }
 
 private struct CatalogUnavailableView: View {
+    let reason: String?
+
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("CATALOG OFFLINE")
@@ -303,6 +344,23 @@ private struct CatalogUnavailableView: View {
                 .font(Typography.poetic)
                 .lineSpacing(Typography.poeticLineSpacing)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+            if let reason {
+                Text(reason)
+                    .font(Typography.statusTag)
+                    .tracking(Typography.statusTagTracking)
+                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button {
+                openURL(AppLinks.support)
+            } label: {
+                Label("联系支持", systemImage: "arrow.up.right")
+                    .font(Typography.guide.weight(.medium))
+                    .foregroundStyle(Palette.signal.opacity(Palette.Level.present))
+                    .frame(minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("打开 StarCatch 支持页面")
         }
         .frame(maxWidth: 300, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
