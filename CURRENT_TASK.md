@@ -32,3 +32,10 @@
 ## 下一步
 
 后续模型开始工作时，先读取 `AGENTS.md`、`PROJECT_CONTEXT.md`、本文件，再执行 `git status --short --branch`。当前工作区中任务开始前已有一批业务和发布资料改动，后续应先逐项审阅，再按功能拆成独立提交；不要把它们自动并入本次仓库卫生提交。
+
+## 后续 GitHub 上传（2026-08-02）
+
+- 用户明确授权后，确认远端为 `git@github.com:tollenceld/StarCatch.git`，并确认当前分支只有一个待推送本地提交。
+- 已将 `0eabc20 chore: establish local repo hygiene and handoff docs` 推送到 `origin/agent/consolidate-current-work`。
+- 未创建 Pull Request，未暂存或上传工作区中的未提交业务改动、删除项和 App Store 资产。
+- 后续继续按功能审阅现有工作区改动，并为每个重要任务单独更新本文件和创建提交。
