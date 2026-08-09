@@ -86,27 +86,32 @@ struct ArchiveOverlay: View {
                 .foregroundStyle(Palette.inkHigh.opacity(0.96))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-                .padding(.top, 9)
+                .padding(.top, 7)
 
             Text(object.archiveNarrative)
-                .font(.system(size: 12, weight: .regular))
+                .font(.system(size: 11.5, weight: .regular))
                 .foregroundStyle(Palette.inkMid.opacity(0.9))
-                .lineSpacing(2)
+                .lineSpacing(1.5)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 5)
+                .padding(.top, 4)
 
             telemetry
-                .padding(.top, 13)
+                .padding(.top, 10)
 
             archiveAction
-                .padding(.top, 12)
+                .padding(.top, 9)
         }
-        .padding(.horizontal, 17)
-        .padding(.top, 15)
-        .padding(.bottom, 11)
+        .padding(.horizontal, 15)
+        .padding(.top, 13)
+        .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(glassSurface)
+        .overlay(alignment: .topTrailing) {
+            collapseControl
+                .padding(.top, 2)
+                .padding(.trailing, 2)
+        }
         .opacity(presentationVisible ? 1 - 0.38 * clampedReleaseProgress : 0)
         .offset(
             y: max(0, dismissTranslation)
@@ -168,22 +173,34 @@ struct ArchiveOverlay: View {
                     .accessibilityLabel("详情已保持")
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
-
-            Button(action: onDismiss) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Palette.inkMid.opacity(0.78))
-                    .frame(
-                        width: ContentTopBarMetrics.controlHeight,
-                        height: ContentTopBarMetrics.controlHeight
-                    )
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("收起目标详情")
         }
         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
         .tracking(0.7)
+        .padding(.trailing, 34)
+    }
+
+    /// 面板关闭并不解除锁定，因此使用向下收起语义，而不是容易被理解为
+    /// “结束目标”的 xmark。44pt 热区浮在内容之上，不再撑高状态行。
+    private var collapseControl: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "chevron.down")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Palette.inkMid.opacity(0.82))
+                .frame(width: 28, height: 28)
+                .background(
+                    Palette.voidBlack.opacity(0.2),
+                    in: RoundedRectangle(cornerRadius: 9, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .stroke(Palette.inkFaint.opacity(0.26), lineWidth: 0.5)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("收起目标详情")
+        .accessibilityHint("目标仍保持锁定，可再次展开")
     }
 
     private var telemetry: some View {
@@ -203,14 +220,14 @@ struct ArchiveOverlay: View {
                 value: ephemeris.map { String(format: "%.2f KM/S", $0.velocityKmS) } ?? "—"
             )
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .background(
-            Palette.voidBlack.opacity(0.22),
-            in: RoundedRectangle(cornerRadius: 13, style: .continuous)
+            Palette.voidBlack.opacity(0.18),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .stroke(Palette.inkFaint.opacity(0.2), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Palette.inkFaint.opacity(0.22), lineWidth: 0.5)
         }
     }
 
@@ -236,59 +253,58 @@ struct ArchiveOverlay: View {
     }
 
     private var archiveAction: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 7) {
             Button(action: onOpenArchive) {
                 HStack(spacing: 8) {
-                    Image(systemName: "book.closed")
-                        .font(.system(size: 11, weight: .medium))
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(object.identityTint.opacity(0.09))
+                            .frame(width: 26, height: 26)
+                        Image(systemName: "book.closed")
+                            .font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(object.identityTint.opacity(0.9))
+                    }
                     Text("查看档案")
-                        .font(.system(size: 12, weight: .medium))
+                        .font(.system(size: 11.5, weight: .medium))
                     Spacer(minLength: 8)
-                    Image(systemName: "arrow.right")
-                        .font(.system(size: 10, weight: .semibold))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(object.identityTint.opacity(0.72))
                 }
                 .foregroundStyle(Palette.inkHigh.opacity(0.88))
-                .frame(height: 34)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 8)
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .background(
+                    Palette.inkHigh.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .stroke(object.identityTint.opacity(0.24), lineWidth: 0.55)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
             }
             .buttonStyle(.plain)
             .accessibilityHint("打开目标的完整任务与轨道资料")
 
             if captured {
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.24))
-                    .frame(width: 0.5, height: 16)
-
                 Button(action: onRelease) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "lock.slash")
-                            .font(.system(size: 10, weight: .medium))
-                        Text("解除锁定")
-                            .font(.system(size: 10.5, weight: .medium))
-                    }
-                    .foregroundStyle(Palette.inkMid.opacity(0.76))
-                    .frame(height: 34)
-                    .contentShape(Rectangle())
+                    auxiliaryActionSurface(
+                        symbol: "lock.open",
+                        tint: Palette.inkMid.opacity(0.76)
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("解除当前目标锁定")
+                .accessibilityHint("结束目标锁定；仅收起面板请使用顶部按钮或向下滑动")
             }
 
             if let reference = object.officialReference {
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.24))
-                    .frame(width: 0.5, height: 16)
-
                 Link(destination: reference.url) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "network")
-                            .font(.system(size: 9.5, weight: .medium))
-                        Text("官网")
-                            .font(.system(size: 10.5, weight: .medium))
-                    }
-                    .foregroundStyle(object.identityTint.opacity(0.86))
-                    .frame(height: 34)
-                    .contentShape(Rectangle())
+                    auxiliaryActionSurface(
+                        symbol: "safari",
+                        tint: object.identityTint.opacity(0.9)
+                    )
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("打开\(reference.title)官方页面")
@@ -300,6 +316,22 @@ struct ArchiveOverlay: View {
                 .fill(Palette.inkFaint.opacity(0.22))
                 .frame(height: 0.5)
         }
+    }
+
+    private func auxiliaryActionSurface(symbol: String, tint: Color) -> some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 40, height: 40)
+            .background(
+                Palette.inkHigh.opacity(0.03),
+                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 11, style: .continuous)
+                    .stroke(Palette.inkFaint.opacity(0.24), lineWidth: 0.55)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }
 
     private var dismissGesture: some Gesture {
