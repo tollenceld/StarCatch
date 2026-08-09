@@ -124,12 +124,7 @@ struct SkyView: View {
                         .scaleEffect(
                             suppressMotion
                                 ? 1
-                                : 0.94 + 0.06 * localSkyPresence
-                        )
-                        .blur(
-                            radius: suppressMotion
-                                ? 0
-                                : 2.8 * (1 - localSkyPresence)
+                                : 0.9 + 0.1 * localSkyPresence
                         )
                         .opacity(localSkyPresence)
                     crosshairLayer
@@ -210,6 +205,7 @@ struct SkyView: View {
             exitOverviewToLocal()
         }
         .onAppear {
+            EarthCoastlineStore.shared.prepare()
             if initialOverviewPresented {
                 persistentOverviewPresented = true
                 overviewCommitted = true
@@ -1538,11 +1534,6 @@ struct SkyView: View {
                 onScaleReturnEnded: finishOverviewReturnGesture
             )
             .opacity(globePresence)
-            .blur(
-                radius: suppressMotion
-                    ? 0
-                    : 1.6 * (1 - globePresence)
-            )
             .transition(
                 suppressMotion
                     ? .opacity

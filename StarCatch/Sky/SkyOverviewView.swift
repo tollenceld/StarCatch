@@ -148,6 +148,7 @@ struct SkyOverviewView: View {
 
     @ObservedObject var session: SkySession
     @ObservedObject var clock: SkyClock
+    @ObservedObject private var coastlineStore = EarthCoastlineStore.shared
 
     let observation: Date
     let frameTime: TimeInterval
@@ -186,7 +187,6 @@ struct SkyOverviewView: View {
 
     private struct RenderSample {
         let object: CatalogObject
-        let ephemeris: Ephemeris
         let projected: Projected3D
     }
 
@@ -246,9 +246,9 @@ struct SkyOverviewView: View {
                 drawAmbientSpace(context, geometry: geometry)
 
                 let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
-                let focusedFamily = focusedObject?.family
                 let live = clock.isLive
-                let sampleDivisor = session.overviewObjects.count < 1_400
+                let renderObjects = session.visibleObjects
+                let sampleDivisor = renderObjects.count < 1_400
                     ? 1
                     : Self.renderSampleDivisor(
                         zoom: zoom,
@@ -256,7 +256,7 @@ struct SkyOverviewView: View {
                     )
 
                 var samples: [RenderSample] = []
-                samples.reserveCapacity(session.overviewObjects.count / sampleDivisor + 1)
+                samples.reserveCapacity(renderObjects.count / sampleDivisor + 1)
                 @MainActor func appendSample(_ object: CatalogObject) {
                     guard let ephemeris = session.ephemeris.cachedEphemeris(
                         object.id,
@@ -272,18 +272,17 @@ struct SkyOverviewView: View {
                     ) else { return }
                     samples.append(RenderSample(
                         object: object,
-                        ephemeris: ephemeris,
                         projected: projected
                     ))
                 }
-                for object in session.overviewObjects {
+                for object in renderObjects {
                     guard object.id == focusedObjectId
                             || object.noradId.isMultiple(of: sampleDivisor)
                     else { continue }
                     appendSample(object)
                 }
                 if let focusedObject,
-                   !session.overviewObjects.contains(where: { $0.id == focusedObject.id }) {
+                   !renderObjects.contains(where: { $0.id == focusedObject.id }) {
                     appendSample(focusedObject)
                 }
 
@@ -301,7 +300,6 @@ struct SkyOverviewView: View {
                         field,
                         samples: samples,
                         front: false,
-                        focusedFamily: focusedFamily,
                         simplified: renderingSimplified
                     )
                     drawEarth(
@@ -319,7 +317,6 @@ struct SkyOverviewView: View {
                         field,
                         samples: samples,
                         front: true,
-                        focusedFamily: focusedFamily,
                         simplified: renderingSimplified
                     )
                     drawFocusedObject(field, samples: samples)
@@ -359,6 +356,7 @@ struct SkyOverviewView: View {
                 resetView()
             }
             .onAppear {
+                coastlineStore.prepare()
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--previewOverviewTransform") {
                     yaw = 0.72
@@ -408,9 +406,11 @@ struct SkyOverviewView: View {
                     cancelObserverLabelEmphasis()
                     markGestureHintsSeen()
                 }
-                yaw = settledYaw + Double(value.translation.width) * 0.0072
+                yaw = settledYaw
+                    + Double(value.translation.width) * SpatialMotion.dragYawSensitivity
                 pitch = Self.clampedPitch(
-                    settledPitch - Double(value.translation.height) * 0.0062
+                    settledPitch
+                        - Double(value.translation.height) * SpatialMotion.dragPitchSensitivity
                 )
             }
             .onEnded { value in
@@ -419,11 +419,11 @@ struct SkyOverviewView: View {
                 startOrbitInertia(
                     yawVelocity: SpatialMotion.limitedAngularVelocity(
                         pointsPerSecond: value.velocity.width,
-                        sensitivity: 0.0019
+                        sensitivity: SpatialMotion.dragYawSensitivity
                     ),
                     pitchVelocity: SpatialMotion.limitedAngularVelocity(
                         pointsPerSecond: -value.velocity.height,
-                        sensitivity: 0.00165
+                        sensitivity: SpatialMotion.dragPitchSensitivity
                     )
                 )
             }
@@ -722,9 +722,7 @@ struct SkyOverviewView: View {
         zoom: CGFloat,
         interactionActive: Bool
     ) -> Int {
-        if interactionActive { return 4 }
-        if zoom < 0.92 { return 3 }
-        if zoom < 1.14 { return 2 }
+        if interactionActive { return zoom < 0.94 ? 6 : 4 }
         return 1
     }
 
@@ -942,141 +940,38 @@ struct SkyOverviewView: View {
         _ context: GraphicsContext,
         samples: [RenderSample],
         front: Bool,
-        focusedFamily: CatalogFamily?,
         simplified: Bool
     ) {
-        var exploration: [CGPoint] = []
-        var observation: [CGPoint] = []
-        var network: [CGPoint] = []
-        var legacy: [CGPoint] = []
-        var explorationNear: [CGPoint] = []
-        var observationNear: [CGPoint] = []
-        var networkNear: [CGPoint] = []
-        var legacyNear: [CGPoint] = []
-        var familyFields: [CatalogFamily: [CGPoint]] = [:]
-        var familyNearFields: [CatalogFamily: [CGPoint]] = [:]
-        exploration.reserveCapacity(samples.count / 8)
-        observation.reserveCapacity(samples.count / 6)
-        network.reserveCapacity(samples.count / 5)
-        legacy.reserveCapacity(64)
-        familyFields.reserveCapacity(CatalogFamily.allCases.count)
+        var field: [CGPoint] = []
+        var nearField: [CGPoint] = []
+        field.reserveCapacity(samples.count / 2)
+        nearField.reserveCapacity(samples.count / 8)
 
         for sample in samples where sample.object.id != focusedObjectId {
             guard (sample.projected.depth >= 0) == front else { continue }
             let isNear = front && sample.projected.depth > 0.24
-            if let family = sample.object.family {
-                if isNear {
-                    familyNearFields[family, default: []].append(sample.projected.point)
-                } else {
-                    familyFields[family, default: []].append(sample.projected.point)
-                }
+            if isNear {
+                nearField.append(sample.projected.point)
             } else {
-                switch sample.object.category {
-                case .exploration:
-                    if isNear {
-                        explorationNear.append(sample.projected.point)
-                    } else {
-                        exploration.append(sample.projected.point)
-                    }
-                case .observation:
-                    if isNear {
-                        observationNear.append(sample.projected.point)
-                    } else {
-                        observation.append(sample.projected.point)
-                    }
-                case .network:
-                    if isNear {
-                        networkNear.append(sample.projected.point)
-                    } else {
-                        network.append(sample.projected.point)
-                    }
-                case .legacy:
-                    if isNear {
-                        legacyNear.append(sample.projected.point)
-                    } else {
-                        legacy.append(sample.projected.point)
-                    }
-                }
+                field.append(sample.projected.point)
             }
         }
 
         let sideOpacity = front ? 1.0 : 0.19
         let detailOpacity = simplified ? 0.68 : 1.0
-        let ordinaryHalo = simplified ? 0 : (front ? 0.016 : 0)
         SkyRenderer.drawTargetField(
             context,
-            points: exploration,
-            tint: Palette.explorationTint,
-            opacity: 0.43 * sideOpacity * detailOpacity,
-            coreRadius: front ? (simplified ? 0.52 : 0.62) : 0.45,
-            haloStrength: ordinaryHalo
-        )
-        SkyRenderer.drawTargetField(
-            context,
-            points: observation,
-            tint: Palette.observationTint,
-            opacity: 0.42 * sideOpacity * detailOpacity,
-            coreRadius: front ? (simplified ? 0.51 : 0.60) : 0.44,
-            haloStrength: ordinaryHalo
-        )
-        SkyRenderer.drawTargetField(
-            context,
-            points: network,
-            tint: Palette.networkTint,
-            opacity: 0.4 * sideOpacity * detailOpacity,
-            coreRadius: front ? (simplified ? 0.5 : 0.59) : 0.43,
-            haloStrength: ordinaryHalo
-        )
-        SkyRenderer.drawTargetField(
-            context,
-            points: legacy,
-            tint: Palette.legacyTint,
-            opacity: 0.36 * sideOpacity * detailOpacity,
-            coreRadius: front ? (simplified ? 0.48 : 0.57) : 0.42,
+            points: field,
+            tint: Palette.inkMid,
+            opacity: 0.37 * sideOpacity * detailOpacity,
+            coreRadius: front ? (simplified ? 0.48 : 0.57) : 0.41,
             haloStrength: simplified ? 0 : (front ? 0.012 : 0)
         )
         if front, !simplified {
             SkyRenderer.drawTargetField(
-                context, points: explorationNear, tint: Palette.explorationTint,
-                opacity: 0.72, coreRadius: 0.92, haloStrength: 0.045
+                context, points: nearField, tint: Palette.inkHigh,
+                opacity: 0.6, coreRadius: 0.8, haloStrength: 0.032
             )
-            SkyRenderer.drawTargetField(
-                context, points: observationNear, tint: Palette.observationTint,
-                opacity: 0.69, coreRadius: 0.88, haloStrength: 0.042
-            )
-            SkyRenderer.drawTargetField(
-                context, points: networkNear, tint: Palette.networkTint,
-                opacity: 0.66, coreRadius: 0.86, haloStrength: 0.038
-            )
-            SkyRenderer.drawTargetField(
-                context, points: legacyNear, tint: Palette.legacyTint,
-                opacity: 0.58, coreRadius: 0.82, haloStrength: 0.032
-            )
-        }
-        for family in CatalogFamily.allCases {
-            let emphasized = family == focusedFamily
-            SkyRenderer.drawTargetField(
-                context,
-                points: familyFields[family, default: []],
-                tint: family.tint,
-                opacity: (emphasized ? 0.64 : 0.28) * sideOpacity * detailOpacity,
-                coreRadius: emphasized
-                    ? (front ? (simplified ? 0.7 : 0.86) : 0.54)
-                    : (front ? (simplified ? 0.48 : 0.56) : 0.38),
-                haloStrength: simplified
-                    ? 0
-                    : (front ? (emphasized ? 0.1 : 0.026) : 0)
-            )
-            if front, !simplified {
-                SkyRenderer.drawTargetField(
-                    context,
-                    points: familyNearFields[family, default: []],
-                    tint: family.tint,
-                    opacity: emphasized ? 0.88 : 0.5,
-                    coreRadius: emphasized ? 1.08 : 0.8,
-                    haloStrength: emphasized ? 0.15 : 0.045
-                )
-            }
         }
     }
 
@@ -1303,10 +1198,45 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry,
         simplified: Bool
     ) {
-        let coordinateStride = simplified ? 4 : 2
         let siderealRadians = zeroMeanSiderealTime(
             julianDate: observation.julianDate
         ) * .pi / 180
+
+        if !coastlineStore.coastlines.isEmpty {
+            let pointStride = simplified ? 3 : 1
+            for coastline in coastlineStore.coastlines {
+                let projected = stride(
+                    from: 0,
+                    to: coastline.count,
+                    by: pointStride
+                ).map { index in
+                    let coordinate = coastline[index]
+                    let direction = Self.sphericalSurfaceDirection(
+                        latitude: Double(coordinate.x),
+                        longitude: Double(coordinate.y),
+                        siderealRadians: siderealRadians
+                    )
+                    return Self.projectDirection(
+                        direction,
+                        displayRadius: Self.earthDisplayRadius,
+                        center: geometry.center,
+                        radius: geometry.radius,
+                        yaw: renderedYaw,
+                        pitch: renderedPitch,
+                        zoom: zoom
+                    )
+                }
+                strokeCoastline(
+                    context,
+                    projected: projected,
+                    simplified: simplified
+                )
+            }
+            return
+        }
+
+        // 资源尚在后台准备时使用极轻的内嵌轮廓，避免转场首帧出现空白地球。
+        let coordinateStride = simplified ? 4 : 2
         for coastline in Self.coastlineSamples {
             let projected = stride(
                 from: 0,
@@ -1328,20 +1258,32 @@ struct SkyOverviewView: View {
                     zoom: zoom
                 )
             }
-            strokeSegments(
+            strokeCoastline(
                 context,
                 projected: projected,
-                front: true,
-                color: Palette.observationTint.opacity(
-                    (simplified ? 0.14 : 0.24) * surfaceDetailPresence
-                ),
-                style: StrokeStyle(
-                    lineWidth: simplified ? 0.38 : 0.48,
-                    lineCap: .round,
-                    lineJoin: .round
-                )
+                simplified: simplified
             )
         }
+    }
+
+    private func strokeCoastline(
+        _ context: GraphicsContext,
+        projected: [Projected3D],
+        simplified: Bool
+    ) {
+        strokeSegments(
+            context,
+            projected: projected,
+            front: true,
+            color: Palette.observationTint.opacity(
+                (simplified ? 0.15 : 0.32) * surfaceDetailPresence
+            ),
+            style: StrokeStyle(
+                lineWidth: simplified ? 0.36 : 0.5,
+                lineCap: .round,
+                lineJoin: .round
+            )
+        )
     }
 
     /// 默认可见区域是一块真正贴在球面的球冠，而不是屏幕坐标中的平面圆。

@@ -43,8 +43,8 @@ enum Motion {
     static let skyOverviewExit = Animation.timingCurve(0.2, 0.66, 0.22, 1, duration: 0.82)
 
     /// 独立全局星图是一次空间尺度切换，比时间轴预览更从容；显隐共用同一进度反向播放。
-    static let skyOverviewMode = Animation.timingCurve(0.24, 0.06, 0.18, 1, duration: 1.02)
-    static let skyOverviewModeDuration: Double = 1.02
+    static let skyOverviewMode = Animation.timingCurve(0.18, 0.72, 0.18, 1, duration: 0.82)
+    static let skyOverviewModeDuration: Double = 0.82
 
     /// 用户没有越过尺度门槛时，天空穹顶带一点阻力退回最广局部视野。
     static let scaleThresholdReturn = Animation.timingCurve(0.3, 0, 0.22, 1, duration: 0.34)
@@ -74,11 +74,13 @@ enum Motion {
 /// 速度统一使用“每秒”单位；衰减采用指数模型，因此不同刷新率下的运动距离一致。
 /// 边界只衰减朝外的速度，不产生反弹，保持仪器而非游戏镜头的质量感。
 enum SpatialMotion {
-    static let frameInterval: TimeInterval = 1.0 / 30.0
-    static let rotationDecay: Double = 4.8
-    static let scaleDecay: Double = 6.2
-    static let minimumAngularVelocity: Double = 0.014
-    static let minimumScaleVelocity: Double = 0.012
+    static let frameInterval: TimeInterval = 1.0 / 60.0
+    static let dragYawSensitivity: Double = 0.0064
+    static let dragPitchSensitivity: Double = 0.0058
+    static let rotationDecay: Double = 3.9
+    static let scaleDecay: Double = 5.4
+    static let minimumAngularVelocity: Double = 0.01
+    static let minimumScaleVelocity: Double = 0.009
 
     nonisolated static func decayFactor(
         rate: Double,
@@ -91,7 +93,7 @@ enum SpatialMotion {
         pointsPerSecond: CGFloat,
         sensitivity: Double
     ) -> Double {
-        min(3.4, max(-3.4, Double(pointsPerSecond) * sensitivity))
+        min(4.2, max(-4.2, Double(pointsPerSecond) * sensitivity))
     }
 
     nonisolated static func boundaryVelocityScale(

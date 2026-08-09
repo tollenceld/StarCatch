@@ -23,6 +23,7 @@
 		41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343FF92394A7814FD1DE6EFA /* PointingProvider.swift */; };
 		47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15874937BFB5C04ABF07F03A /* BootSequenceView.swift */; };
 		489F2384F2AEF996008F6118 /* SatelliteStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */; };
+		4DBEA44D0F54B8662D9030A1 /* earth_coastlines_50m.bin in Resources */ = {isa = PBXBuildFile; fileRef = 342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */; };
 		5D275617161364BBE646062E /* ObservationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE08D9AC749129724E543DB0 /* ObservationLog.swift */; };
 		5D5DAFCEFE7D46958DF98D88 /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5E65F462749E92BDC454CC83 /* SatelliteKit */; };
 		5E50679C759F41669BB6A568 /* SkySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1242DAD73E4C1124A97F05 /* SkySession.swift */; };
@@ -43,6 +44,7 @@
 		B06EE5A9211468963079D27F /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3ED49626A8ECAFCCD5421A5 /* Typography.swift */; };
 		B2005F5DA969169B64720C2A /* SatelliteStoryLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */; };
 		BC4DEC4E59BFD7C4D7898133 /* TimeDial.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F56DD137CFA306BC531DC61 /* TimeDial.swift */; };
+		C459C00D31425977719942A9 /* EarthCoastlineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */; };
 		C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 7CDEE5FF1B933D8AF1C1D67B /* catalog.json */; };
 		C9EF9FD2DDEC995351B91F51 /* InstrumentPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */; };
 		CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */; };
@@ -79,6 +81,7 @@
 		22944084EE07EF80863E4089 /* CatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogStore.swift; sourceTree = "<group>"; };
 		2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryLibrary.swift; sourceTree = "<group>"; };
 		2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyClock.swift; sourceTree = "<group>"; };
+		342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = earth_coastlines_50m.bin; sourceTree = "<group>"; };
 		343FF92394A7814FD1DE6EFA /* PointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointingProvider.swift; sourceTree = "<group>"; };
 		36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFilterControl.swift; sourceTree = "<group>"; };
 		3CAEF5F15EA29265AD47221C /* EphemerisEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EphemerisEngine.swift; sourceTree = "<group>"; };
@@ -86,6 +89,7 @@
 		4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Projection.swift; sourceTree = "<group>"; };
 		54D43B6181117F9B6935B886 /* Grain.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Grain.metal; sourceTree = "<group>"; };
 		553B0A3ED35132FE1D5AFC9C /* MotionPointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MotionPointingProvider.swift; sourceTree = "<group>"; };
+		564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EarthCoastlineStore.swift; sourceTree = "<group>"; };
 		5AF4AD5A77F90459147777B6 /* StarCatch.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = StarCatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyStatementView.swift; sourceTree = "<group>"; };
 		66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarMagnitudeScale.swift; sourceTree = "<group>"; };
@@ -209,6 +213,7 @@
 			isa = PBXGroup;
 			children = (
 				7CDEE5FF1B933D8AF1C1D67B /* catalog.json */,
+				342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */,
 				7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */,
 			);
 			path = Resources;
@@ -261,6 +266,7 @@
 			isa = PBXGroup;
 			children = (
 				36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */,
+				564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */,
 				4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */,
 				116D67906640E5C006C8B390 /* SkyActionControls.swift */,
 				2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */,
@@ -385,6 +391,7 @@
 				E6C65C8211E88265E6DD9236 /* Assets.xcassets in Resources */,
 				95ADA40FA7051C75178FE81F /* PrivacyInfo.xcprivacy in Resources */,
 				C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */,
+				4DBEA44D0F54B8662D9030A1 /* earth_coastlines_50m.bin in Resources */,
 				39A138A742BE73310774170E /* satellite_profiles.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -437,6 +444,7 @@
 				100E9ECA0F4E99680CD2DA35 /* CatalogFilterControl.swift in Sources */,
 				1DD6FD7136765D4481A4F5CF /* CatalogModels.swift in Sources */,
 				ACF22B027FC0CE7B3B4EE2D3 /* CatalogStore.swift in Sources */,
+				C459C00D31425977719942A9 /* EarthCoastlineStore.swift in Sources */,
 				787205462F44B77336DE3CB2 /* EphemerisEngine.swift in Sources */,
 				352EAAF4270E9334DC47F26E /* Grain.metal in Sources */,
 				C9EF9FD2DDEC995351B91F51 /* InstrumentPanel.swift in Sources */,

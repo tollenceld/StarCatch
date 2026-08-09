@@ -241,26 +241,36 @@ struct SkyStatusIndicator: View {
     }
 
     private func islandWingPair(label: String, breath: Double) -> some View {
-        GeometryReader { geo in
-            let centerX = geo.size.width / 2
-            let statusCenterOffset = islandGapWidth / 2 + resolvedStatusWingWidth / 2
-            let directionCenterOffset = islandGapWidth / 2 + islandDirectionWingWidth / 2
-            let centerY = SkyTopBarMetrics.controlHeight / 2
+        HStack(spacing: 0) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                statusWing(label: label, breath: breath)
+                    .frame(
+                        width: backTitle == nil ? islandStatusWingWidth : nil,
+                        alignment: .trailing
+                    )
+                    .fixedSize(horizontal: backTitle != nil, vertical: false)
+            }
+            .frame(maxWidth: .infinity)
 
-            statusWing(label: label, breath: breath)
-                .frame(width: resolvedStatusWingWidth, alignment: .trailing)
-                .position(x: centerX - statusCenterOffset, y: centerY)
+            Color.clear
+                .frame(width: islandGapWidth)
 
-            directionWing
-                .frame(width: islandDirectionWingWidth, alignment: .leading)
-                .position(x: centerX + directionCenterOffset, y: centerY)
+            HStack(spacing: 0) {
+                directionWing
+                    .frame(width: islandDirectionWingWidth, alignment: .leading)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity)
         }
+        .frame(height: SkyTopBarMetrics.controlHeight)
     }
 
     private func compactWingPair(label: String, breath: Double) -> some View {
         HStack(spacing: 0) {
             statusWing(label: label, breath: breath)
-                .frame(width: resolvedStatusWingWidth)
+                .frame(width: backTitle == nil ? resolvedStatusWingWidth : nil)
+                .fixedSize(horizontal: backTitle != nil, vertical: false)
             Spacer(minLength: 12)
             directionWing
                 .frame(width: islandDirectionWingWidth)
@@ -277,8 +287,8 @@ struct SkyStatusIndicator: View {
     @ViewBuilder
     private func statusWing(label: String, breath: Double) -> some View {
         if let backTitle, let onBack {
-            Color.clear
-                .frame(maxWidth: .infinity)
+            AppBackControl(title: backTitle, action: onBack)
+                .padding(.horizontal, 8)
                 .frame(height: wingHeight)
                 .modifier(
                     SkyWingSurfaceModifier(
@@ -286,11 +296,8 @@ struct SkyStatusIndicator: View {
                         interactive: true
                     )
                 )
-                .overlay(alignment: .leading) {
-                    AppBackControl(title: backTitle, action: onBack)
-                        .padding(.horizontal, 9)
-                }
                 .frame(height: SkyTopBarMetrics.controlHeight)
+                .fixedSize(horizontal: true, vertical: false)
         } else {
             statusSurface(label: label, breath: breath)
         }

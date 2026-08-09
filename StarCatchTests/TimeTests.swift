@@ -784,17 +784,43 @@ final class TimeTests: XCTestCase {
             4
         )
         XCTAssertEqual(
-            SkyOverviewView.renderSampleDivisor(zoom: 0.8, interactionActive: false),
-            3
+            SkyOverviewView.renderSampleDivisor(zoom: 0.8, interactionActive: true),
+            6
         )
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 1, interactionActive: false),
-            2
+            1
         )
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 1.2, interactionActive: false),
             1
         )
+    }
+
+    func testBundledCoastlineBinaryDecoderRejectsTruncationAndPreservesCoordinates() {
+        var data = Data("SCGL".utf8)
+        func append<T: FixedWidthInteger>(_ value: T) {
+            var littleEndian = value.littleEndian
+            withUnsafeBytes(of: &littleEndian) { data.append(contentsOf: $0) }
+        }
+        func append(_ value: Float) {
+            append(value.bitPattern)
+        }
+
+        append(UInt16(1))
+        append(UInt32(1))
+        append(UInt16(2))
+        append(Float(31.23))
+        append(Float(121.47))
+        append(Float(39.90))
+        append(Float(116.40))
+
+        let decoded = EarthCoastlineStore.decode(data)
+        XCTAssertEqual(decoded.count, 1)
+        XCTAssertEqual(decoded[0].count, 2)
+        XCTAssertEqual(decoded[0][0].x, 31.23, accuracy: 0.0001)
+        XCTAssertEqual(decoded[0][0].y, 121.47, accuracy: 0.0001)
+        XCTAssertTrue(EarthCoastlineStore.decode(Data(data.dropLast())).isEmpty)
     }
 
     func testSpatialMotionUsesFrameRateIndependentDecayAndSoftBoundaries() {
