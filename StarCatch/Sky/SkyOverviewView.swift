@@ -419,7 +419,7 @@ struct SkyOverviewView: View {
                 orbitGestureActive = false
                 startOrbitInertia(
                     yawVelocity: SpatialMotion.limitedAngularVelocity(
-                        pointsPerSecond: -value.velocity.width,
+                        pointsPerSecond: value.velocity.width,
                         sensitivity: SpatialMotion.dragYawSensitivity
                     ),
                     pitchVelocity: SpatialMotion.limitedAngularVelocity(
@@ -716,7 +716,7 @@ struct SkyOverviewView: View {
         translation: CGSize
     ) -> (yaw: Double, pitch: Double) {
         (
-            yaw: -Double(translation.width) * SpatialMotion.dragYawSensitivity,
+            yaw: Double(translation.width) * SpatialMotion.dragYawSensitivity,
             pitch: Double(translation.height) * SpatialMotion.dragPitchSensitivity
         )
     }
@@ -1097,11 +1097,11 @@ struct SkyOverviewView: View {
         )
         let earth = Path(ellipseIn: earthRect)
         context.drawLayer { atmosphere in
-            atmosphere.addFilter(.blur(radius: 9))
+            atmosphere.addFilter(.blur(radius: 8))
             atmosphere.stroke(
-                Path(ellipseIn: earthRect.insetBy(dx: -2.5, dy: -2.5)),
-                with: .color(Palette.observationTint.opacity(0.11)),
-                style: StrokeStyle(lineWidth: 3.2)
+                Path(ellipseIn: earthRect.insetBy(dx: -3.2, dy: -3.2)),
+                with: .color(Palette.observationTint.opacity(0.14)),
+                style: StrokeStyle(lineWidth: 3.8)
             )
         }
         context.fill(
@@ -1163,6 +1163,14 @@ struct SkyOverviewView: View {
             )
         }
 
+        drawEarthSurfaceMaterial(
+            context,
+            earth: earth,
+            earthRect: earthRect,
+            earthRadius: earthRadius,
+            simplified: simplified
+        )
+
         drawEarthGrid(context, geometry: geometry, simplified: simplified)
         drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
         drawObserverVisibilityRegion(
@@ -1190,6 +1198,66 @@ struct SkyOverviewView: View {
             illuminatedLimb,
             with: .color(Palette.inkHigh.opacity(0.24)),
             style: StrokeStyle(lineWidth: 0.72, lineCap: .round)
+        )
+    }
+
+    /// 用海面高光、柔和昼夜分界与内侧大气边缘建立球体体积。它们全部裁切在
+    /// 同一个 Canvas 图层内，不引入纹理贴图，也不会在拖动时改变几何复杂度。
+    private func drawEarthSurfaceMaterial(
+        _ context: GraphicsContext,
+        earth: Path,
+        earthRect: CGRect,
+        earthRadius: CGFloat,
+        simplified: Bool
+    ) {
+        context.drawLayer { surface in
+            surface.clip(to: earth)
+
+            // 海面并非纯色圆盘：受光侧有一块宽而克制的反射，中心保持深黑。
+            surface.fill(
+                earth,
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Palette.inkHigh.opacity(simplified ? 0.025 : 0.045), location: 0),
+                        .init(color: Palette.observationTint.opacity(0.018), location: 0.38),
+                        .init(color: .clear, location: 0.76),
+                    ]),
+                    center: CGPoint(
+                        x: earthRect.minX + earthRadius * 0.58,
+                        y: earthRect.minY + earthRadius * 0.48
+                    ),
+                    startRadius: 0,
+                    endRadius: earthRadius * 0.92
+                )
+            )
+
+            // 椭圆形暗部形成柔和的 terminator，而不是把球体简单做成径向渐变圆。
+            let nightRect = CGRect(
+                x: earthRect.midX + earthRadius * 0.16,
+                y: earthRect.minY - earthRadius * 0.08,
+                width: earthRadius * 1.34,
+                height: earthRadius * 2.16
+            )
+            surface.addFilter(.blur(radius: simplified ? 7 : 10))
+            surface.fill(
+                Path(ellipseIn: nightRect),
+                with: .color(Palette.voidBlack.opacity(simplified ? 0.22 : 0.3))
+            )
+        }
+
+        // 内侧大气边缘仅在受光半球可见，避免再画一圈完整装饰环。
+        var innerAtmosphere = Path()
+        innerAtmosphere.addArc(
+            center: CGPoint(x: earthRect.midX, y: earthRect.midY),
+            radius: earthRadius - 1.25,
+            startAngle: .degrees(132),
+            endAngle: .degrees(302),
+            clockwise: false
+        )
+        context.stroke(
+            innerAtmosphere,
+            with: .color(Palette.observationTint.opacity(simplified ? 0.14 : 0.2)),
+            style: StrokeStyle(lineWidth: 1.15, lineCap: .round)
         )
     }
 
@@ -1330,15 +1398,29 @@ struct SkyOverviewView: View {
         projected: [Projected3D],
         simplified: Bool
     ) {
+        // 极细暗底把海岸从经纬线中分离出来，仍保持地图是轨道空间的背景。
+        strokeSegments(
+            context,
+            projected: projected,
+            front: true,
+            color: Palette.voidBlack.opacity(
+                (simplified ? 0.24 : 0.42) * surfaceDetailPresence
+            ),
+            style: StrokeStyle(
+                lineWidth: simplified ? 0.9 : 1.25,
+                lineCap: .round,
+                lineJoin: .round
+            )
+        )
         strokeSegments(
             context,
             projected: projected,
             front: true,
             color: Palette.observationTint.opacity(
-                (simplified ? 0.15 : 0.32) * surfaceDetailPresence
+                (simplified ? 0.19 : 0.4) * surfaceDetailPresence
             ),
             style: StrokeStyle(
-                lineWidth: simplified ? 0.36 : 0.5,
+                lineWidth: simplified ? 0.4 : 0.56,
                 lineCap: .round,
                 lineJoin: .round
             )

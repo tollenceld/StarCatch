@@ -54,7 +54,7 @@ final class TrackSampler {
 
         preparationTask?.cancel()
         preparingObjectId = objectId
-        preparationTask = Task.detached(priority: .userInitiated) {
+        preparationTask = Task.detached(priority: .utility) {
             let points = Self.sampleTrack(
                 satellite: sat,
                 observer: observer,
@@ -71,6 +71,15 @@ final class TrackSampler {
                 self.preparationTask = nil
             }
         }
+    }
+
+    /// 启动叙事期间只运行一次 SatelliteKit 的多时刻传播路径。结果无需保留；
+    /// 目的只是把库级冷初始化移出第一次目标感应动画。
+    func prewarm(observer: ObserverLocation.Coordinates, at now: Date) async {
+        guard let satellite = store.satellites.values.first else { return }
+        _ = await Task.detached(priority: .utility) {
+            Self.sampleTrack(satellite: satellite, observer: observer, at: now)
+        }.value
     }
 
     nonisolated private static func sampleTrack(

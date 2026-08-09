@@ -273,6 +273,27 @@ struct ArchiveOverlay: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("解除当前目标锁定")
             }
+
+            if let reference = object.officialReference {
+                Rectangle()
+                    .fill(Palette.inkFaint.opacity(0.24))
+                    .frame(width: 0.5, height: 16)
+
+                Link(destination: reference.url) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "network")
+                            .font(.system(size: 9.5, weight: .medium))
+                        Text("官网")
+                            .font(.system(size: 10.5, weight: .medium))
+                    }
+                    .foregroundStyle(object.identityTint.opacity(0.86))
+                    .frame(height: 34)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("打开\(reference.title)官方页面")
+                .accessibilityHint("将在浏览器中打开外部网站")
+            }
         }
         .overlay(alignment: .top) {
             Rectangle()

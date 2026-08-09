@@ -214,7 +214,13 @@ struct RootView: View {
         }.value
         guard !Task.isCancelled else { return }
 
-        session = SkySession(catalog: catalog)
+        let preparedSession = SkySession(catalog: catalog)
+        await preparedSession.prewarmCapturePipeline()
+        guard !Task.isCancelled else { return }
+        session = preparedSession
+        // 启动文字仍在屏幕上时预热触觉管线。第一次卫星进入准星不再承担
+        // UIImpactFeedbackGenerator 的冷启动成本。
+        ObservationHaptics.shared.prepare()
 
         #if DEBUG
         applyDebugArgs()

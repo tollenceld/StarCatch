@@ -147,6 +147,22 @@ final class SkySession: ObservableObject {
         ephemeris.stop()
     }
 
+    /// 在启动页仍可见时预热首次捕获会用到的“速度精算 + 多时刻轨迹”路径。
+    /// 两项都在 utility 后台执行，完成后主天空才接管，避免第一颗卫星承担冷成本。
+    func prewarmCapturePipeline(at date: Date = Date()) async {
+        guard let objectID = displayObjects.first?.id else { return }
+        async let precise = ephemeris.preparePreciseEphemeris(
+            objectID,
+            at: date,
+            live: true
+        )
+        async let track: Void = tracks.prewarm(
+            observer: observer.coordinates,
+            at: date
+        )
+        _ = await (precise, track)
+    }
+
     private nonisolated static func locationAllowsTrueNorth(
         _ status: CLAuthorizationStatus
     ) -> Bool {

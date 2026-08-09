@@ -219,7 +219,7 @@ final class EphemerisEngine: ObservableObject {
         if let cached = preciseCache[key] { return cached }
         guard let satellite = store.satellites[objectId] else { return nil }
         let capturedObserver = observer
-        let result = await Task.detached(priority: .userInitiated) {
+        let result = await Task.detached(priority: .utility) {
             Self.preciseEphemeris(
                 objectId: objectId,
                 satellite: satellite,
@@ -261,7 +261,9 @@ final class EphemerisEngine: ObservableObject {
         let capturedObserver = observer
         let satellites = store.satellites
         let objectIDs = propagationObjectIDs
-        liveTask = Task.detached(priority: .userInitiated) { [self] in
+        // 完整目录传播是持续后台工作，不能与首次捕获动画争抢 userInitiated CPU。
+        // 精确目标仍由独立缓存补齐，主界面在两帧之间使用插值。
+        liveTask = Task.detached(priority: .utility) { [self] in
             let frame = Self.bulkSnapshot(
                 satellites: satellites,
                 objectIDs: objectIDs,

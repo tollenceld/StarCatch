@@ -208,6 +208,24 @@ final class OrbitTests: XCTestCase {
         XCTAssertEqual(starlinkArchive.lead, starlink.poetic)
         XCTAssertTrue(starlinkArchive.lead.contains("N\(starlink.noradId)"))
         XCTAssertGreaterThanOrEqual(starlinkArchive.chapters.count, 3)
+        XCTAssertEqual(
+            starlinkArchive.officialReference?.url.absoluteString,
+            "https://www.spacex.com/starlink"
+        )
+
+        for family in [
+            CatalogFamily.starlink,
+            .oneweb,
+            .kuiper,
+            .iridium,
+            .globalstar,
+            .orbcomm,
+        ] {
+            let object = try XCTUnwrap(store.objects.first { $0.family == family })
+            let reference = try XCTUnwrap(object.deepArchiveStory?.officialReference)
+            XCTAssertEqual(reference.url.scheme, "https")
+            XCTAssertFalse(reference.title.isEmpty)
+        }
 
         let otherStarlink = try XCTUnwrap(
             store.objects.first { $0.family == .starlink && $0.id != starlink.id }

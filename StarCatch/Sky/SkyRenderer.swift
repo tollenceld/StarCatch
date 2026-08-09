@@ -13,28 +13,58 @@ enum SkyRenderer {
     ) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let quietRadiusSquared: CGFloat = 55 * 55
+        var faintStars = Path()
+        var neutralStars = Path()
+        var coolStars = Path()
+        var warmStars = Path()
+        var stellarSpikes = Path()
         for grain in dust.grains {
-            // 背景恒星只响应统一天球变换，不随时间漂移或集体呼吸。
+            // 背景恒星只响应统一天球变换，不随时间漂移或集体呼吸，也永远
+            // 不进入目录投影与捕获状态机。
             let p = dust.screenPosition(
                 of: grain,
                 canvasSize: size,
                 transform: transform
             )
-            let rect = CGRect(
-                x: p.x - grain.radius, y: p.y - grain.radius,
-                width: grain.radius * 2, height: grain.radius * 2
-            )
+            guard p.x > -4, p.x < size.width + 4,
+                  p.y > -4, p.y < size.height + 4
+            else { continue }
             let distanceSquared = pow(p.x - center.x, 2) + pow(p.y - center.y, 2)
-            let centerAttenuation = distanceSquared < quietRadiusSquared ? 0.78 : 1
-            // 亮度分层：多数颗粒是 dust 底噪，最亮的少数升到 inkFaint / inkLow
-            let color: Color = grain.alpha > 0.85
-                ? Palette.inkLow
-                : (grain.alpha > 0.6 ? Palette.inkFaint : Palette.dust)
-            context.fill(
-                Path(ellipseIn: rect),
-                with: .color(color.opacity(grain.alpha * centerAttenuation * 0.72))
+            let centerAttenuation: CGFloat = distanceSquared < quietRadiusSquared ? 0.78 : 1
+            let radius = grain.radius * centerAttenuation
+            let rect = CGRect(
+                x: p.x - radius, y: p.y - radius,
+                width: radius * 2, height: radius * 2
             )
+            switch grain.alpha {
+            case ..<0.58:
+                faintStars.addEllipse(in: rect)
+            case 0.58 ..< 0.84:
+                neutralStars.addEllipse(in: rect)
+            default:
+                if grain.temperature < 0.28 {
+                    warmStars.addEllipse(in: rect)
+                } else {
+                    coolStars.addEllipse(in: rect)
+                }
+                // 极少数亮恒星使用对称的短衍射线；卫星则使用单侧人工刻度。
+                // 这让两类点位无需依赖颜色或尺寸就能被迅速区分。
+                let spike: CGFloat = 2.8 + 1.1 * CGFloat(grain.alpha)
+                stellarSpikes.move(to: CGPoint(x: p.x - spike, y: p.y))
+                stellarSpikes.addLine(to: CGPoint(x: p.x + spike, y: p.y))
+                stellarSpikes.move(to: CGPoint(x: p.x, y: p.y - spike))
+                stellarSpikes.addLine(to: CGPoint(x: p.x, y: p.y + spike))
+            }
         }
+        context.fill(faintStars, with: .color(Palette.dust.opacity(0.3)))
+        context.fill(neutralStars, with: .color(Palette.inkFaint.opacity(0.46)))
+        context.fill(coolStars, with: .color(Palette.inkHigh.opacity(0.55)))
+        context.fill(warmStars, with: .color(Palette.signal.opacity(0.38)))
+        context.stroke(
+            stellarSpikes,
+            with: .color(Palette.inkLow.opacity(0.23)),
+            style: StrokeStyle(lineWidth: 0.35, lineCap: .round)
+        )
     }
 
     // MARK: - 十字丝
@@ -239,6 +269,25 @@ enum SkyRenderer {
     struct SatellitePoint {
         let point: CGPoint
         let seed: Int
+        let signature: SatelliteSignature
+    }
+
+    /// 人造目标的稳定微型轮廓。它只改变 3–6pt 的局部刻度，不改变可见性或
+    /// 捕获优先级，因此仍然是一套轨道事实的视觉翻译，而不是类别图例。
+    enum SatelliteSignature: Int {
+        case network
+        case navigation
+        case observation
+        case science
+        case legacy
+    }
+
+    static func satelliteSignature(for object: CatalogObject) -> SatelliteSignature {
+        if object.family != nil || object.kind == "comms" { return .network }
+        if object.kind == "nav" { return .navigation }
+        if object.category == .observation || object.kind == "weather" { return .observation }
+        if object.status != .active || object.category == .legacy { return .legacy }
+        return .science
     }
 
     /// 同一个目录目标在不同帧、不同位置使用同一枚方向刻度。
@@ -331,29 +380,88 @@ enum SkyRenderer {
 
             // 可辨识的目录目标带一枚极短方向刻度；背景尘埃没有这层结构。
             // 角度由稳定屏幕坐标散列，避免所有目标排成机械一致的纹理。
-            if magnitude == .mid || magnitude == .bright {
+            if magnitude != .faint {
                 var signatures = Path()
-                let signatureLength: CGFloat = (magnitude == .bright ? 5.5 : 3.8)
-                    * visualScale
+                let signatureLength: CGFloat = switch magnitude {
+                case .faint: 0
+                case .low: 2.8 * visualScale
+                case .mid: 3.9 * visualScale
+                case .bright: 5.5 * visualScale
+                }
                 let offset = radius + 2 * visualScale
                 for sample in samples {
                     let point = sample.point
                     let angle = satelliteSignatureAngle(seed: sample.seed)
                     let dx = CGFloat(cos(angle))
                     let dy = CGFloat(sin(angle))
-                    signatures.move(to: CGPoint(
+                    let px = -dy
+                    let py = dx
+                    let start = CGPoint(
                         x: point.x + dx * offset,
                         y: point.y + dy * offset
-                    ))
-                    signatures.addLine(to: CGPoint(
+                    )
+                    let end = CGPoint(
                         x: point.x + dx * (offset + signatureLength),
                         y: point.y + dy * (offset + signatureLength)
-                    ))
+                    )
+                    switch sample.signature {
+                    case .network:
+                        for side: CGFloat in [-0.9, 0.9] {
+                            signatures.move(to: CGPoint(
+                                x: start.x + px * side,
+                                y: start.y + py * side
+                            ))
+                            signatures.addLine(to: CGPoint(
+                                x: end.x + px * side,
+                                y: end.y + py * side
+                            ))
+                        }
+                    case .navigation:
+                        signatures.move(to: start)
+                        signatures.addLine(to: end)
+                        signatures.addLine(to: CGPoint(
+                            x: end.x - dx * 1.6 + px * 1.35,
+                            y: end.y - dy * 1.6 + py * 1.35
+                        ))
+                    case .observation:
+                        signatures.addArc(
+                            center: CGPoint(
+                                x: point.x + dx * (offset + 1.7),
+                                y: point.y + dy * (offset + 1.7)
+                            ),
+                            radius: 2.1 * visualScale,
+                            startAngle: .radians(angle - 0.7),
+                            endAngle: .radians(angle + 0.7),
+                            clockwise: false
+                        )
+                    case .science:
+                        signatures.move(to: start)
+                        signatures.addLine(to: end)
+                        let midpoint = CGPoint(
+                            x: (start.x + end.x) / 2,
+                            y: (start.y + end.y) / 2
+                        )
+                        signatures.move(to: CGPoint(
+                            x: midpoint.x - px * 1.5,
+                            y: midpoint.y - py * 1.5
+                        ))
+                        signatures.addLine(to: CGPoint(
+                            x: midpoint.x + px * 1.5,
+                            y: midpoint.y + py * 1.5
+                        ))
+                    case .legacy:
+                        signatures.move(to: start)
+                        signatures.addLine(to: CGPoint(
+                            x: start.x + dx * signatureLength * 0.58,
+                            y: start.y + dy * signatureLength * 0.58
+                        ))
+                    }
                 }
                 context.stroke(
                     signatures,
                     with: .color(Palette.inkMid.opacity(
-                        (magnitude == .bright ? 0.23 : 0.13) * opacity
+                        (magnitude == .bright ? 0.25 : magnitude == .mid ? 0.16 : 0.1)
+                            * opacity
                     )),
                     style: StrokeStyle(lineWidth: 0.45, lineCap: .butt)
                 )

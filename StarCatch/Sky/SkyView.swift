@@ -420,11 +420,7 @@ struct SkyView: View {
 
     /// 进入感应范围先给一次轻而清晰的接触感，表示准星已经吸附到真实目标。
     private func acquisitionEntryHaptic() {
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .soft)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.28)
-        #endif
+        ObservationHaptics.shared.softImpact(intensity: 0.28)
     }
 
     /// 捕获环收缩时，脉冲间隔随进度缩短；亮度和触觉使用同一进度源。
@@ -438,40 +434,24 @@ struct SkyView: View {
         if let lastAcquisitionPulse,
            now.timeIntervalSince(lastAcquisitionPulse) < interval { return }
         lastAcquisitionPulse = now
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .soft)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.2 + 0.28 * p)
-        #endif
+        ObservationHaptics.shared.softImpact(intensity: 0.2 + 0.28 * p)
     }
 
     /// 默认识别完成：捕获环闭合与完整档案出现共用一次明确的刚性确认。
     private func recognitionCompleteHaptic() {
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.86)
-        #endif
+        ObservationHaptics.shared.rigidImpact(intensity: 0.86)
     }
 
     /// 手动锁定与默认识别完成保持同一种触觉语义。
     private func lockHaptic() {
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.86)
-        #endif
+        ObservationHaptics.shared.rigidImpact(intensity: 0.86)
     }
 
     /// 所有主动退出入口汇入同一个动作：先给一次极轻的“松开”触觉，再启动统一回收序列。
     private func requestRelease() {
         guard capture.isLocked || capture.recognitionReady else { return }
         releaseHintVisible = false
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .soft)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.32)
-        #endif
+        ObservationHaptics.shared.softImpact(intensity: 0.32)
         capture.releaseSignal()
     }
 
@@ -589,7 +569,7 @@ struct SkyView: View {
             retainedByInteraction: detailPinnedByInteraction,
             releaseProgress: releasePresentationProgress(at: Date()),
             onOpenArchive: {
-                if object.deepArchiveStory != nil {
+                if object.hasDeepArchive {
                     presentDeepArchive(for: object)
                 } else {
                     onOpenArchive()
@@ -768,11 +748,8 @@ struct SkyView: View {
     }
 
     private func presentDeepArchive(for object: CatalogObject) {
-        guard object.deepArchiveStory != nil else { return }
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .soft)
-        generator.impactOccurred(intensity: 0.5)
-        #endif
+        guard object.hasDeepArchive else { return }
+        ObservationHaptics.shared.softImpact(intensity: 0.5)
         withAnimation(
             suppressMotion
                 ? .easeOut(duration: 0.12)
@@ -837,18 +814,12 @@ struct SkyView: View {
         // 只保留这一次回归生成的轨迹，避免与上一次拖动残影混在一起。
         screenTrails.clear()
         overviewTrails.clear()
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred(intensity: 0.82)
-        #endif
+        ObservationHaptics.shared.mediumImpact(intensity: 0.82)
         clock.returnToLive()
     }
 
     private func resetActiveFieldOfView() {
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred(intensity: 0.68)
-        #endif
+        ObservationHaptics.shared.lightImpact(intensity: 0.68)
 
         if overviewCommitted {
             overviewResetRequest &+= 1
@@ -1046,11 +1017,7 @@ struct SkyView: View {
     }
 
     private func scaleThresholdHaptic() {
-        #if !targetEnvironment(simulator)
-        let generator = UIImpactFeedbackGenerator(style: .rigid)
-        generator.prepare()
-        generator.impactOccurred(intensity: 0.38)
-        #endif
+        ObservationHaptics.shared.rigidImpact(intensity: 0.38)
     }
 
     // MARK: - 指向读数
@@ -1185,10 +1152,7 @@ struct SkyView: View {
     }
 
     private func toggleTopPanel(_ panel: TopPanel) {
-        #if !targetEnvironment(simulator)
-        let generator = UISelectionFeedbackGenerator()
-        generator.selectionChanged()
-        #endif
+        ObservationHaptics.shared.selectionChanged()
         withAnimation(
             suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand
         ) {
@@ -1749,7 +1713,8 @@ struct SkyView: View {
                 && !object.isFeatured {
                 let sample = SkyRenderer.SatellitePoint(
                     point: proj.point,
-                    seed: object.noradId
+                    seed: object.noradId,
+                    signature: SkyRenderer.satelliteSignature(for: object)
                 )
                 if capture.isAcquiring,
                    !archivePresentationReady,

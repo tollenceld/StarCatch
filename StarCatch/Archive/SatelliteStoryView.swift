@@ -24,7 +24,12 @@ struct SatelliteStoryView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     identityHeader
-                        .padding(.bottom, 28)
+                        .padding(.bottom, story.officialReference == nil ? 28 : 16)
+
+                    if let reference = story.officialReference {
+                        officialReferenceLink(reference)
+                            .padding(.bottom, 26)
+                    }
 
                     Text(story.lead)
                         .font(Typography.readingBody)
@@ -124,6 +129,46 @@ struct SatelliteStoryView: View {
             }
             .padding(.top, 3)
         }
+    }
+
+    private func officialReferenceLink(
+        _ reference: SatelliteStory.OfficialReference
+    ) -> some View {
+        Link(destination: reference.url) {
+            HStack(spacing: 11) {
+                Image(systemName: "network")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(width: 18)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("官方任务页面")
+                        .font(Typography.guide)
+                        .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                    Text(reference.title)
+                        .font(Typography.statusTag)
+                        .tracking(0.45)
+                        .foregroundStyle(Palette.inkMid.opacity(0.74))
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(object.identityTint.opacity(0.82))
+            }
+            .padding(.horizontal, 13)
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
+            .background(
+                object.identityTint.opacity(0.055),
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(object.identityTint.opacity(0.3), lineWidth: 0.55)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("打开\(reference.title)官方任务页面")
+        .accessibilityHint("将在浏览器中打开外部网站")
     }
 
     private func storyChapter(_ chapter: SatelliteStory.Chapter) -> some View {

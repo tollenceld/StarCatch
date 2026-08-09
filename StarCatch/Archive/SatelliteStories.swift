@@ -6,6 +6,13 @@ import Foundation
 /// 文本由 `SatelliteKnowledge/Profiles` 与 `Families` 在构建时编译；动态轨道
 /// 读数仍来自 `catalog.json` 中的 CelesTrak 元素集。
 struct SatelliteStory: Codable, Sendable {
+    struct OfficialReference: Identifiable, Sendable {
+        let title: String
+        let url: URL
+
+        var id: String { url.absoluteString }
+    }
+
     struct Chapter: Codable, Identifiable, Sendable {
         let id: String
         let title: String
@@ -33,6 +40,24 @@ struct SatelliteStory: Codable, Sendable {
     let milestones: [Milestone]
     let facts: [Fact]
     let sources: [String]
+
+    /// 资料源仍以可审阅的纯文本保存在离线档案中；界面只把其中第一个非
+    /// CelesTrak 的 HTTPS 官方页面提升为明确操作，避免把轨道数据源误称为官网。
+    var officialReference: OfficialReference? {
+        for source in sources {
+            guard let range = source.range(of: "https://"),
+                  let url = URL(string: String(source[range.lowerBound...])),
+                  url.scheme == "https",
+                  url.host?.localizedCaseInsensitiveContains("celestrak") != true
+            else { continue }
+            var title = String(source[..<range.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            title = title.trimmingCharacters(in: CharacterSet(charactersIn: "·—- "))
+            if title.isEmpty { title = url.host ?? "官方网站" }
+            return OfficialReference(title: title, url: url)
+        }
+        return nil
+    }
 
     /// A constellation has a shared program history, but the object the user
     /// actually locked must remain the subject of the archive.  Personalizing
@@ -85,6 +110,23 @@ enum SatelliteStoryCatalog {
         return library.storiesByFamily[family]?.personalized(for: object)
     }
 
+    /// 捕获摘要每帧只需要知道入口是否存在，不应为大型星座节点反复构造个性化章节。
+    static func hasDeepArchive(for object: CatalogObject) -> Bool {
+        if let family = object.family {
+            return library.storiesByFamily[family] != nil
+        }
+        return library.storiesByNORAD[object.noradId] != nil
+    }
+
+    static func officialReference(
+        for object: CatalogObject
+    ) -> SatelliteStory.OfficialReference? {
+        if let family = object.family {
+            return library.storiesByFamily[family]?.officialReference
+        }
+        return library.storiesByNORAD[object.noradId]?.officialReference
+    }
+
     /// 测试和开发诊断使用。Release 中即使单份笔记损坏，其他档案仍可读取。
     static var diagnostics: [String] { library.diagnostics }
     static var storyCount: Int { library.storiesByNORAD.count }
@@ -94,6 +136,10 @@ enum SatelliteStoryCatalog {
 extension CatalogObject {
     var story: SatelliteStory? { SatelliteStoryCatalog.story(for: self) }
     var deepArchiveStory: SatelliteStory? { SatelliteStoryCatalog.deepArchive(for: self) }
+    var hasDeepArchive: Bool { SatelliteStoryCatalog.hasDeepArchive(for: self) }
+    var officialReference: SatelliteStory.OfficialReference? {
+        SatelliteStoryCatalog.officialReference(for: self)
+    }
     var isFeatured: Bool { story != nil }
     var deepArchiveTitle: String { name }
 

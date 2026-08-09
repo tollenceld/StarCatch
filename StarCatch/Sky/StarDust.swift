@@ -34,6 +34,8 @@ struct StarDust {
         let alpha: Double
         /// 保留的稳定相位，可供未来局部响应使用；普通观测中不驱动整层呼吸。
         let phase: Double
+        /// 0...1 的稳定色温。它只在最亮的少数恒星上形成极轻冷暖差，绝不参与捕获。
+        let temperature: Double
     }
 
     let grains: [Grain]
@@ -45,7 +47,8 @@ struct StarDust {
                 position: CGPoint(x: rng.nextUnit(), y: rng.nextUnit()),
                 radius: 0.5 + 0.9 * pow(rng.nextUnit(), 2.2), // 大颗粒稀少
                 alpha: 0.3 + 0.7 * pow(rng.nextUnit(), 1.6),
-                phase: rng.nextUnit() * 2 * .pi
+                phase: rng.nextUnit() * 2 * .pi,
+                temperature: rng.nextUnit()
             )
         }
     }

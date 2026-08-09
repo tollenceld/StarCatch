@@ -805,10 +805,23 @@ final class TimeTests: XCTestCase {
             translation: CGSize(width: 0, height: 20)
         )
 
-        XCTAssertLessThan(rightward.yaw, 0)
+        XCTAssertGreaterThan(rightward.yaw, 0)
         XCTAssertEqual(rightward.pitch, 0, accuracy: 0.000_001)
         XCTAssertEqual(downward.yaw, 0, accuracy: 0.000_001)
         XCTAssertGreaterThan(downward.pitch, 0)
+    }
+
+    func testSatelliteSignaturesSeparateArtificialTargetRoles() throws {
+        let store = CatalogStore()
+        let starlink = try XCTUnwrap(store.objects.first { $0.family == .starlink })
+        let navigation = try XCTUnwrap(store.objects.first { $0.kind == "nav" })
+        let observation = try XCTUnwrap(
+            store.objects.first { $0.category == .observation && $0.family == nil }
+        )
+
+        XCTAssertEqual(SkyRenderer.satelliteSignature(for: starlink), .network)
+        XCTAssertEqual(SkyRenderer.satelliteSignature(for: navigation), .navigation)
+        XCTAssertEqual(SkyRenderer.satelliteSignature(for: observation), .observation)
     }
 
     func testBundledCoastlineBinaryDecoderRejectsTruncationAndPreservesCoordinates() {

@@ -47,6 +47,7 @@
 		C459C00D31425977719942A9 /* EarthCoastlineStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */; };
 		C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */ = {isa = PBXBuildFile; fileRef = 7CDEE5FF1B933D8AF1C1D67B /* catalog.json */; };
 		C9EF9FD2DDEC995351B91F51 /* InstrumentPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAB5CD323D1119A24CEB83CF /* InstrumentPanel.swift */; };
+		CAD8B2F75A7A3832A66F80DA /* ObservationHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */; };
 		CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */; };
 		D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */; };
 		D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */; };
@@ -114,6 +115,7 @@
 		C2CCEDFEA2F14F120C28C217 /* SatelliteKnowledge */ = {isa = PBXFileReference; lastKnownFileType = folder; path = SatelliteKnowledge; sourceTree = SOURCE_ROOT; };
 		C46654E6CDC6B538BA4F54DF /* StarCatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarCatchApp.swift; sourceTree = "<group>"; };
 		CAED47075CCD0A05E34BD0F4 /* ArchiveOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOverlay.swift; sourceTree = "<group>"; };
+		CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationHaptics.swift; sourceTree = "<group>"; };
 		CC1242DAD73E4C1124A97F05 /* SkySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkySession.swift; sourceTree = "<group>"; };
 		CC72F3D341678B6E05B6865B /* CaptureStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStateMachine.swift; sourceTree = "<group>"; };
 		D2F9347467801F9F456031BB /* SkyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyView.swift; sourceTree = "<group>"; };
@@ -267,6 +269,7 @@
 			children = (
 				36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */,
 				564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */,
+				CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */,
 				4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */,
 				116D67906640E5C006C8B390 /* SkyActionControls.swift */,
 				2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */,
@@ -452,6 +455,7 @@
 				04B05F850A6992BF6B578356 /* ManualPointingProvider.swift in Sources */,
 				E7270D554FD76E845317E301 /* Motion.swift in Sources */,
 				08E59486EE0227D8370D7CAA /* MotionPointingProvider.swift in Sources */,
+				CAD8B2F75A7A3832A66F80DA /* ObservationHaptics.swift in Sources */,
 				5D275617161364BBE646062E /* ObservationLog.swift in Sources */,
 				D8047DD627EAA63983B35DDC /* ObserverLocation.swift in Sources */,
 				F260B9BA3A5AA778CCC17F6B /* Palette.swift in Sources */,
