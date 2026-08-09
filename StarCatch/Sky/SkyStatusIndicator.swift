@@ -241,29 +241,48 @@ struct SkyStatusIndicator: View {
     }
 
     private func islandWingPair(label: String, breath: Double) -> some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+        GeometryReader { geo in
+            if backTitle != nil {
                 statusWing(label: label, breath: breath)
+                    .fixedSize(horizontal: true, vertical: false)
                     .frame(
-                        width: backTitle == nil ? islandStatusWingWidth : nil,
-                        alignment: .trailing
+                        width: geo.size.width,
+                        height: SkyTopBarMetrics.controlHeight,
+                        alignment: .leading
                     )
-                    .fixedSize(horizontal: backTitle != nil, vertical: false)
-            }
-            .frame(maxWidth: .infinity)
+                    .padding(.leading, SkyTopBarMetrics.outerMargin)
 
-            Color.clear
-                .frame(width: islandGapWidth)
-
-            HStack(spacing: 0) {
+                let centerX = geo.size.width / 2
+                let directionCenterOffset = islandGapWidth / 2
+                    + islandDirectionWingWidth / 2
                 directionWing
                     .frame(width: islandDirectionWingWidth, alignment: .leading)
-                Spacer(minLength: 0)
+                    .position(
+                        x: centerX + directionCenterOffset,
+                        y: SkyTopBarMetrics.controlHeight / 2
+                    )
+            } else {
+                let centerX = geo.size.width / 2
+                let statusCenterOffset = islandGapWidth / 2
+                    + islandStatusWingWidth / 2
+                let directionCenterOffset = islandGapWidth / 2
+                    + islandDirectionWingWidth / 2
+
+                statusWing(label: label, breath: breath)
+                    .frame(width: islandStatusWingWidth, alignment: .trailing)
+                    .position(
+                        x: centerX - statusCenterOffset,
+                        y: SkyTopBarMetrics.controlHeight / 2
+                    )
+
+                directionWing
+                    .frame(width: islandDirectionWingWidth, alignment: .leading)
+                    .position(
+                        x: centerX + directionCenterOffset,
+                        y: SkyTopBarMetrics.controlHeight / 2
+                    )
             }
-            .frame(maxWidth: .infinity)
         }
-        .frame(height: SkyTopBarMetrics.controlHeight)
     }
 
     private func compactWingPair(label: String, breath: Double) -> some View {

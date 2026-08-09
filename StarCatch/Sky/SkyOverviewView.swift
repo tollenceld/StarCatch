@@ -406,11 +406,12 @@ struct SkyOverviewView: View {
                     cancelObserverLabelEmphasis()
                     markGestureHintsSeen()
                 }
-                yaw = settledYaw
-                    + Double(value.translation.width) * SpatialMotion.dragYawSensitivity
+                let rotation = Self.dragRotationDelta(
+                    translation: value.translation
+                )
+                yaw = settledYaw + rotation.yaw
                 pitch = Self.clampedPitch(
-                    settledPitch
-                        - Double(value.translation.height) * SpatialMotion.dragPitchSensitivity
+                    settledPitch + rotation.pitch
                 )
             }
             .onEnded { value in
@@ -418,11 +419,11 @@ struct SkyOverviewView: View {
                 orbitGestureActive = false
                 startOrbitInertia(
                     yawVelocity: SpatialMotion.limitedAngularVelocity(
-                        pointsPerSecond: value.velocity.width,
+                        pointsPerSecond: -value.velocity.width,
                         sensitivity: SpatialMotion.dragYawSensitivity
                     ),
                     pitchVelocity: SpatialMotion.limitedAngularVelocity(
-                        pointsPerSecond: -value.velocity.height,
+                        pointsPerSecond: value.velocity.height,
                         sensitivity: SpatialMotion.dragPitchSensitivity
                     )
                 )
@@ -709,6 +710,17 @@ struct SkyOverviewView: View {
         min(1.28, max(-1.28, value))
     }
 
+    /// 地球仪采用“抓住球体表面”的直接操控：手指向右时经度内容跟随向右，
+    /// 手指向下时纬度内容跟随向下。惯性速度使用同一符号约定。
+    nonisolated static func dragRotationDelta(
+        translation: CGSize
+    ) -> (yaw: Double, pitch: Double) {
+        (
+            yaw: -Double(translation.width) * SpatialMotion.dragYawSensitivity,
+            pitch: Double(translation.height) * SpatialMotion.dragPitchSensitivity
+        )
+    }
+
     nonisolated private static func shortestAngle(from start: Double, to end: Double) -> Double {
         var delta = (end - start).truncatingRemainder(dividingBy: 2 * .pi)
         if delta > .pi { delta -= 2 * .pi }
@@ -716,13 +728,12 @@ struct SkyOverviewView: View {
         return delta
     }
 
-    /// 交互时稳定降采样；停止后按缩放级别恢复细节。NORAD 取模由调用方执行，
-    /// 同一目标在连续帧中始终处于相同档位，不会因随机抽样产生闪烁。
+    /// 轨道点在静止、拖动、惯性和缩放阶段保持同一集合。交互期只收敛海岸线、
+    /// 轨迹和光晕，不抽走卫星，避免点云在手指落下时产生跳变。
     nonisolated static func renderSampleDivisor(
-        zoom: CGFloat,
-        interactionActive: Bool
+        zoom _: CGFloat,
+        interactionActive _: Bool
     ) -> Int {
-        if interactionActive { return zoom < 0.94 ? 6 : 4 }
         return 1
     }
 
@@ -958,19 +969,20 @@ struct SkyOverviewView: View {
         }
 
         let sideOpacity = front ? 1.0 : 0.19
-        let detailOpacity = simplified ? 0.68 : 1.0
         SkyRenderer.drawTargetField(
             context,
             points: field,
             tint: Palette.inkMid,
-            opacity: 0.37 * sideOpacity * detailOpacity,
-            coreRadius: front ? (simplified ? 0.48 : 0.57) : 0.41,
+            opacity: 0.37 * sideOpacity,
+            coreRadius: front ? 0.57 : 0.41,
             haloStrength: simplified ? 0 : (front ? 0.012 : 0)
         )
-        if front, !simplified {
+        if front {
             SkyRenderer.drawTargetField(
                 context, points: nearField, tint: Palette.inkHigh,
-                opacity: 0.6, coreRadius: 0.8, haloStrength: 0.032
+                opacity: 0.6,
+                coreRadius: 0.8,
+                haloStrength: simplified ? 0 : 0.032
             )
         }
     }
@@ -1118,6 +1130,41 @@ struct SkyOverviewView: View {
             )
         )
 
+        // 单一方向光把球体从“圆形底板”提升为具有体积的观测对象。光照只作用于
+        // 地表底色，不改变卫星、轨道和功能色的既有语义。
+        context.drawLayer { lighting in
+            lighting.clip(to: earth)
+            lighting.fill(
+                earth,
+                with: .linearGradient(
+                    Gradient(stops: [
+                        .init(
+                            color: Palette.observationTint.opacity(0.055),
+                            location: 0
+                        ),
+                        .init(
+                            color: Palette.voidBlack.opacity(0.02),
+                            location: 0.46
+                        ),
+                        .init(
+                            color: Palette.voidBlack.opacity(0.34),
+                            location: 1
+                        ),
+                    ]),
+                    startPoint: CGPoint(
+                        x: earthRect.minX + earthRadius * 0.24,
+                        y: earthRect.minY + earthRadius * 0.18
+                    ),
+                    endPoint: CGPoint(
+                        x: earthRect.maxX - earthRadius * 0.08,
+                        y: earthRect.maxY - earthRadius * 0.02
+                    )
+                )
+            )
+        }
+
+        drawEarthGrid(context, geometry: geometry, simplified: simplified)
+        drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
         drawObserverVisibilityRegion(
             context,
             geometry: geometry,
@@ -1125,12 +1172,24 @@ struct SkyOverviewView: View {
             simplified: simplified,
             presence: surfaceDetailPresence
         )
-        drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
-        drawEarthGrid(context, geometry: geometry, simplified: simplified)
         context.stroke(
             earth,
             with: .color(Palette.inkMid.opacity(0.54)),
             style: StrokeStyle(lineWidth: 0.82)
+        )
+
+        var illuminatedLimb = Path()
+        illuminatedLimb.addArc(
+            center: geometry.center,
+            radius: earthRadius - 0.35,
+            startAngle: .degrees(192),
+            endAngle: .degrees(310),
+            clockwise: false
+        )
+        context.stroke(
+            illuminatedLimb,
+            with: .color(Palette.inkHigh.opacity(0.24)),
+            style: StrokeStyle(lineWidth: 0.72, lineCap: .round)
         )
     }
 
@@ -1377,18 +1436,19 @@ struct SkyOverviewView: View {
         if !simplified,
            presence > 0.78,
            centerProjection.depth > 0.12,
-           let labelAnchor = ring.first,
-           labelAnchor.depth >= 0 {
+           let labelAnchor = ring
+               .filter({ $0.depth >= 0 })
+               .min(by: { $0.point.y < $1.point.y }) {
             context.draw(
                 Text("默认视域")
                     .font(Typography.statusTag)
                     .tracking(0.55)
                     .foregroundStyle(Palette.signal.opacity(0.62)),
                 at: CGPoint(
-                    x: labelAnchor.point.x + 5,
-                    y: labelAnchor.point.y - 4
+                    x: labelAnchor.point.x,
+                    y: labelAnchor.point.y - 7
                 ),
-                anchor: .leading
+                anchor: .bottom
             )
         }
     }

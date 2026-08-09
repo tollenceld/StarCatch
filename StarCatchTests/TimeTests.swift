@@ -778,14 +778,14 @@ final class TimeTests: XCTestCase {
         )
     }
 
-    func testOverviewRenderDetailTiersAreStableDuringInteraction() {
+    func testOverviewKeepsTheSameSatelliteSetDuringInteraction() {
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 1.4, interactionActive: true),
-            4
+            1
         )
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 0.8, interactionActive: true),
-            6
+            1
         )
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 1, interactionActive: false),
@@ -795,6 +795,20 @@ final class TimeTests: XCTestCase {
             SkyOverviewView.renderSampleDivisor(zoom: 1.2, interactionActive: false),
             1
         )
+    }
+
+    func testOverviewDragTreatsTheGlobeAsDirectlyManipulatedContent() {
+        let rightward = SkyOverviewView.dragRotationDelta(
+            translation: CGSize(width: 20, height: 0)
+        )
+        let downward = SkyOverviewView.dragRotationDelta(
+            translation: CGSize(width: 0, height: 20)
+        )
+
+        XCTAssertLessThan(rightward.yaw, 0)
+        XCTAssertEqual(rightward.pitch, 0, accuracy: 0.000_001)
+        XCTAssertEqual(downward.yaw, 0, accuracy: 0.000_001)
+        XCTAssertGreaterThan(downward.pitch, 0)
     }
 
     func testBundledCoastlineBinaryDecoderRejectsTruncationAndPreservesCoordinates() {
