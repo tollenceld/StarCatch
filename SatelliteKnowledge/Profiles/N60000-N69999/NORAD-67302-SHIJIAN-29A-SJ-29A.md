@@ -4,7 +4,7 @@ schema: 1
 norad: 67302
 catalog_name: SHIJIAN-29A (SJ-29A)
 eyebrow: ORBITAL NETWORK ARCHIVE
-organization: CHINA SPACE TECHNOLOGY PROGRAM
+organization: PUBLICLY REGISTERED TECHNOLOGY SERIES
 program: SHIJIAN-29A (SJ-29A)
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-技术试验系列。它验证空间技术或载荷能力；未公开的具体用途不在这里推测。
+当前目标是 2025-315A / N67302：约 23.93 小时绕地一周，沿3.5° 的近赤道轨道运行。 它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 SHIJIAN-29A (SJ-29A) 记录为 通信与导航网络中的通信任务。它的 NORAD 编号是 67302，国际编号是 2025-315A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。 当前目标是 2025-315A / N67302：约 23.93 小时绕地一周，沿3.5° 的近赤道轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 23.93 小时绕地一周，运行在3.5° 的近赤道轨道上。由当前平均元素估算，近地点约 35763 千米、远地点约 35809 千米。离心率 0.00054，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2025-315 发射中的A 号分件。当前快照收录同批 2 个在轨对象，它按编号排序位于第 1 位；同批还可见 SHIJIAN-29B (SJ-29B)。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2025 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-13 | 当前随包轨道元素的历元日期
+- 2025 | 国际编号记录的发射年份；当前目标以 2025-315A 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 67302
 - COSPAR | 2025-315A
-- 分类 | 通信与导航网络
-- 类型 | 通信任务
+- 分类 | 通信或导航网络节点
+- 类型 | 通信节点
 - 轨道 | GEO
 - 状态 | ACTIVE
+- 周期 | 约 23.93 小时
+- 倾角 | 3.49°
+- 离心率 | 0.000543
+- 估算近 / 远地点 | 35763 / 35809 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- UNOOSA · Space object registration records · https://www.unoosa.org/oosa/en/spaceobjectregister/index.html
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

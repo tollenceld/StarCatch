@@ -206,7 +206,7 @@ struct RootView: View {
         guard session == nil else { return }
         let catalog = await Task.detached(priority: .userInitiated) {
             let catalog = CatalogStore()
-            // 深度档案索引约 5 MB；在启动叙事期间完成首次映射与解码，避免用户
+            // 深度档案索引约 9 MB；在启动叙事期间完成首次映射与解码，避免用户
             // 第一次进入感应/筛选路径时触发静态库初始化。
             _ = SatelliteStoryCatalog.storyCount
             _ = SatelliteStoryCatalog.familyStoryCount

@@ -203,13 +203,30 @@ final class OrbitTests: XCTestCase {
 
         let starlink = try XCTUnwrap(store.objects.first(where: { $0.family == .starlink }))
         let starlinkArchive = try XCTUnwrap(starlink.deepArchiveStory)
-        XCTAssertEqual(starlink.deepArchiveTitle, "STARLINK")
-        XCTAssertEqual(starlinkArchive.program, "STARLINK CONSTELLATION")
-        XCTAssertTrue(starlinkArchive.lead.contains("低轨宽带网络"))
-        XCTAssertGreaterThanOrEqual(starlinkArchive.chapters.count, 2)
+        XCTAssertEqual(starlink.deepArchiveTitle, starlink.name)
+        XCTAssertTrue(starlinkArchive.program.contains(starlink.name))
+        XCTAssertEqual(starlinkArchive.lead, starlink.poetic)
+        XCTAssertTrue(starlinkArchive.lead.contains("N\(starlink.noradId)"))
+        XCTAssertGreaterThanOrEqual(starlinkArchive.chapters.count, 3)
+
+        let otherStarlink = try XCTUnwrap(
+            store.objects.first { $0.family == .starlink && $0.id != starlink.id }
+        )
+        let otherArchive = try XCTUnwrap(otherStarlink.deepArchiveStory)
+        XCTAssertNotEqual(starlink.archiveNarrative, otherStarlink.archiveNarrative)
+        XCTAssertNotEqual(starlinkArchive.lead, otherArchive.lead)
+        XCTAssertNotEqual(starlinkArchive.program, otherArchive.program)
+        XCTAssertNotEqual(starlinkArchive.chapters.first?.body, otherArchive.chapters.first?.body)
 
         let qianfan = try XCTUnwrap(store.objects.first(where: { $0.family == .qianfan }))
-        XCTAssertEqual(qianfan.deepArchiveStory?.program, "千帆星座")
+        XCTAssertTrue(qianfan.deepArchiveStory?.program.hasPrefix("千帆星座 · ") == true)
+    }
+
+    func testEveryCatalogObjectHasUniqueFirstLayerCopy() {
+        let store = Self.store
+        XCTAssertEqual(Set(store.objects.map(\.poetic)).count, store.objects.count)
+        XCTAssertFalse(store.objects.contains { $0.poetic.contains("待核实") })
+        XCTAssertFalse(store.objects.contains { $0.poetic.contains("掌握更准确") })
     }
 
     func testPackagedCatalogHasPlausiblePublicIdentifiers() {

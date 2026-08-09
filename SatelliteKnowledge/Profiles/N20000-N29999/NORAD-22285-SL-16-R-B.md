@@ -4,7 +4,7 @@ schema: 1
 norad: 22285
 catalog_name: SL-16 R/B
 eyebrow: ORBITAL HERITAGE ARCHIVE
-organization: OPERATOR TO BE VERIFIED
+organization: PUBLIC ORBIT RECORD · N22285
 program: SL-16 R/B
 review_status: generated
 ---
@@ -13,32 +13,38 @@ review_status: generated
 
 ## 摘要
 
-一支用完就被遗忘的火箭。它已经漂了三十多年。
+当前目标是 1992-093B / N22285；它的历史记录不再提供可用于推算的现代 OMM 元素。 公开 GP/OMM 条目把它记录为轨道历史对象；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 SL-16 R/B 记录为 轨道历史与遗迹中的火箭体。它的 NORAD 编号是 22285，国际编号是 1992-093B。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+公开 GP/OMM 条目把它记录为轨道历史对象；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。 当前目标是 1992-093B / N22285；它的历史记录不再提供可用于推算的现代 OMM 元素。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+这是一条为历史阅读保留的目录记录。实时天空不会把过期元素伪装成当前位置；名称、NORAD 与国际编号仍用于说明它在轨道史中的身份。
+
+### 与它一同进入目录的对象
+
+当前离线快照只保留了 1992-093 这次发射的这一条在轨记录，它是其中的 B 号分件。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 1992-12-25 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 历史 TLE | 当前随包轨道元素的历元日期
+- 1992-12-25 | 国际编号记录的发射年份；当前目标以 1992-093B 进入公开目录
+- 历史记录 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 22285
 - COSPAR | 1992-093B
-- 分类 | 轨道历史与遗迹
+- 分类 | 轨道历史对象
 - 类型 | 火箭体
 - 轨道 | LEO
 - 状态 | DEBRIS
 
+
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

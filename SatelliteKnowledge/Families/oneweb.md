@@ -38,5 +38,5 @@ OneWeb 的节点沿高倾角轨道反复覆盖地球。它们不是彼此独立�
 
 ## 来源
 
-- Eutelsat OneWeb public program information
-- CelesTrak GP/OMM offline snapshot
+- Eutelsat OneWeb · https://www.eutelsat.com/satellite-network/oneweb-leo-constellation
+- CelesTrak GP/OMM 离线快照

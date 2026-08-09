@@ -38,5 +38,5 @@ review_status: generated
 
 ## 来源
 
-- Public China SatNet program information
-- CelesTrak GP/OMM offline snapshot
+- CelesTrak · Hulianwang public GP group
+- CelesTrak GP/OMM 离线快照

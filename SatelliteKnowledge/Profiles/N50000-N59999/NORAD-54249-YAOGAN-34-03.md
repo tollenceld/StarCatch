@@ -4,7 +4,7 @@ schema: 1
 norad: 54249
 catalog_name: YAOGAN-34 03
 eyebrow: EARTH OBSERVATION ARCHIVE
-organization: CHINA REMOTE SENSING PROGRAM
+organization: PUBLICLY REGISTERED REMOTE-SENSING SERIES
 program: YAOGAN-34 03
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-公开目录将其识别为遥感系列；资料只陈述可核实的轨道身份，不推断未公开载荷。
+当前目标是 2022-154A / N54249：约 107.0 分钟绕地一周，沿63.4° 的中倾角轨道运行。 公开目录将它识别为遥感系列；未公开的具体载荷和用途不在这里推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 YAOGAN-34 03 记录为 地球与大气观测中的科学任务。它的 NORAD 编号是 54249，国际编号是 2022-154A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+公开目录将它识别为遥感系列；未公开的具体载荷和用途不在这里推测。 当前目标是 2022-154A / N54249：约 107.0 分钟绕地一周，沿63.4° 的中倾角轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 107.0 分钟绕地一周，运行在63.4° 的中倾角轨道上。由当前平均元素估算，近地点约 1029 千米、远地点约 1149 千米。离心率 0.00800，轨道整体接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+当前离线快照只保留了 2022-154 这次发射的这一条在轨记录，它是其中的 A 号分件。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2022 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-14 | 当前随包轨道元素的历元日期
+- 2022 | 国际编号记录的发射年份；当前目标以 2022-154A 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 54249
 - COSPAR | 2022-154A
-- 分类 | 地球与大气观测
-- 类型 | 科学任务
+- 分类 | 地球与大气观测对象
+- 类型 | 科学或技术任务
 - 轨道 | LEO
 - 状态 | ACTIVE
+- 周期 | 约 107.0 分钟
+- 倾角 | 63.40°
+- 离心率 | 0.008001
+- 估算近 / 远地点 | 1029 / 1149 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- UNOOSA · Space object registration records · https://www.unoosa.org/oosa/en/spaceobjectregister/index.html
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

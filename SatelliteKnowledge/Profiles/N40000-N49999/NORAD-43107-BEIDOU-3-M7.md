@@ -4,7 +4,7 @@ schema: 1
 norad: 43107
 catalog_name: BEIDOU-3 M7
 eyebrow: ORBITAL NETWORK ARCHIVE
-organization: BEIDOU NAVIGATION SYSTEM
+organization: BEIDOU NAVIGATION SATELLITE SYSTEM
 program: BEIDOU-3 M7
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-在中地轨道广播精密时间与轨道信息，参与全球定位、导航和授时。
+当前目标是 2018-003A / N43107：约 12.89 小时绕地一周，沿54.3° 的中倾角轨道运行。 北斗卫星广播导航与授时信号；不同轨道层的节点共同构成全球定位服务。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 BEIDOU-3 M7 记录为 通信与导航网络中的导航授时。它的 NORAD 编号是 43107，国际编号是 2018-003A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+北斗卫星广播导航与授时信号；不同轨道层的节点共同构成全球定位服务。 当前目标是 2018-003A / N43107：约 12.89 小时绕地一周，沿54.3° 的中倾角轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 12.89 小时绕地一周，运行在54.3° 的中倾角轨道上。平均轨道高度约 21528 千米。离心率 0.00042，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2018-003 发射中的A 号分件。当前快照收录同批 2 个在轨对象，它按编号排序位于第 1 位；同批还可见 BEIDOU-3 M8。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2018 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-13 | 当前随包轨道元素的历元日期
+- 2018 | 国际编号记录的发射年份；当前目标以 2018-003A 进入公开目录
+- 2026-07-24 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 43107
 - COSPAR | 2018-003A
-- 分类 | 通信与导航网络
-- 类型 | 导航授时
+- 分类 | 通信或导航网络节点
+- 类型 | 导航授时节点
 - 轨道 | MEO
 - 状态 | ACTIVE
+- 周期 | 约 12.89 小时
+- 倾角 | 54.29°
+- 离心率 | 0.000422
+- 估算近 / 远地点 | 21517 / 21540 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- BeiDou Navigation Satellite System · http://en.beidou.gov.cn/
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

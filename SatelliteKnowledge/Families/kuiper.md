@@ -38,5 +38,5 @@ Project Kuiper 通过近地轨道卫星、地面网关与用户终端共同建�
 
 ## 来源
 
-- Amazon Project Kuiper public program information
-- CelesTrak GP/OMM offline snapshot
+- Amazon Project Kuiper · https://www.aboutamazon.com/what-we-do/devices-services/project-kuiper
+- CelesTrak GP/OMM 离线快照

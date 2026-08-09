@@ -4,7 +4,7 @@ schema: 1
 norad: 49809
 catalog_name: GSAT0223 (GALILEO 27)
 eyebrow: EARTH OBSERVATION ARCHIVE
-organization: EUROPEAN UNION · ESA
+organization: EUROPEAN UNION · EUSPA · ESA
 program: GSAT0223 (GALILEO 27)
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-在中地轨道广播精密时间与轨道信息，参与全球定位、导航和授时。
+当前目标是 2021-116A / N49809：约 14.08 小时绕地一周，沿57.1° 的中倾角轨道运行。 Galileo 在中地轨道广播欧洲民用全球导航信号，为定位、导航、授时与搜救服务提供空间基准。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 GSAT0223 (GALILEO 27) 记录为 地球与大气观测中的科学任务。它的 NORAD 编号是 49809，国际编号是 2021-116A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+Galileo 在中地轨道广播欧洲民用全球导航信号，为定位、导航、授时与搜救服务提供空间基准。 当前目标是 2021-116A / N49809：约 14.08 小时绕地一周，沿57.1° 的中倾角轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 14.08 小时绕地一周，运行在57.1° 的中倾角轨道上。平均轨道高度约 23222 千米。离心率 0.00026，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2021-116 发射中的A 号分件。当前快照收录同批 2 个在轨对象，它按编号排序位于第 1 位；同批还可见 GSAT0224 (GALILEO 28)。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2021 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-12 | 当前随包轨道元素的历元日期
+- 2021 | 国际编号记录的发射年份；当前目标以 2021-116A 进入公开目录
+- 2026-07-24 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 49809
 - COSPAR | 2021-116A
-- 分类 | 地球与大气观测
-- 类型 | 科学任务
+- 分类 | 地球与大气观测对象
+- 类型 | 科学或技术任务
 - 轨道 | MEO
 - 状态 | ACTIVE
+- 周期 | 约 14.08 小时
+- 倾角 | 57.15°
+- 离心率 | 0.000261
+- 估算近 / 远地点 | 23214 / 23230 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- ESA · Galileo · https://www.esa.int/Applications/Satellite_navigation/Galileo
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

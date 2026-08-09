@@ -35,9 +35,16 @@ bundled snapshot is therefore part of every App Store release.
 Run the repository-wide archive gate after generating the catalog:
 
 ```sh
+python3 Scripts/satellite_knowledge.py sync
 python3 Scripts/satellite_knowledge.py validate
 python3 Scripts/release_check.py
 ```
+
+`sync` deterministically rebuilds only notes marked `review_status: generated`,
+preserves authored notes, and refreshes every generated compact summary from
+the object's real COSPAR/NORAD identity and OMM orbit. The validation and
+release gates reject placeholder markers or duplicate first-layer/individual
+story copy.
 
 An Xcode Archive (`ACTION=install`) runs the same release check automatically.
 The check rejects a stale packaged snapshot even if no catalog generation took

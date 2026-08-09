@@ -4,7 +4,7 @@ schema: 1
 norad: 57193
 catalog_name: SITRO-AIS 8 (ANOKHIN)
 eyebrow: ORBITAL NETWORK ARCHIVE
-organization: OPERATOR TO BE VERIFIED
+organization: PUBLIC ORBIT RECORD · N57193
 program: SITRO-AIS 8 (ANOKHIN)
 review_status: generated
 ---
@@ -13,32 +13,41 @@ review_status: generated
 
 ## 摘要
 
-它是轨道网络中的一个节点，让信号跨越地平线。
+当前目标是 2023-091AD / N57193：约 93.9 分钟绕地一周，沿97.5° 的近极轨道运行。 公开 GP/OMM 条目把它记录为通信或导航网络节点；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 SITRO-AIS 8 (ANOKHIN) 记录为 通信与导航网络中的通信任务。它的 NORAD 编号是 57193，国际编号是 2023-091AD。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+公开 GP/OMM 条目把它记录为通信或导航网络节点；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。 当前目标是 2023-091AD / N57193：约 93.9 分钟绕地一周，沿97.5° 的近极轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 93.9 分钟绕地一周，运行在97.5° 的近极轨道上。平均轨道高度约 467 千米。离心率 0.00086，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2023-091 发射中的AD 号分件。当前快照收录同批 39 个在轨对象，它按编号排序位于第 4 位；同批还可见 METEOR-M2 3、POLYTECH-UNIVERSE 3 (RS46S)。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2023 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-14 | 当前随包轨道元素的历元日期
+- 2023 | 国际编号记录的发射年份；当前目标以 2023-091AD 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 57193
 - COSPAR | 2023-091AD
-- 分类 | 通信与导航网络
-- 类型 | 通信任务
+- 分类 | 通信或导航网络节点
+- 类型 | 通信节点
 - 轨道 | LEO
 - 状态 | ACTIVE
+- 周期 | 约 93.9 分钟
+- 倾角 | 97.50°
+- 离心率 | 0.000858
+- 估算近 / 远地点 | 461 / 472 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

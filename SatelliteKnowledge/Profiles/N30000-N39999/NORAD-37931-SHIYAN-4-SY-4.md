@@ -4,7 +4,7 @@ schema: 1
 norad: 37931
 catalog_name: SHIYAN-4 (SY-4)
 eyebrow: SCIENCE AND EXPLORATION ARCHIVE
-organization: CHINA SPACE TECHNOLOGY PROGRAM
+organization: PUBLICLY REGISTERED TECHNOLOGY SERIES
 program: SHIYAN-4 (SY-4)
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-技术试验系列。它验证空间技术或载荷能力；未公开的具体用途不在这里推测。
+当前目标是 2011-068B / N37931：约 100.6 分钟绕地一周，沿98.7° 的近极轨道运行。 它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 SHIYAN-4 (SY-4) 记录为 探索与科学中的科学任务。它的 NORAD 编号是 37931，国际编号是 2011-068B。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。 当前目标是 2011-068B / N37931：约 100.6 分钟绕地一周，沿98.7° 的近极轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 100.6 分钟绕地一周，运行在98.7° 的近极轨道上。平均轨道高度约 788 千米。离心率 0.00236，轨道整体接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2011-068 发射中的B 号分件。当前快照收录同批 2 个在轨对象，它按编号排序位于第 2 位；同批还可见 CHUANGXIN 1-03 (CX-1-03)。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2011 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-14 | 当前随包轨道元素的历元日期
+- 2011 | 国际编号记录的发射年份；当前目标以 2011-068B 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 37931
 - COSPAR | 2011-068B
-- 分类 | 探索与科学
-- 类型 | 科学任务
+- 分类 | 科学、实验或其他公开轨道对象
+- 类型 | 科学或技术任务
 - 轨道 | LEO
 - 状态 | ACTIVE
+- 周期 | 约 100.6 分钟
+- 倾角 | 98.70°
+- 离心率 | 0.002358
+- 估算近 / 远地点 | 771 / 805 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- UNOOSA · Space object registration records · https://www.unoosa.org/oosa/en/spaceobjectregister/index.html
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

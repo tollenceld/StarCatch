@@ -4,7 +4,7 @@ schema: 1
 norad: 69910
 catalog_name: TRANSPORTER-17 OBJECT AT
 eyebrow: SCIENCE AND EXPLORATION ARCHIVE
-organization: OPERATOR TO BE VERIFIED
+organization: PUBLIC ORBIT RECORD · N69910
 program: TRANSPORTER-17 OBJECT AT
 review_status: generated
 ---
@@ -13,32 +13,41 @@ review_status: generated
 
 ## 摘要
 
-它携带一项仍在轨道上运行的任务，按自己的周期越过天空。
+当前目标是 2026-156AT / N69910：约 96.6 分钟绕地一周，沿97.8° 的近极轨道运行。 公开 GP/OMM 条目把它记录为科学、实验或其他公开轨道对象；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 TRANSPORTER-17 OBJECT AT 记录为 探索与科学中的科学任务。它的 NORAD 编号是 69910，国际编号是 2026-156AT。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+公开 GP/OMM 条目把它记录为科学、实验或其他公开轨道对象；条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。 当前目标是 2026-156AT / N69910：约 96.6 分钟绕地一周，沿97.8° 的近极轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 96.6 分钟绕地一周，运行在97.8° 的近极轨道上。平均轨道高度约 595 千米。离心率 0.00049，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2026-156 发射中的AT 号分件。当前快照收录同批 75 个在轨对象，它按编号排序位于第 19 位；同批还可见 CAS500-4、TRANSPORTER-17 OBJECT AA。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2026 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-25 | 当前随包轨道元素的历元日期
+- 2026 | 国际编号记录的发射年份；当前目标以 2026-156AT 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 69910
 - COSPAR | 2026-156AT
-- 分类 | 探索与科学
-- 类型 | 科学任务
+- 分类 | 科学、实验或其他公开轨道对象
+- 类型 | 科学或技术任务
 - 轨道 | LEO
 - 状态 | ACTIVE
+- 周期 | 约 96.6 分钟
+- 倾角 | 97.75°
+- 离心率 | 0.000494
+- 估算近 / 远地点 | 591 / 598 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

@@ -1,37 +1,47 @@
-# 当前任务：修正三维地球直接操控与全局页顶部布局
+# 当前任务：逐星资料真实性、唯一性与发布防回退
 
 状态：已完成（2026-08-09）
 
 ## 目标
 
-根据实际使用反馈，修正全局三维地球上下、左右拖动方向；让全局页“天空”返回入口真正左对齐；保证卫星点在拖动、惯性和缩放前后始终保持一致，并在不改变现有色彩语言的前提下提高球体精致度。
+清除卫星资料中的模板、占位和重复内容；让用户连续切换目标时，紧凑摘要与完整档案都以当前真实轨道对象为主体，同时不为公开资料没有确认的载荷或运营方编造结论。
 
 ## 已完成
 
-- 同时反转水平与垂直拖动映射，并同步修正松手惯性速度的方向；现在采用“抓住地球表面”的直接操控语义。
-- 将拖动方向提取为纯值函数并加入符号测试，防止后续再次把视角移动与内容拖动混淆。
-- 全局页返回翼不再占用灵动岛左翼位置；“天空”固定从屏幕左侧统一安全边距开始，AZ / EL 仍保持灵动岛右侧基准和相同垂直中心。
-- 卫星采样系数在静止、拖动、惯性和缩放状态下统一为 1；交互时不再移除普通点或漏绘近景点。
-- 继续以单个 Canvas 和远近两类批次绘制完整卫星集合；交互期只收敛海岸线采样、非关键轨迹和点核光晕。
-- 为地球增加克制的方向光、明暗半球和局部受光外缘；经纬线、海岸线、默认视域和观察者标记重新按空间层级排序。
-- 将“默认视域”标签移到可见范围轮廓上缘，避免与“当前位置”在地球下半部叠压。
+- 新增确定性资料引擎，以名称、NORAD、COSPAR 发射分件、同批对象、OMM 周期、倾角、离心率及估算近远地点生成逐星内容。
+- 为可由公开任务名称可靠识别的 NASA、NOAA、ESA、EUMETSAT、GPS、Galileo、北斗、JAXA、ISRO 及主要通信星座加入具体任务说明、机构和官方来源。
+- 对身份不明的条目明确公开 OMM 的资料边界，不再显示“运营方待核实”或邀请后续替换的占位段落；仍提供该对象独有且可验证的轨道与发射关系。
+- 重建 3,814 份 `review_status: generated` 的逐星 Markdown，保留 18 份人工迁移/整理档案；重新编译 3,832 份逐星档案。
+- 刷新 16,216 条自动首层摘要。完整 16,243 个目录对象的首层文案现在逐条唯一，且把唯一身份放在两行摘要的句首。
+- 大型星座继续共享项目历史以控制包体，但每个节点的摘要、完整档案标题、项目行、身份章节和发射标记均按当前对象个性化；Starlink 等节点之间不再打开同一张完整页面。
+- `sync` 现在只重建仍标记为 `generated` 的内容，人工内容不覆盖；未来 `update_catalog.py` 也会直接使用同一资料引擎。
+- 校验与发布门禁新增首层摘要唯一性、逐星档案摘要唯一性、空内容及占位词检查。
+- 更新资料库和发布脚本文档，说明自动内容、人工内容与大型星座背景的所有权。
 
 ## 主要涉及文件
 
-- `StarCatch/Sky/SkyOverviewView.swift`
-- `StarCatch/Sky/SkyStatusIndicator.swift`
-- `StarCatchTests/TimeTests.swift`
+- `Scripts/satellite_content.py`
+- `Scripts/satellite_knowledge.py`
+- `Scripts/update_catalog.py`
+- `Scripts/release_check.py`
+- `SatelliteKnowledge/Profiles/`
+- `SatelliteKnowledge/Families/`
+- `SatelliteKnowledge/README.md`
+- `StarCatch/Resources/catalog.json`
+- `StarCatch/Resources/satellite_profiles.json`
+- `StarCatch/Archive/SatelliteStories.swift`
+- `StarCatch/Orbits/CatalogModels.swift`
+- `StarCatchTests/OrbitTests.swift`
 
 ## 验证
 
-- iPhone 17 Pro / iOS 26.3 Debug 模拟器构建、安装和运行通过。
-- 全局页实际截图复核通过：“天空”位于左侧安全边距，AZ / EL 保持右侧基准；地球方向光、海岸线、完整卫星点和时间轴正常显示。
-- 3 项定向测试通过，覆盖直接拖动方向、交互前后卫星集合一致性和空间惯性软边界。
+- `python3 Scripts/satellite_knowledge.py validate` 通过：3,832 份逐星档案、8 份星座背景档案，覆盖 16,243 个对象。
+- 数据审计通过：16,243 / 16,243 条首层摘要唯一；3,832 / 3,832 条逐星档案摘要唯一；旧占位短语和 `OPERATOR TO BE VERIFIED` 均为 0。
+- `python3 Scripts/release_check.py --now 2026-08-08T00:00:00+00:00` 通过，用固定时间验证新增发布门禁而不伪装刷新轨道快照。
+- iPhone 17 Pro / iOS 26.3 模拟器构建通过；2 项定向测试通过，覆盖全目录首层唯一性和大型星座节点完整档案差异。
 - `git diff --check` 通过。
-- 当前 Xcode 的 AXe / SimulatorKit 架构仍无法注入自动化拖拽手势，因此惯性触感最终仍需真机复核；拖动与惯性的符号约定已由纯值测试锁定。
 
 ## 下一步
 
-- 在 iPhone 17 系列真机上分别验证慢速拖动、快速甩动、上下接近俯仰边界，以及双指缩放期间的完整点云帧表现。
-- 如完整 16k 点云在真机交互期产生 GPU 压力，只收敛光晕和轨迹，不再改变卫星数量或身份集合。
-- 本地 `main` 当前包含尚未推送的工作；需要同步 GitHub 时等待用户明确授权后普通推送。
+- 下一次 App Store 归档前按既有发布流程刷新 CelesTrak 快照；当前任务没有联网替换轨道元素或改写快照时间。
+- 若后续人工核实某颗卫星的载荷与运营方，将对应 Markdown 的 `review_status` 改为 `reviewed`，后续目录同步会保留人工资料。

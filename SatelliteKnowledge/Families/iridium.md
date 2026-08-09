@@ -38,5 +38,5 @@ Iridium 以高倾角低轨卫星服务移动语音与数据通信。相邻节点
 
 ## 来源
 
-- Iridium public constellation information
-- CelesTrak GP/OMM offline snapshot
+- Iridium · https://www.iridium.com/network/
+- CelesTrak GP/OMM 离线快照

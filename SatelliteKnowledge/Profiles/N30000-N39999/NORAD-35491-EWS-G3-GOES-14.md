@@ -2,43 +2,53 @@
 type: satellite-profile
 schema: 1
 norad: 35491
-catalog_name: GOES 14
+catalog_name: EWS-G3 (GOES 14)
 eyebrow: EARTH OBSERVATION ARCHIVE
 organization: NOAA · NASA
-program: GOES 14
+program: EWS-G3 (GOES 14)
 review_status: generated
 ---
 
-# GOES 14
+# EWS-G3 (GOES 14)
 
 ## 摘要
 
-从地球同步轨道持续凝视同一片区域，追踪云系、强对流与热带气旋的快速变化。
+当前目标是 2009-033A / N35491：约 23.98 小时绕地一周，沿1.8° 的近赤道轨道运行。 GOES 从地球同步轨道持续凝视同一大片区域，追踪云系、强对流与热带气旋的快速变化。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 GOES 14 记录为 地球与大气观测中的气象任务。它的 NORAD 编号是 35491，国际编号是 2009-033A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+GOES 从地球同步轨道持续凝视同一大片区域，追踪云系、强对流与热带气旋的快速变化。 当前目标是 2009-033A / N35491：约 23.98 小时绕地一周，沿1.8° 的近赤道轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 23.98 小时绕地一周，运行在1.8° 的近赤道轨道上。平均轨道高度约 35837 千米。离心率 0.00023，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+当前离线快照只保留了 2009-033 这次发射的这一条在轨记录，它是其中的 A 号分件。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2009 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-13 | 当前随包轨道元素的历元日期
+- 2009 | 国际编号记录的发射年份；当前目标以 2009-033A 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 35491
 - COSPAR | 2009-033A
-- 分类 | 地球与大气观测
+- 分类 | 地球与大气观测对象
 - 类型 | 气象任务
 - 轨道 | GEO
 - 状态 | ACTIVE
+- 周期 | 约 23.98 小时
+- 倾角 | 1.79°
+- 离心率 | 0.000230
+- 估算近 / 远地点 | 35827 / 35846 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- NOAA · GOES-R Series · https://www.nesdis.noaa.gov/our-satellites/currently-flying/goes-r-series
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

@@ -38,5 +38,5 @@ Orbcomm 的轨道节点主要服务资产跟踪、传感器与机器数据通信
 
 ## 来源
 
-- ORBCOMM public network information
-- CelesTrak GP/OMM offline snapshot
+- ORBCOMM · https://www.orbcomm.com/
+- CelesTrak GP/OMM 离线快照

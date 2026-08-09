@@ -5,7 +5,7 @@
 当前状态：
 
 - 3,832 颗保留卫星，每颗都有独立 Markdown 文件。
-- 12,411 个高重复通信星座节点不创建逐星文件，而是共同读取 `Families/` 下的 8 份项目档案，清单见 `EXCLUDED_CONSTELLATIONS.md`。
+- 12,411 个高重复通信星座节点不复制项目历史，而是以 `Families/` 下的 8 份项目档案为背景，再叠加当前节点独有的 COSPAR、NORAD、轨道摘要与发射标记，清单见 `EXCLUDED_CONSTELLATIONS.md`。
 - 轨道位置、速度、距离和过境时间仍由 `StarCatch/Resources/catalog.json` 计算，不需要在笔记中维护。
 
 ## 修改一颗卫星
@@ -30,8 +30,8 @@ APP 一次解码并按 NORAD 建立索引
 ## 修改一个大型星座
 
 Starlink、OneWeb、千帆、国网、Project Kuiper、Iridium、Globalstar 和 Orbcomm
-采用项目级共享档案。打开 `Families/` 中对应的 Markdown 修改一次，主天空里属于
-该星座的任意节点都会读取同一份“深入档案”：
+采用项目级背景档案。打开 `Families/` 中对应的 Markdown 修改一次，主天空里属于
+该星座的任意节点都会继承项目背景；运行时仍生成以当前卫星为标题的独立“深入档案”：
 
 ```text
 Families/
@@ -45,7 +45,8 @@ Families/
 └── orbcomm.md
 ```
 
-共享只发生在历史与项目说明层。每个节点的 NORAD、位置、距离和速度仍然独立计算。
+共享只发生在历史与项目说明层。每个节点的摘要、标题、NORAD、COSPAR、发射标记、
+位置、距离和速度都保持独立。
 
 ## 文件位置
 
@@ -103,7 +104,10 @@ python3 Scripts/satellite_knowledge.py locate 43226
 python3 Scripts/satellite_knowledge.py sync
 ```
 
-它只为新增的非星座对象创建文件，不会覆盖已经人工修改过的档案。随后可以手动检查：
+它会为新增对象建档、更新 `catalog.json` 中的逐星首层摘要，并重建
+`review_status: generated` 的自动档案。已经改为 `reviewed`、`migrated` 或其他人工状态的
+内容不会被覆盖。自动文案只使用可核实的任务名称与本地 OMM 轨道事实，不猜测未知载荷或运营方。
+随后可以手动检查：
 
 ```sh
 python3 Scripts/satellite_knowledge.py validate

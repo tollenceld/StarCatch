@@ -4,7 +4,7 @@ schema: 1
 norad: 68139
 catalog_name: SHIYAN-30 03
 eyebrow: SCIENCE AND EXPLORATION ARCHIVE
-organization: CHINA SPACE TECHNOLOGY PROGRAM
+organization: PUBLICLY REGISTERED TECHNOLOGY SERIES
 program: SHIYAN-30 03
 review_status: generated
 ---
@@ -13,32 +13,42 @@ review_status: generated
 
 ## 摘要
 
-技术试验系列。它验证空间技术或载荷能力；未公开的具体用途不在这里推测。
+当前目标是 2026-048A / N68139：约 96.5 分钟绕地一周，沿35.0° 的中倾角轨道运行。 它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 SHIYAN-30 03 记录为 探索与科学中的科学任务。它的 NORAD 编号是 68139，国际编号是 2026-048A。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+它属于公开登记的空间技术试验系列；未公开的具体载荷不在这里推测。 当前目标是 2026-048A / N68139：约 96.5 分钟绕地一周，沿35.0° 的中倾角轨道运行。
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+它约 96.5 分钟绕地一周，运行在35.0° 的中倾角轨道上。平均轨道高度约 592 千米。离心率 0.00053，轨道非常接近圆形。这些数值描述轨道元素历元附近的结构，并不是永久不变的轨道铭牌。
+
+### 与它一同进入目录的对象
+
+国际编号把它标为 2026-048 发射中的A 号分件。当前快照收录同批 2 个在轨对象，它按编号排序位于第 1 位；同批还可见 SHIYAN-30 04。 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- 2026 | 目录记录的发射年份或日期；完整日期可在核实后补充
-- 2026-07-13 | 当前随包轨道元素的历元日期
+- 2026 | 国际编号记录的发射年份；当前目标以 2026-048A 进入公开目录
+- 2026-07-25 | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | 68139
 - COSPAR | 2026-048A
-- 分类 | 探索与科学
-- 类型 | 科学任务
+- 分类 | 科学、实验或其他公开轨道对象
+- 类型 | 科学或技术任务
 - 轨道 | LEO
 - 状态 | ACTIVE
+- 周期 | 约 96.5 分钟
+- 倾角 | 35.00°
+- 离心率 | 0.000531
+- 估算近 / 远地点 | 588 / 596 KM
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+- UNOOSA · Space object registration records · https://www.unoosa.org/oosa/en/spaceobjectregister/index.html
+- CelesTrak · GP/OMM 轨道目录 · https://celestrak.org/NORAD/documentation/gp-data-formats.php
+- NASA Earth Observatory · 轨道、倾角与离心率参考 · https://science.nasa.gov/earth/earth-observatory/catalog-of-earth-satellite-orbits/

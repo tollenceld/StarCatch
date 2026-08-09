@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from satellite_content import unique_summary
+
 
 CELESTRAK_GP = "https://celestrak.org/NORAD/elements/gp.php"
 MAX_ELEMENT_AGE_DAYS = 14
@@ -230,30 +232,6 @@ def kind_for(record: dict[str, Any], category: str, memberships: dict[str, set[i
     return "science"
 
 
-def poetic_for(name: str, identifier: int, category: str, kind: str, orbit: str) -> str:
-    if name.upper().startswith("STARLINK"):
-        variants = (
-            "它是低轨通信星座的一枚节点；锁定它，会看见同一网络在天空中的尺度。",
-            "它与数千枚同伴共享低轨壳层，把连续链路铺过地平线。",
-            "这一枚高速越过天空的节点，以邻近卫星接力维持星座覆盖。",
-            "它的名字来自编号；真正的身份，是一张全球低轨网络中的坐标。",
-        )
-        return variants[identifier % len(variants)]
-    if kind == "station":
-        return "有人生活与工作的轨道空间，正从这片天空经过。"
-    if kind == "telescope":
-        return "它在大气层之外收集光线，把更远处交还给地面。"
-    if category == "observation":
-        return "它反复越过地球，保存云层、海洋与陆地正在发生的变化。"
-    if category == "network" and kind == "nav":
-        return "它以稳定的轨道节奏参与定位与授时。"
-    if category == "network":
-        return "它是轨道网络中的一个节点，让信号跨越地平线。"
-    if orbit == "GEO":
-        return "它在遥远的同步轨道上，长久守住近似固定的方位。"
-    return "它携带一项仍在轨道上运行的任务，按自己的周期越过天空。"
-
-
 def family_for(name: str) -> str | None:
     upper = name.upper()
     for family, tokens in FAMILY_TOKENS:
@@ -293,10 +271,12 @@ def metadata_for_active(
             "STARCATCH_STATUS": curated_record.get("status", "active") if curated_record else "active",
             "STARCATCH_ORBIT_CLASS": orbit,
             "STARCATCH_LAUNCHED": curated_record.get("launched") if curated_record else str(record.get("OBJECT_ID") or "—")[:4],
-            "STARCATCH_POETIC": curated_record.get("poetic") if curated_record else poetic_for(name, identifier, category, kind, orbit),
+            "STARCATCH_POETIC": curated_record.get("poetic") if curated_record else "",
             "STARCATCH_CURATED": curated_record is not None,
         }
     )
+    if not curated_record:
+        output["STARCATCH_POETIC"] = unique_summary(output)
     if family := family_for(name):
         output["STARCATCH_FAMILY"] = family
     return output

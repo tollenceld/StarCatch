@@ -38,5 +38,5 @@ Globalstar 的低轨卫星负责把移动终端信号转交给覆盖范围内的
 
 ## 来源
 
-- Globalstar public constellation information
-- CelesTrak GP/OMM offline snapshot
+- Globalstar · https://www.globalstar.com/en-us/about/our-technology
+- CelesTrak GP/OMM 离线快照

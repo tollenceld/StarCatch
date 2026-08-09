@@ -318,29 +318,6 @@ enum CatalogFamily: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// 大型星座默认以一个“轨道场”出现。这里描述共同任务；具体型号与
-    /// NORAD 编号仍保留在展开后的真实节点中。
-    var narrative: String {
-        switch self {
-        case .starlink:
-            "低轨宽带网络。大量节点分布在多个轨道壳层，以连续接力覆盖地面终端。"
-        case .oneweb:
-            "低轨通信网络。卫星沿近极轨道分布，为地面与移动终端建立广域连接。"
-        case .qianfan:
-            "正在扩展的低轨通信星座。目录中的每个点都是同一网络的一枚独立轨道节点。"
-        case .hulianwang:
-            "低轨卫星互联网系统。节点共同组成覆盖网络，而不是彼此重复的独立科学任务。"
-        case .kuiper:
-            "近地轨道宽带星座。多轨道面的节点共同向地面网关与用户终端传递数据。"
-        case .iridium:
-            "全球移动通信星座。极轨节点通过系统协作，为高纬度与远洋区域维持连接。"
-        case .globalstar:
-            "移动卫星通信网络。低轨节点把语音与数据链路转交给可见的地面站。"
-        case .orbcomm:
-            "面向物联网与资产通信的低轨网络，以窄带数据连接偏远区域的终端。"
-        }
-    }
-
     static func infer(from name: String) -> CatalogFamily? {
         let upper = name.uppercased()
         if upper.hasPrefix("STARLINK") { return .starlink }

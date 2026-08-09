@@ -38,5 +38,5 @@ Starlink 不是一颗卫星的任务，而是由许多近地轨道节点共同�
 
 ## 来源
 
-- SpaceX · Starlink public program information
-- CelesTrak GP/OMM offline snapshot
+- SpaceX · https://www.spacex.com/starlink
+- CelesTrak GP/OMM 离线快照

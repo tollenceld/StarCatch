@@ -15,6 +15,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAX_CATALOG_AGE_DAYS = 14.0
 MIN_CATALOG_OBJECTS = 10_000
+FORBIDDEN_CONTENT_MARKERS = (
+    "OPERATOR TO BE VERIFIED",
+    "可编辑的本地基础档案",
+    "掌握更准确",
+    "完整日期可在核实后补充",
+    "它携带一项仍在轨道上运行的任务",
+)
 
 
 class ReleaseCheckError(RuntimeError):
@@ -100,6 +107,26 @@ def check_catalog(now: datetime) -> tuple[int, float]:
     require(age_days <= MAX_CATALOG_AGE_DAYS, f"轨道快照已过期：{age_days:.1f} 天（上限 {MAX_CATALOG_AGE_DAYS:.0f} 天）")
     require(len(profiles.get("stories", [])) > 0, "逐星档案为空")
     require(len(profiles.get("familyStories", [])) > 0, "星座家族档案为空")
+    summaries = [str(item.get("STARCATCH_POETIC", item.get("poetic", ""))).strip() for item in objects]
+    require(all(summaries), "轨道目录存在空的首层摘要")
+    require(
+        len(set(summaries)) == len(summaries),
+        f"首层摘要存在重复：{len(summaries) - len(set(summaries))} 条未区分对象",
+    )
+    stories = profiles.get("stories", [])
+    leads = [str(item.get("lead", "")).strip() for item in stories]
+    require(all(leads), "逐星档案存在空摘要")
+    require(
+        len(set(leads)) == len(leads),
+        f"逐星档案摘要存在重复：{len(leads) - len(set(leads))} 条",
+    )
+    serialized_copy = json.dumps(
+        {"summaries": summaries, "stories": stories},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    for marker in FORBIDDEN_CONTENT_MARKERS:
+        require(marker not in serialized_copy, f"卫星资料仍含占位内容：{marker}")
     return len(objects), age_days
 
 

@@ -10,6 +10,21 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+from satellite_content import (
+    CatalogContext,
+    category_title,
+    cohort_sentence,
+    cospar_id,
+    identity_sentence,
+    kind_title,
+    mission_summary,
+    orbit_chapter,
+    orbit_fact_pairs,
+    organization_for as factual_organization_for,
+    sources_for,
+    unique_summary,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "StarCatch" / "Resources" / "catalog.json"
@@ -20,6 +35,13 @@ DEFAULT_OUTPUT = ROOT / "StarCatch" / "Resources" / "satellite_profiles.json"
 
 REQUIRED_METADATA = ("type", "schema", "norad", "catalog_name", "eyebrow", "organization", "program")
 REQUIRED_SECTIONS = ("摘要", "正文", "时间线", "事实", "来源")
+FORBIDDEN_GENERATED_COPY = (
+    "可编辑的本地基础档案",
+    "掌握更准确",
+    "完整日期可在核实后补充",
+    "OPERATOR TO BE VERIFIED",
+    "它携带一项仍在轨道上运行的任务",
+)
 
 # 这些是大量同构节点组成的通信星座。它们继续留在真实轨道目录和天空中，
 # 但不生成数千份近乎相同的人工资料文件。
@@ -63,7 +85,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "本地轨道快照继续分别推算每枚可识别节点的位置"),
         ],
         "facts": [("任务", "低轨宽带通信"), ("形态", "多轨道面大型星座"), ("档案范围", "Starlink 项目共同介绍")],
-        "sources": ["SpaceX · Starlink public program information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["SpaceX · https://www.spacex.com/starlink", "CelesTrak GP/OMM 离线快照"],
     },
     "oneweb": {
         "eyebrow": "POLAR COMMUNICATION NETWORK",
@@ -80,7 +102,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "每枚节点仍以独立轨道点位接受观测"),
         ],
         "facts": [("任务", "低轨宽带通信"), ("形态", "高倾角多轨道面星座"), ("档案范围", "OneWeb 项目共同介绍")],
-        "sources": ["Eutelsat OneWeb public program information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["Eutelsat OneWeb · https://www.eutelsat.com/satellite-network/oneweb-leo-constellation", "CelesTrak GP/OMM 离线快照"],
     },
     "qianfan": {
         "eyebrow": "EMERGING ORBITAL NETWORK",
@@ -97,7 +119,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "APP 使用离线元素分别推算已收录节点"),
         ],
         "facts": [("任务", "低轨卫星互联网"), ("形态", "分批部署的大型星座"), ("档案范围", "千帆项目共同介绍")],
-        "sources": ["Public Qianfan constellation program information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["CelesTrak · Qianfan public GP group", "CelesTrak GP/OMM 离线快照"],
     },
     "hulianwang": {
         "eyebrow": "NATIONAL ORBITAL NETWORK",
@@ -114,7 +136,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "本地目录按真实编号保存已公开的轨道对象"),
         ],
         "facts": [("任务", "低轨卫星互联网"), ("形态", "多节点通信星座"), ("档案范围", "国网项目共同介绍")],
-        "sources": ["Public China SatNet program information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["CelesTrak · Hulianwang public GP group", "CelesTrak GP/OMM 离线快照"],
     },
     "kuiper": {
         "eyebrow": "LOW EARTH ORBIT BROADBAND",
@@ -131,7 +153,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "已公开轨道对象由本地快照独立推算"),
         ],
         "facts": [("任务", "低轨宽带通信"), ("形态", "卫星、网关与用户终端系统"), ("档案范围", "Project Kuiper 共同介绍")],
-        "sources": ["Amazon Project Kuiper public program information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["Amazon Project Kuiper · https://www.aboutamazon.com/what-we-do/devices-services/project-kuiper", "CelesTrak GP/OMM 离线快照"],
     },
     "iridium": {
         "eyebrow": "GLOBAL MOBILE CONSTELLATION",
@@ -148,7 +170,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "可公开识别的节点继续分别出现在本地天空"),
         ],
         "facts": [("任务", "全球移动语音与数据"), ("形态", "高倾角低轨星座"), ("档案范围", "Iridium 系统共同介绍")],
-        "sources": ["Iridium public constellation information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["Iridium · https://www.iridium.com/network/", "CelesTrak GP/OMM 离线快照"],
     },
     "globalstar": {
         "eyebrow": "MOBILE SATELLITE NETWORK",
@@ -165,7 +187,7 @@ FAMILY_ARCHIVES = {
             ("此刻", "公开轨道节点继续由 APP 分别推算"),
         ],
         "facts": [("任务", "移动卫星通信"), ("形态", "低轨节点与地面网关"), ("档案范围", "Globalstar 系统共同介绍")],
-        "sources": ["Globalstar public constellation information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["Globalstar · https://www.globalstar.com/en-us/about/our-technology", "CelesTrak GP/OMM 离线快照"],
     },
     "orbcomm": {
         "eyebrow": "MACHINE DATA NETWORK",
@@ -182,89 +204,32 @@ FAMILY_ARCHIVES = {
             ("此刻", "每个公开节点仍以独立点位接受观测"),
         ],
         "facts": [("任务", "物联网与资产通信"), ("形态", "低轨窄带数据星座"), ("档案范围", "Orbcomm 系统共同介绍")],
-        "sources": ["ORBCOMM public network information", "CelesTrak GP/OMM offline snapshot"],
+        "sources": ["ORBCOMM · https://www.orbcomm.com/", "CelesTrak GP/OMM 离线快照"],
     },
 }
 
-CATEGORY_TITLES = {
-    "exploration": "探索与科学",
-    "observation": "地球与大气观测",
-    "network": "通信与导航网络",
-    "legacy": "轨道历史与遗迹",
-}
-
-KIND_TITLES = {
-    "science": "科学任务",
-    "weather": "气象任务",
-    "comms": "通信任务",
-    "nav": "导航授时",
-    "station": "载人空间设施",
-    "telescope": "空间望远镜",
-    "rocket_body": "火箭体",
-    "debris": "轨道碎片",
-}
-
-PUBLIC_SUMMARY_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("LANDSAT",), "持续记录陆地表面的光谱与热信息，用于辨认城市、农田、水体和森林如何变化。"),
-    (("NOAA 20", "NOAA 21", "JPSS", "SUOMI NPP"), "从极轨反复覆盖全球，为天气预报、灾害监测和长期气候记录提供大气与地表观测。"),
-    (("GOES", "HIMAWARI", "FENGYUN 4"), "从地球同步轨道持续凝视同一片区域，追踪云系、强对流与热带气旋的快速变化。"),
-    (("METOP",), "欧洲极轨气象任务，测量大气温湿廓线、海面风与痕量气体，为数值天气预报提供输入。"),
-    (("SENTINEL-1",), "Copernicus 雷达观测任务，可穿透云层并在昼夜条件下记录陆地、海冰与海面变化。"),
-    (("SENTINEL-2",), "Copernicus 多光谱成像任务，长期记录植被、土地利用、海岸和灾害现场。"),
-    (("SENTINEL-3",), "面向海洋与陆地的综合观测任务，测量海表温度、海色、地表温度与高度。"),
-    (("SENTINEL-5P",), "从全球尺度读取大气成分，追踪臭氧、氮氧化物、甲烷和气溶胶等关键变量。"),
-    (("SENTINEL-6",), "以雷达测高延续全球海平面高度记录，为气候与业务海洋学提供长期基准。"),
-    (("GALILEO", "BEIDOU", "NAVSTAR", "GLONASS", "MICHIBIKI", "IRNSS"), "在中地轨道广播精密时间与轨道信息，参与全球定位、导航和授时。"),
-    (("SWOT",), "用宽幅雷达测高同时读取海洋与陆地水体，描绘河流、湖泊和海面高度的细微变化。"),
-    (("ICESAT",), "用激光测高读取冰盖、海冰、森林与地表高度，追踪冰冻圈和地形的长期变化。"),
-    (("SMAP",), "测量表层土壤水分与冻融状态，帮助理解水、能量和碳在陆地表面的交换。"),
-    (("GOSAT",), "面向温室气体观测，读取大气中的二氧化碳与甲烷分布，并延续长期全球记录。"),
-    (("ALOS",), "以雷达或光学载荷观察陆地，用于测绘、灾害响应、森林与地表变化研究。"),
-    (("GCOM-",), "日本全球变化观测任务，持续读取水循环、气候与地表环境的关键变量。"),
-    (("CARTOSAT",), "印度高分辨率制图任务，为地形测绘、城市规划和土地信息提供立体影像。"),
-    (("RESOURCESAT",), "印度资源观测任务，记录农业、林业、水体与土地利用的长期变化。"),
-    (("OCEANSAT",), "印度海洋观测任务，读取海色、海面风与海洋生物生产力等环境信息。"),
-    (("METEOR-M",), "俄罗斯极轨气象任务，获取云层、大气与地表资料，服务天气与环境监测。"),
-    (("ELEKTRO-L",), "俄罗斯地球同步气象任务，持续观察大范围云系与快速发展的天气过程。"),
-    (("KANOPUS",), "俄罗斯对地观测任务，以高分辨率影像支持灾害、环境与地表变化监测。"),
-    (("TDRS",), "NASA 空间网络的数据中继节点，为近地轨道航天器与地面之间维持高覆盖通信。"),
-    (("INTELSAT", "EUTELSAT", "INMARSAT", "TELSTAR"), "地球同步通信节点，将广播、数据或移动链路跨越地平线连接到远方地面站。"),
-    (("GAOFEN",), "高分辨率对地观测任务，用于国土、农业、环境与灾害等遥感应用。"),
-    (("HAIYANG",), "海洋观测任务，读取海色、海面动力或海洋环境变量，服务海洋研究与监测。"),
-    (("ZIYUAN",), "资源与测绘遥感任务，以地表影像支持国土调查、制图和环境观察。"),
-    (("YAOGAN",), "公开目录将其识别为遥感系列；资料只陈述可核实的轨道身份，不推断未公开载荷。"),
-    (("SHIJIAN", "SHIYAN"), "技术试验系列。它验证空间技术或载荷能力；未公开的具体用途不在这里推测。"),
-)
-
-ORGANIZATION_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
-    (("NAVSTAR",), "UNITED STATES SPACE FORCE · GPS"),
-    (("GLONASS",), "GLONASS NAVIGATION SYSTEM"),
-    (("MICHIBIKI",), "JAPAN QZSS"),
-    (("IRNSS",), "ISRO · NAVIC"),
-    (("LANDSAT",), "NASA · USGS"),
-    (("NOAA", "JPSS", "SUOMI NPP", "GOES"), "NOAA · NASA"),
-    (("SENTINEL",), "COPERNICUS · ESA"),
-    (("METOP", "METEOSAT"), "EUMETSAT · ESA"),
-    (("GALILEO",), "EUROPEAN UNION · ESA"),
-    (("HIMAWARI",), "JAPAN METEOROLOGICAL AGENCY"),
-    (("GOSAT",), "JAXA · NIES · JAPAN MOE"),
-    (("ALOS", "GCOM-"), "JAXA"),
-    (("CARTOSAT", "RESOURCESAT", "OCEANSAT", "INSAT", "RISAT", "EOS-"), "ISRO · EARTH OBSERVATION"),
-    (("METEOR-M", "ELEKTRO-L", "KANOPUS"), "ROSCOSMOS · EARTH OBSERVATION"),
-    (("TDRS",), "NASA SPACE NETWORK"),
-    (("INTELSAT",), "INTELSAT"),
-    (("EUTELSAT",), "EUTELSAT"),
-    (("INMARSAT",), "INMARSAT"),
-    (("FENGYUN",), "CHINA METEOROLOGICAL ADMINISTRATION"),
-    (("BEIDOU",), "BEIDOU NAVIGATION SYSTEM"),
-    (("GAOFEN", "HAIYANG", "ZIYUAN"), "CHINA EARTH OBSERVATION PROGRAM"),
-    (("YAOGAN",), "CHINA REMOTE SENSING PROGRAM"),
-    (("SHIJIAN", "SHIYAN"), "CHINA SPACE TECHNOLOGY PROGRAM"),
-)
-
-
 def catalog_document() -> dict:
     return json.loads(CATALOG.read_text(encoding="utf-8"))
+
+
+def refresh_catalog_summaries(document: dict) -> int:
+    """Refresh generated first-layer copy without fetching or aging the snapshot."""
+    changed = 0
+    for record in document["objects"]:
+        if "STARCATCH_POETIC" not in record or record.get("STARCATCH_CURATED") is True:
+            continue
+        summary = unique_summary(record)
+        if record.get("STARCATCH_POETIC") != summary:
+            record["STARCATCH_POETIC"] = summary
+            changed += 1
+    if changed:
+        temporary = CATALOG.with_suffix(CATALOG.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(document, ensure_ascii=False, separators=(",", ":")),
+            encoding="utf-8",
+        )
+        temporary.replace(CATALOG)
+    return changed
 
 
 def catalog_objects() -> list[dict]:
@@ -471,52 +436,30 @@ def profile_path(norad: int, name: str) -> Path:
     return bucket / f"NORAD-{norad:05d}-{slug(name)}.md"
 
 
-def summary_for(record: dict) -> str:
-    name = identity(record)[1].upper()
-    if name == "TERRA":
-        return "以多台仪器同时观察大气、陆地、海洋与能量交换，把地球作为相互连接的系统来阅读。"
-    if name == "AQUA":
-        return "围绕地球水循环工作，观察云、降水、水汽、海冰、积雪以及海陆表面温度。"
-    for tokens, summary in PUBLIC_SUMMARY_RULES:
-        if any(token in name for token in tokens):
-            return summary
-    return str(value(record, "STARCATCH_POETIC", "poetic") or "它仍在轨道上，以自己的周期穿过观察者此刻的天空。")
-
-
-def organization_for(record: dict) -> str:
-    name = identity(record)[1].upper()
-    if name in {"TERRA", "AQUA"} or "ICESAT" in name or "SMAP" in name:
-        return "NASA EARTH SCIENCE"
-    for tokens, organization in ORGANIZATION_RULES:
-        if any(token in name for token in tokens):
-            return organization
-    return "OPERATOR TO BE VERIFIED"
-
-
-def render_generated_profile(record: dict) -> str:
+def render_generated_profile(record: dict, context: CatalogContext) -> str:
     norad, name = identity(record)
-    cospar = str(value(record, "OBJECT_ID", "cosparId") or "—")
+    cospar = cospar_id(record)
     orbit = str(value(record, "STARCATCH_ORBIT_CLASS", "orbitClass") or "—")
     category = str(value(record, "STARCATCH_CATEGORY", "category") or "exploration")
     status = str(value(record, "STARCATCH_STATUS", "status") or "active")
-    kind = str(value(record, "STARCATCH_KIND", "kind") or "science")
     launched = str(value(record, "STARCATCH_LAUNCHED", "launched") or cospar[:4] or "—")
-    summary = summary_for(record)
-    category_title = CATEGORY_TITLES.get(category, category.upper())
-    kind_title = KIND_TITLES.get(kind, kind.upper())
     eyebrow = {
         "observation": "EARTH OBSERVATION ARCHIVE",
         "network": "ORBITAL NETWORK ARCHIVE",
         "legacy": "ORBITAL HERITAGE ARCHIVE",
     }.get(category, "SCIENCE AND EXPLORATION ARCHIVE")
-    epoch = str(record.get("EPOCH") or "历史 TLE")[:10]
+    epoch = str(record.get("EPOCH") or "历史记录")[:10]
+    orbital_facts = "\n".join(
+        f"- {label} | {item_value}" for label, item_value in orbit_fact_pairs(record)
+    )
+    source_text = "\n".join(f"- {source}" for source in sources_for(record))
     return f"""---
 type: satellite-profile
 schema: 1
 norad: {norad}
 catalog_name: {name}
 eyebrow: {eyebrow}
-organization: {organization_for(record)}
+organization: {factual_organization_for(record)}
 program: {name}
 review_status: generated
 ---
@@ -525,35 +468,40 @@ review_status: generated
 
 ## 摘要
 
-{summary}
+{unique_summary(record)}
 
 ## 正文
 
-### 任务与身份
+### 可以确认的任务边界
 
-公开轨道目录将 {name} 记录为 {category_title}中的{kind_title}。它的 NORAD 编号是 {norad}，国际编号是 {cospar}。这份文字是可编辑的本地基础档案；当你掌握更准确的任务、载荷或历史资料时，可以直接替换这一段。
+{mission_summary(record)} {identity_sentence(record)}
 
-### 如何阅读它
+### 这条轨道的性格
 
-StarCatch 使用随 APP 打包的轨道元素计算它在指定时间相对观察者的方位、仰角、高度、距离与速度。这里保存的是不会随每次轨道更新而丢失的任务说明，动态读数不需要手工维护。
+{orbit_chapter(record)}
+
+### 与它一同进入目录的对象
+
+{cohort_sentence(record, context)} 国际编号关联的是发射事件，不等同于任务归属；这里仅陈述当前离线快照能够交叉确认的对象关系。
 
 ## 时间线
 
-- {launched} | 目录记录的发射年份或日期；完整日期可在核实后补充
-- {epoch} | 当前随包轨道元素的历元日期
+- {launched} | 国际编号记录的发射年份；当前目标以 {cospar} 进入公开目录
+- {epoch} | 随 App 打包的 GP/OMM 平均轨道元素历元
 
 ## 事实
 
 - NORAD | {norad}
 - COSPAR | {cospar}
-- 分类 | {category_title}
-- 类型 | {kind_title}
+- 分类 | {category_title(record)}
+- 类型 | {kind_title(record)}
 - 轨道 | {orbit}
 - 状态 | {status.upper()}
+{orbital_facts}
 
 ## 来源
 
-- CelesTrak GP/OMM 离线快照
+{source_text}
 """
 
 
@@ -604,16 +552,25 @@ review_status: generated
 """
 
 
-def sync_family_profiles() -> int:
+def sync_family_profiles() -> tuple[int, int]:
     FAMILIES.mkdir(parents=True, exist_ok=True)
     created = 0
+    refreshed = 0
     for family in FAMILY_ARCHIVES:
         path = FAMILIES / f"{family}.md"
         if path.exists():
-            continue
-        path.write_text(render_family_profile(family), encoding="utf-8")
-        created += 1
-    return created
+            try:
+                metadata, _ = front_matter(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, ValueError):
+                continue
+            if metadata.get("review_status") != "generated":
+                continue
+            path.write_text(render_family_profile(family), encoding="utf-8")
+            refreshed += 1
+        else:
+            path.write_text(render_family_profile(family), encoding="utf-8")
+            created += 1
+    return created, refreshed
 
 
 def existing_profiles_by_norad() -> dict[int, Path]:
@@ -629,7 +586,10 @@ def existing_profiles_by_norad() -> dict[int, Path]:
 
 
 def sync_profiles() -> int:
-    records = catalog_objects()
+    document = catalog_document()
+    refreshed_summaries = refresh_catalog_summaries(document)
+    records = document["objects"]
+    context = CatalogContext(records)
     eligible = eligible_records(records)
     eligible_ids = {identity(record)[0] for record in eligible}
     existing = existing_profiles_by_norad()
@@ -651,22 +611,32 @@ def sync_profiles() -> int:
             existing[norad] = target
 
     created = 0
+    refreshed = 0
     for record in eligible:
         norad, name = identity(record)
         if norad in existing:
+            path = existing[norad]
+            try:
+                metadata, _ = front_matter(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, ValueError):
+                continue
+            if metadata.get("review_status") == "generated":
+                path.write_text(render_generated_profile(record, context), encoding="utf-8")
+                refreshed += 1
             continue
         path = profile_path(norad, name)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(render_generated_profile(record), encoding="utf-8")
+        path.write_text(render_generated_profile(record, context), encoding="utf-8")
         existing[norad] = path
         created += 1
 
     write_index(eligible, existing)
     write_exclusions(records)
-    created_families = sync_family_profiles()
+    created_families, refreshed_families = sync_family_profiles()
     print(
-        f"SatelliteKnowledge: 保留 {len(eligible)} 颗，新增 {created} 份逐星档案；"
-        f"新增 {created_families} 份星座共享档案，覆盖 {len(records) - len(eligible)} 个同质节点"
+        f"SatelliteKnowledge: 保留 {len(eligible)} 颗，新增 {created}、重建 {refreshed} 份逐星档案；"
+        f"新增 {created_families}、重建 {refreshed_families} 份星座档案；"
+        f"刷新 {refreshed_summaries} 条首层摘要，覆盖 {len(records) - len(eligible)} 个星座节点"
     )
     return 0
 
@@ -697,7 +667,7 @@ def write_exclusions(records: list[dict]) -> None:
     lines = [
         "# 已排除的高重复星座",
         "",
-        "这些节点继续存在于 APP 的真实轨道目录与天空中，但不创建逐星 Markdown，避免产生大量内容完全相同的文件。任意节点的“深入档案”会进入 `Families/` 中对应的项目共享档案。",
+        "这些节点继续存在于 APP 的真实轨道目录与天空中，但不复制数千份项目历史。任意节点的“深入档案”会继承 `Families/` 中的项目背景，同时注入当前节点独有的标题、摘要、COSPAR、NORAD、发射标记和实时轨道读数。",
         "",
         "| 星座 | 排除数量 |",
         "| --- | ---: |",
@@ -715,7 +685,18 @@ def validate_profiles(require_complete_coverage: bool = True) -> tuple[list[dict
     stories: list[dict] = []
     errors: list[str] = []
     seen: dict[int, Path] = {}
+    generated_leads: dict[str, Path] = {}
     for path in profile_paths():
+        try:
+            raw_text = path.read_text(encoding="utf-8")
+            metadata, _ = front_matter(raw_text)
+        except (OSError, UnicodeError, ValueError):
+            raw_text = ""
+            metadata = {}
+        if metadata.get("review_status") == "generated":
+            for phrase in FORBIDDEN_GENERATED_COPY:
+                if phrase in raw_text:
+                    errors.append(f"{path.relative_to(ROOT)}: 自动档案仍含占位文案“{phrase}”")
         story, parse_errors = parse_profile(path)
         if parse_errors:
             errors.extend(f"{path.relative_to(ROOT)}: {error}" for error in parse_errors)
@@ -731,6 +712,13 @@ def validate_profiles(require_complete_coverage: bool = True) -> tuple[list[dict
         else:
             seen[norad] = path
             stories.append(story)
+        if metadata.get("review_status") == "generated":
+            if prior := generated_leads.get(story["lead"]):
+                errors.append(
+                    f"{path.relative_to(ROOT)}: 自动摘要与 {prior.relative_to(ROOT)} 完全重复"
+                )
+            else:
+                generated_leads[story["lead"]] = path
     if require_complete_coverage:
         missing = sorted(eligible_ids - set(seen))
         extra = sorted(set(seen) - eligible_ids)
@@ -739,6 +727,33 @@ def validate_profiles(require_complete_coverage: bool = True) -> tuple[list[dict
         if extra:
             errors.append(f"存在 {len(extra)} 颗不应编译的档案；前 10 项：{extra[:10]}")
     return sorted(stories, key=lambda item: item["noradID"]), errors
+
+
+def validate_catalog_copy() -> list[str]:
+    errors: list[str] = []
+    seen: dict[str, int] = {}
+    generated_count = 0
+    for record in catalog_objects():
+        if "STARCATCH_POETIC" not in record or record.get("STARCATCH_CURATED") is True:
+            continue
+        generated_count += 1
+        norad, _ = identity(record)
+        summary = str(record.get("STARCATCH_POETIC") or "").strip()
+        if not summary:
+            errors.append(f"catalog.json: N{norad} 缺少首层摘要")
+            continue
+        for phrase in FORBIDDEN_GENERATED_COPY:
+            if phrase in summary:
+                errors.append(f"catalog.json: N{norad} 仍含占位文案“{phrase}”")
+        if prior := seen.get(summary):
+            errors.append(f"catalog.json: N{norad} 与 N{prior} 的首层摘要完全重复")
+        else:
+            seen[summary] = norad
+    if len(seen) != generated_count:
+        errors.append(
+            f"catalog.json: {generated_count} 条自动摘要中只有 {len(seen)} 条唯一内容"
+        )
+    return errors
 
 
 def validate_family_profiles() -> tuple[list[dict], list[str]]:
@@ -772,7 +787,7 @@ def validate_family_profiles() -> tuple[list[dict], list[str]]:
 def validate() -> int:
     stories, errors = validate_profiles()
     family_stories, family_errors = validate_family_profiles()
-    errors += family_errors
+    errors += family_errors + validate_catalog_copy()
     if errors:
         print("SatelliteKnowledge 校验失败：", file=sys.stderr)
         for error in errors:
@@ -789,7 +804,7 @@ def validate() -> int:
 def compile_profiles(output: Path) -> int:
     stories, errors = validate_profiles()
     family_stories, family_errors = validate_family_profiles()
-    errors += family_errors
+    errors += family_errors + validate_catalog_copy()
     if errors:
         print("SatelliteKnowledge 编译失败：", file=sys.stderr)
         for error in errors:
@@ -851,7 +866,10 @@ def locate_profile(query: str) -> int:
         return 0
     path = profile_path(norad, name)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_generated_profile(record), encoding="utf-8")
+    path.write_text(
+        render_generated_profile(record, CatalogContext(catalog_objects())),
+        encoding="utf-8",
+    )
     print(path)
     return 0
 
