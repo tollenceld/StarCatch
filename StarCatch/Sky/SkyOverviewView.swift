@@ -168,11 +168,15 @@ struct SkyOverviewView: View {
     @State private var settledYaw: Double = -0.42
     @State private var pitch: Double = 0.28
     @State private var settledPitch: Double = 0.28
+    /// 双指旋转只改变观察平面中的球体倾角；经纬旋转仍由单指 yaw / pitch 控制。
+    @State private var roll: Double = 0
+    @State private var settledRoll: Double = 0
     @State private var zoom: CGFloat = 1
     @State private var settledZoom: CGFloat = 1
     @State private var scaleGestureActive = false
     @State private var scaleReturnProgress: Double = 0
     @State private var orbitGestureActive = false
+    @State private var rotationGestureActive = false
     @State private var spatialInertiaActive = false
     @State private var spatialMotionEvent = 0
     @State private var scaleGestureSample: CGFloat = 1
@@ -221,9 +225,12 @@ struct SkyOverviewView: View {
         return Self.clampedPitch(pitch + delta * 0.28 * (1 - controlHandoff))
     }
 
+    private var renderedRoll: Double { roll }
+
     private var renderingSimplified: Bool {
         orbitGestureActive
             || scaleGestureActive
+            || rotationGestureActive
             || spatialInertiaActive
             || !renderDetailsSettled
     }
@@ -268,6 +275,7 @@ struct SkyOverviewView: View {
                         radius: geometry.radius,
                         yaw: renderedYaw,
                         pitch: renderedPitch,
+                        roll: renderedRoll,
                         zoom: zoom
                     ) else { return }
                     samples.append(RenderSample(
@@ -342,6 +350,7 @@ struct SkyOverviewView: View {
             .contentShape(Rectangle())
             .gesture(orbitGesture)
             .simultaneousGesture(magnificationGesture)
+            .simultaneousGesture(rotationGesture)
             .simultaneousGesture(
                 SpatialTapGesture()
                     .onEnded { value in
@@ -363,6 +372,8 @@ struct SkyOverviewView: View {
                     settledYaw = yaw
                     pitch = -0.36
                     settledPitch = pitch
+                    roll = 0.18
+                    settledRoll = roll
                     zoom = 1.26
                     settledZoom = zoom
                 }
@@ -389,7 +400,7 @@ struct SkyOverviewView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("交互式三维地球轨道星图，显示观察者位置、卫星与实时轨迹")
-        .accessibilityHint(interactive ? "单指上下左右旋转，双指缩放，双击复位" : "拖动时间轴查看轨道变化")
+        .accessibilityHint(interactive ? "单指上下左右旋转，双指缩放或旋转倾角，双击复位" : "拖动时间轴查看轨道变化")
         .accessibilityAction(named: "复位星图") { resetView() }
     }
 
@@ -398,7 +409,10 @@ struct SkyOverviewView: View {
     private var orbitGesture: some Gesture {
         DragGesture(minimumDistance: 3)
             .onChanged { value in
-                guard interactive, !scaleGestureActive else { return }
+                guard interactive,
+                      !scaleGestureActive,
+                      !rotationGestureActive
+                else { return }
                 if !orbitGestureActive {
                     cancelSpatialInertia()
                     orbitGestureActive = true
@@ -415,7 +429,10 @@ struct SkyOverviewView: View {
                 )
             }
             .onEnded { value in
-                guard interactive, !scaleGestureActive else { return }
+                guard interactive,
+                      !scaleGestureActive,
+                      !rotationGestureActive
+                else { return }
                 orbitGestureActive = false
                 startOrbitInertia(
                     yawVelocity: SpatialMotion.limitedAngularVelocity(
@@ -430,12 +447,40 @@ struct SkyOverviewView: View {
             }
     }
 
+    /// 与系统地图一致的双指旋转：两指围绕中心扭转时，球体沿屏幕视轴倾斜。
+    /// 它与 MagnificationGesture 同时识别，因此同一手势可以连续缩放并校正角度。
+    private var rotationGesture: some Gesture {
+        RotateGesture(minimumAngleDelta: .degrees(0.8))
+            .onChanged { value in
+                guard interactive else { return }
+                if !rotationGestureActive {
+                    cancelSpatialInertia()
+                    orbitGestureActive = false
+                    rotationGestureActive = true
+                    beginRenderInteraction()
+                    cancelObserverLabelEmphasis()
+                    markGestureHintsSeen()
+                }
+                roll = settledRoll + value.rotation.radians
+            }
+            .onEnded { value in
+                guard interactive else { return }
+                rotationGestureActive = false
+                if scaleGestureActive {
+                    settledRoll = roll
+                } else {
+                    startRollInertia(angularVelocity: value.velocity.radians)
+                }
+            }
+    }
+
     private var magnificationGesture: some Gesture {
         MagnificationGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
                 guard interactive else { return }
                 if !scaleGestureActive {
                     cancelSpatialInertia()
+                    orbitGestureActive = false
                     beginRenderInteraction()
                     cancelObserverLabelEmphasis()
                     markGestureHintsSeen()
@@ -480,6 +525,8 @@ struct SkyOverviewView: View {
                 if shouldReturn {
                     settledZoom = zoom
                     recoverRenderDetails(after: transitionMotionEnabled ? 0.22 : 0.08)
+                } else if rotationGestureActive {
+                    settledZoom = zoom
                 } else {
                     startScaleInertia(
                         logarithmicVelocity: scaleLogarithmicVelocity
@@ -493,12 +540,14 @@ struct SkyOverviewView: View {
         cancelSpatialInertia()
         settledYaw = -0.42
         settledPitch = 0.28
+        settledRoll = 0
         settledZoom = 1
         scaleModified = false
         beginRenderInteraction()
         withAnimation(Motion.fieldReset) {
             yaw = settledYaw
             pitch = settledPitch
+            roll = settledRoll
             zoom = settledZoom
         }
         recoverRenderDetails(after: transitionMotionEnabled ? 0.48 : 0.08)
@@ -534,7 +583,8 @@ struct SkyOverviewView: View {
                 try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
                 guard event == spatialMotionEvent,
                       !orbitGestureActive,
-                      !scaleGestureActive
+                      !scaleGestureActive,
+                      !rotationGestureActive
                 else { return }
 
                 let now = Date()
@@ -575,6 +625,53 @@ struct SkyOverviewView: View {
         }
     }
 
+    private func startRollInertia(angularVelocity: Double) {
+        let limitedVelocity = min(3.2, max(-3.2, angularVelocity))
+        guard transitionMotionEnabled,
+              abs(limitedVelocity) > SpatialMotion.minimumAngularVelocity
+        else {
+            settledRoll = roll
+            recoverRenderDetails(after: 0.08)
+            return
+        }
+
+        spatialMotionEvent &+= 1
+        let event = spatialMotionEvent
+        spatialInertiaActive = true
+        beginRenderInteraction()
+
+        Task { @MainActor in
+            var velocity = limitedVelocity
+            var previousDate = Date()
+            while abs(velocity) > SpatialMotion.minimumAngularVelocity {
+                try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
+                guard event == spatialMotionEvent,
+                      !orbitGestureActive,
+                      !scaleGestureActive,
+                      !rotationGestureActive
+                else { return }
+
+                let now = Date()
+                let deltaTime = min(
+                    0.05,
+                    max(0.008, now.timeIntervalSince(previousDate))
+                )
+                previousDate = now
+                velocity *= SpatialMotion.decayFactor(
+                    rate: SpatialMotion.rotationDecay,
+                    deltaTime: deltaTime
+                )
+                roll += velocity * deltaTime
+            }
+
+            guard event == spatialMotionEvent else { return }
+            roll = roll.truncatingRemainder(dividingBy: 2 * .pi)
+            settledRoll = roll
+            spatialInertiaActive = false
+            recoverRenderDetails(after: 0.1)
+        }
+    }
+
     private func startScaleInertia(logarithmicVelocity: Double) {
         guard transitionMotionEnabled,
               abs(logarithmicVelocity) > SpatialMotion.minimumScaleVelocity
@@ -597,7 +694,8 @@ struct SkyOverviewView: View {
                 try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
                 guard event == spatialMotionEvent,
                       !orbitGestureActive,
-                      !scaleGestureActive
+                      !scaleGestureActive,
+                      !rotationGestureActive
                 else { return }
 
                 let now = Date()
@@ -639,6 +737,7 @@ struct SkyOverviewView: View {
         spatialInertiaActive = false
         settledYaw = yaw
         settledPitch = pitch
+        settledRoll = roll
         settledZoom = zoom
     }
 
@@ -662,6 +761,7 @@ struct SkyOverviewView: View {
             guard event == renderRecoveryEvent,
                   !orbitGestureActive,
                   !scaleGestureActive,
+                  !rotationGestureActive,
                   !spatialInertiaActive
             else { return }
             withAnimation(.easeOut(duration: 0.18)) {
@@ -792,6 +892,7 @@ struct SkyOverviewView: View {
         radius: CGFloat,
         yaw: Double,
         pitch: Double,
+        roll: Double = 0,
         zoom: CGFloat
     ) -> Projected3D? {
         let magnitude = Self.magnitude(of: orbitalPosition)
@@ -811,6 +912,7 @@ struct SkyOverviewView: View {
             radius: radius,
             yaw: yaw,
             pitch: pitch,
+            roll: roll,
             zoom: zoom
         )
     }
@@ -822,6 +924,7 @@ struct SkyOverviewView: View {
         radius: CGFloat,
         yaw: Double,
         pitch: Double,
+        roll: Double,
         zoom: CGFloat
     ) -> Projected3D {
         let cy = cos(yaw)
@@ -832,11 +935,15 @@ struct SkyOverviewView: View {
         let firstDepth = -direction.x * sy + direction.z * cy
         let y = direction.y * cp - firstDepth * sp
         let depth = direction.y * sp + firstDepth * cp
+        let cr = cos(roll)
+        let sr = sin(roll)
+        let screenX = x * cr + y * sr
+        let screenY = y * cr - x * sr
         let scale = Double(radius * zoom) * displayRadius
         return Projected3D(
             point: CGPoint(
-                x: center.x + CGFloat(x * scale),
-                y: center.y - CGFloat(y * scale)
+                x: center.x + CGFloat(screenX * scale),
+                y: center.y - CGFloat(screenY * scale)
             ),
             depth: depth * displayRadius
         )
@@ -928,6 +1035,7 @@ struct SkyOverviewView: View {
                 radius: geometry.radius,
                 yaw: renderedYaw,
                 pitch: renderedPitch,
+                roll: renderedRoll,
                 zoom: zoom
             )
         }
@@ -1032,6 +1140,7 @@ struct SkyOverviewView: View {
                     radius: geometry.radius,
                     yaw: renderedYaw,
                     pitch: renderedPitch,
+                    roll: renderedRoll,
                     zoom: zoom
                 ) else { return nil }
                 return (projection, point.at)
@@ -1291,6 +1400,7 @@ struct SkyOverviewView: View {
                     radius: geometry.radius,
                     yaw: renderedYaw,
                     pitch: renderedPitch,
+                    roll: renderedRoll,
                     zoom: zoom
                 )
             }
@@ -1313,6 +1423,7 @@ struct SkyOverviewView: View {
                     radius: geometry.radius,
                     yaw: renderedYaw,
                     pitch: renderedPitch,
+                    roll: renderedRoll,
                     zoom: zoom
                 )
             }
@@ -1350,6 +1461,7 @@ struct SkyOverviewView: View {
                         radius: geometry.radius,
                         yaw: renderedYaw,
                         pitch: renderedPitch,
+                        roll: renderedRoll,
                         zoom: zoom
                     )
                 }
@@ -1382,6 +1494,7 @@ struct SkyOverviewView: View {
                     radius: geometry.radius,
                     yaw: renderedYaw,
                     pitch: renderedPitch,
+                    roll: renderedRoll,
                     zoom: zoom
                 )
             }
@@ -1445,6 +1558,7 @@ struct SkyOverviewView: View {
             radius: geometry.radius,
             yaw: renderedYaw,
             pitch: renderedPitch,
+            roll: renderedRoll,
             zoom: zoom
         )
         guard centerProjection.depth > -0.02 else { return }
@@ -1472,6 +1586,7 @@ struct SkyOverviewView: View {
                 radius: geometry.radius,
                 yaw: renderedYaw,
                 pitch: renderedPitch,
+                roll: renderedRoll,
                 zoom: zoom
             )
         }
@@ -1617,6 +1732,7 @@ struct SkyOverviewView: View {
             radius: geometry.radius,
             yaw: renderedYaw,
             pitch: renderedPitch,
+            roll: renderedRoll,
             zoom: zoom
         )
     }
@@ -1713,7 +1829,7 @@ struct SkyOverviewView: View {
         )
         if showGestureHint {
             context.draw(
-                Text("DRAG  ↕↔  ·  PINCH  ±  ·  DOUBLE TAP  RESET")
+                Text("DRAG  ↕↔  ·  PINCH / ROTATE  ·  DOUBLE TAP  RESET")
                     .font(Typography.statusTag)
                     .tracking(0.7)
                     .foregroundStyle(Palette.inkLow.opacity(0.68 * presence)),

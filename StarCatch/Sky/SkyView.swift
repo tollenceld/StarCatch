@@ -485,6 +485,13 @@ struct SkyView: View {
     /// 捕获完成时建立新的阅读对象。重新对准同一对象只取消离焦倒计时，不会撤销
     /// 用户通过点按建立的保持态；明确捕获另一对象时才开始一张新卡片。
     private func presentDetail(for objectID: String) {
+        // 用户明确固定了一张资料卡后，新的准星候选不能静默替换阅读对象。
+        // 取消固定时再追上当前捕获目标，保证“锁住的是这张面板”语义稳定。
+        if detailPinnedByInteraction,
+           let retainedDetailObjectID,
+           retainedDetailObjectID != objectID {
+            return
+        }
         let isNewObject = retainedDetailObjectID != objectID
         retainedDetailObjectID = objectID
         detailGraceDeadline = nil
@@ -514,6 +521,30 @@ struct SkyView: View {
         else { return }
         detailPinnedByInteraction = true
         detailGraceDeadline = nil
+    }
+
+    /// 底部锁图标只管理阅读面板的固定状态，不再解除卫星捕获。取消固定时，
+    /// 若准星已经离开目标，则重新给用户完整的阅读宽限，而不是立刻收走面板。
+    private func toggleDetailRetention() {
+        guard retainedDetailObjectID != nil,
+              lockedDetailPresented
+        else { return }
+        detailPinnedByInteraction.toggle()
+        if detailPinnedByInteraction {
+            detailGraceDeadline = nil
+            ObservationHaptics.shared.rigidImpact(intensity: 0.38)
+        } else {
+            detailGraceDeadline = TargetDetailRetentionPolicy.deadlineAfterUnpin(
+                now: Date(),
+                isCaptureActive: archivePresentationReady
+            )
+            ObservationHaptics.shared.softImpact(intensity: 0.26)
+            if archivePresentationReady,
+               let currentObjectID = capture.engagedObjectId,
+               currentObjectID != retainedDetailObjectID {
+                presentDetail(for: currentObjectID)
+            }
+        }
     }
 
     private func dismissRetainedDetail() {
@@ -565,7 +596,6 @@ struct SkyView: View {
             object: object,
             ephemeris: engagedDisplayEphemeris(for: objectID),
             revealed: lockedDetailPresented,
-            captured: detailRepresentsCapturedTarget(objectID) && !isReleasing,
             retainedByInteraction: detailPinnedByInteraction,
             releaseProgress: releasePresentationProgress(at: Date()),
             onOpenArchive: {
@@ -576,8 +606,8 @@ struct SkyView: View {
                 }
             },
             onInteraction: keepDetailVisible,
+            onToggleRetention: toggleDetailRetention,
             onDismiss: hideLockedDetail,
-            onRelease: requestRelease
         )
         .id(objectID)
         .padding(.horizontal, 16)
@@ -736,7 +766,12 @@ struct SkyView: View {
     @ViewBuilder
     private var primaryBottomAction: some View {
         if persistentOverviewProgress < 0.05 {
-            if captureConfirmationEnabled, focusActionMode.isInteractive {
+            if capture.isLocked || isReleasing {
+                CaptureSecondaryControl(
+                    mode: captureSecondaryMode,
+                    action: performSecondaryCaptureAction
+                )
+            } else if captureConfirmationEnabled, focusActionMode.isInteractive {
                 FocusActionControl(
                     mode: focusActionMode,
                     action: performFocusAction
@@ -2046,13 +2081,6 @@ struct SkyView: View {
             || (!captureConfirmationEnabled && capture.recognitionReady)
     }
 
-    private func detailRepresentsCapturedTarget(_ objectID: String) -> Bool {
-        capture.lockedObjectId == objectID
-            || (!captureConfirmationEnabled
-                && capture.engagedObjectId == objectID
-                && capture.recognitionReady)
-    }
-
     // MARK: - 引导层
 
     @State private var lockedAt: Date?
@@ -2258,6 +2286,13 @@ enum TargetDetailRetentionPolicy {
 
     static func deadline(after date: Date) -> Date {
         date.addingTimeInterval(graceDuration)
+    }
+
+    static func deadlineAfterUnpin(
+        now: Date,
+        isCaptureActive: Bool
+    ) -> Date? {
+        isCaptureActive ? nil : deadline(after: now)
     }
 
     static func shouldDismiss(

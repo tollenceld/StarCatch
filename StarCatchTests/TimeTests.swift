@@ -778,6 +778,33 @@ final class TimeTests: XCTestCase {
         )
     }
 
+    func testOverviewTwoFingerRollRotatesAroundScreenCenterWithoutChangingDepth() throws {
+        let center = CGPoint(x: 100, y: 100)
+        let level = try XCTUnwrap(SkyOverviewView.project(
+            orbitalPosition: SIMD3(0, 0, 6_900),
+            center: center,
+            radius: 100,
+            yaw: .pi / 2,
+            pitch: 0,
+            roll: 0,
+            zoom: 1
+        ))
+        let rolled = try XCTUnwrap(SkyOverviewView.project(
+            orbitalPosition: SIMD3(0, 0, 6_900),
+            center: center,
+            radius: 100,
+            yaw: .pi / 2,
+            pitch: 0,
+            roll: .pi / 2,
+            zoom: 1
+        ))
+
+        XCTAssertGreaterThan(level.point.x, center.x)
+        XCTAssertEqual(rolled.point.x, center.x, accuracy: 0.001)
+        XCTAssertGreaterThan(rolled.point.y, center.y)
+        XCTAssertEqual(rolled.depth, level.depth, accuracy: 0.000_001)
+    }
+
     func testOverviewKeepsTheSameSatelliteSetDuringInteraction() {
         XCTAssertEqual(
             SkyOverviewView.renderSampleDivisor(zoom: 1.4, interactionActive: true),
@@ -1096,6 +1123,25 @@ final class TimeTests: XCTestCase {
                 isPinned: false,
                 isCaptureActive: true
             )
+        )
+    }
+
+    func testUnpinningDetailRestoresGraceOnlyAfterFocusLeaves() throws {
+        let now = Date(timeIntervalSince1970: 1_750_000_000)
+        XCTAssertNil(
+            TargetDetailRetentionPolicy.deadlineAfterUnpin(
+                now: now,
+                isCaptureActive: true
+            )
+        )
+        let deadline = try XCTUnwrap(TargetDetailRetentionPolicy.deadlineAfterUnpin(
+            now: now,
+            isCaptureActive: false
+        ))
+        XCTAssertEqual(
+            deadline.timeIntervalSince(now),
+            TargetDetailRetentionPolicy.graceDuration,
+            accuracy: 0.0001
         )
     }
 }

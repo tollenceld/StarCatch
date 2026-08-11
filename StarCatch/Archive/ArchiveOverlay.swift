@@ -48,13 +48,12 @@ struct ArchiveOverlay: View {
     let object: CatalogObject
     let ephemeris: Ephemeris?
     let revealed: Bool
-    var captured: Bool = true
     var retainedByInteraction: Bool = false
     var releaseProgress: Double = 0
     var onOpenArchive: () -> Void = {}
     var onInteraction: () -> Void = {}
+    var onToggleRetention: () -> Void = {}
     var onDismiss: () -> Void = {}
-    var onRelease: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
@@ -79,25 +78,29 @@ struct ArchiveOverlay: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            identityHeader
+            VStack(alignment: .leading, spacing: 0) {
+                identityHeader
 
-            Text(object.name)
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundStyle(Palette.inkHigh.opacity(0.96))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .padding(.top, 7)
+                Text(object.name)
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Palette.inkHigh.opacity(0.96))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 7)
 
-            Text(object.archiveNarrative)
-                .font(.system(size: 11.5, weight: .regular))
-                .foregroundStyle(Palette.inkMid.opacity(0.9))
-                .lineSpacing(1.5)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 4)
+                Text(object.archiveNarrative)
+                    .font(.system(size: 11.5, weight: .regular))
+                    .foregroundStyle(Palette.inkMid.opacity(0.9))
+                    .lineSpacing(1.5)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
 
-            telemetry
-                .padding(.top, 10)
+                telemetry
+                    .padding(.top, 10)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onInteraction)
 
             archiveAction
                 .padding(.top, 9)
@@ -118,7 +121,6 @@ struct ArchiveOverlay: View {
                 + (suppressMotion ? 0 : (presentationVisible ? 0 : 12) + 5 * clampedReleaseProgress)
         )
         .simultaneousGesture(dismissGesture)
-        .onTapGesture(perform: onInteraction)
         .accessibilityElement(children: .contain)
         .accessibilityAction(named: "保持目标详情", onInteraction)
         .accessibilityAction(named: "收起目标详情", onDismiss)
@@ -166,13 +168,6 @@ struct ArchiveOverlay: View {
 
             Spacer(minLength: 8)
 
-            if retainedByInteraction {
-                Image(systemName: "pin.fill")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundStyle(object.identityTint.opacity(0.76))
-                    .accessibilityLabel("详情已保持")
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
-            }
         }
         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
         .tracking(0.7)
@@ -287,23 +282,31 @@ struct ArchiveOverlay: View {
             .buttonStyle(.plain)
             .accessibilityHint("打开目标的完整任务与轨道资料")
 
-            if captured {
-                Button(action: onRelease) {
-                    auxiliaryActionSurface(
-                        symbol: "lock.open",
-                        tint: Palette.inkMid.opacity(0.76)
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("解除当前目标锁定")
-                .accessibilityHint("结束目标锁定；仅收起面板请使用顶部按钮或向下滑动")
+            Button(action: onToggleRetention) {
+                auxiliaryActionSurface(
+                    symbol: retainedByInteraction ? "lock.fill" : "lock.open",
+                    tint: retainedByInteraction
+                        ? object.identityTint.opacity(0.94)
+                        : Palette.inkMid.opacity(0.76),
+                    selected: retainedByInteraction
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                retainedByInteraction ? "取消固定目标详情" : "固定目标详情"
+            )
+            .accessibilityHint(
+                retainedByInteraction
+                    ? "准星移开后，详情将按正常宽限时间收起"
+                    : "准星移开或转向其他目标时，详情仍保持显示"
+            )
 
             if let reference = object.officialReference {
                 Link(destination: reference.url) {
                     auxiliaryActionSurface(
                         symbol: "safari",
-                        tint: object.identityTint.opacity(0.9)
+                        tint: object.identityTint.opacity(0.9),
+                        selected: false
                     )
                 }
                 .buttonStyle(.plain)
@@ -318,18 +321,29 @@ struct ArchiveOverlay: View {
         }
     }
 
-    private func auxiliaryActionSurface(symbol: String, tint: Color) -> some View {
+    private func auxiliaryActionSurface(
+        symbol: String,
+        tint: Color,
+        selected: Bool
+    ) -> some View {
         Image(systemName: symbol)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(tint)
             .frame(width: 40, height: 40)
             .background(
-                Palette.inkHigh.opacity(0.03),
+                selected
+                    ? object.identityTint.opacity(0.1)
+                    : Palette.inkHigh.opacity(0.03),
                 in: RoundedRectangle(cornerRadius: 11, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(Palette.inkFaint.opacity(0.24), lineWidth: 0.55)
+                    .stroke(
+                        selected
+                            ? object.identityTint.opacity(0.48)
+                            : Palette.inkFaint.opacity(0.24),
+                        lineWidth: selected ? 0.7 : 0.55
+                    )
             }
             .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
     }

@@ -11,6 +11,9 @@ struct SatelliteStoryView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var revealed = false
+    @State private var expandedChapterID: String?
+    @State private var missionHistoryExpanded = false
+    @State private var sourcesExpanded = false
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
 
@@ -24,59 +27,77 @@ struct SatelliteStoryView: View {
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     identityHeader
-                        .padding(.bottom, story.officialReference == nil ? 28 : 16)
+                        .padding(.bottom, ephemeris == nil ? 20 : 14)
+
+                    if let ephemeris {
+                        observationSnapshot(ephemeris)
+                            .padding(.bottom, 20)
+                    }
 
                     if let reference = story.officialReference {
                         officialReferenceLink(reference)
-                            .padding(.bottom, 26)
+                            .padding(.bottom, 22)
                     }
 
+                    sectionLabel("MISSION IN VIEW")
                     Text(story.lead)
                         .font(Typography.readingBody)
                         .tracking(Typography.readingBodyTracking)
-                        .lineSpacing(Typography.readingBodyLineSpacing)
-                        .foregroundStyle(Palette.inkMid.opacity(0.9))
+                        .lineSpacing(4)
+                        .foregroundStyle(Palette.inkMid.opacity(0.88))
+                        .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.bottom, 30)
+                        .padding(.top, 10)
+                        .padding(.bottom, 24)
 
-                    ForEach(story.chapters) { chapter in
-                        storyChapter(chapter)
-                            .padding(.bottom, 26)
-                    }
-
-                    sectionLabel("MISSION ARC")
-                    milestoneRail
-                        .padding(.top, 12)
-                        .padding(.bottom, 30)
-
-                    sectionLabel("ARCHIVE FACTS")
+                    sectionLabel("ORBIT & IDENTITY")
                     VStack(spacing: 0) {
-                        ForEach(story.facts) { fact in
+                        ForEach(preferredFacts) { fact in
                             storyField(fact.label, fact.value)
                         }
-                        if object.family == nil {
-                            storyField("NORAD", "N\(object.noradId)")
-                            storyField("COSPAR", object.cosparId)
-                            storyField("发射", object.launched)
-                            storyField("轨道", object.orbitClass)
-                        } else {
-                            storyField("当前节点", object.name)
-                            storyField("节点 NORAD", "N\(object.noradId)")
-                            storyField("节点轨道", object.orbitClass)
-                        }
-                        if let ephemeris {
-                            storyField("此刻高度", String(format: "%.0f KM", ephemeris.altitudeKm))
-                            storyField("此刻距离", String(format: "%.0f KM", ephemeris.rangeKm))
-                            storyField("此刻速度", String(format: "%.2f KM/S", ephemeris.velocityKmS))
-                        }
+                        storyField("NORAD", "N\(object.noradId)")
+                        storyField("COSPAR", object.cosparId)
+                        storyField("发射", object.launched)
+                        storyField("轨道", object.orbitClass)
                     }
                     .padding(.top, 8)
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 24)
 
-                    sourceNote
+                    if !story.chapters.isEmpty {
+                        sectionLabel("MISSION NOTES")
+                        VStack(spacing: 0) {
+                            ForEach(story.chapters) { chapter in
+                                chapterDisclosure(chapter)
+                            }
+                        }
+                        .padding(.top, 7)
+                        .padding(.bottom, 20)
+                    }
+
+                    if !story.milestones.isEmpty {
+                        compactDisclosure(
+                            title: "任务历程",
+                            detail: "\(story.milestones.count) 个关键节点",
+                            isExpanded: $missionHistoryExpanded
+                        ) {
+                            milestoneRail
+                                .padding(.top, 12)
+                                .padding(.bottom, 8)
+                        }
+                    }
+
+                    compactDisclosure(
+                        title: "资料与计算说明",
+                        detail: "\(story.sources.count) 个离线来源",
+                        isExpanded: $sourcesExpanded
+                    ) {
+                        sourceNote
+                            .padding(.top, 12)
+                            .padding(.bottom, 6)
+                    }
                 }
                 .padding(.horizontal, 30)
-                .padding(.top, 18)
+                .padding(.top, 14)
                 .padding(.bottom, 42)
             }
         }
@@ -171,18 +192,177 @@ struct SatelliteStoryView: View {
         .accessibilityHint("将在浏览器中打开外部网站")
     }
 
-    private func storyChapter(_ chapter: SatelliteStory.Chapter) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(chapter.title)
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkHigh.opacity(0.86))
-            Text(chapter.body)
-                .font(Typography.readingBody)
-                .tracking(Typography.readingBodyTracking)
-                .lineSpacing(Typography.readingBodyLineSpacing)
-                .foregroundStyle(Palette.inkMid.opacity(0.76))
+    private var preferredFacts: [SatelliteStory.Fact] {
+        let priority = [
+            "任务", "类型", "周期", "倾角", "估算近 / 远地点",
+            "形态", "主镜", "观测", "档案范围",
+        ]
+        let indexed = Dictionary(uniqueKeysWithValues: priority.enumerated().map {
+            ($0.element, $0.offset)
+        })
+        return story.facts
+            .filter { indexed[$0.label] != nil }
+            .sorted {
+                (indexed[$0.label] ?? .max) < (indexed[$1.label] ?? .max)
+            }
+            .prefix(5)
+            .map { $0 }
+    }
+
+    private func observationSnapshot(_ ephemeris: Ephemeris) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 0) {
+                observationCell(
+                    label: "AZ",
+                    value: String(format: "%03.0f°", normalizedDegrees(ephemeris.azimuth))
+                )
+                observationDivider
+                observationCell(
+                    label: "EL",
+                    value: String(format: "%+.1f°", ephemeris.elevation * 180 / .pi)
+                )
+                observationDivider
+                observationCell(
+                    label: "RANGE",
+                    value: String(format: "%.0f KM", ephemeris.rangeKm)
+                )
+            }
+
+            HStack(spacing: 0) {
+                observationCell(
+                    label: "ALT",
+                    value: String(format: "%.0f KM", ephemeris.altitudeKm)
+                )
+                observationDivider
+                observationCell(
+                    label: "SPEED",
+                    value: String(format: "%.2f KM/S", ephemeris.velocityKmS)
+                )
+                observationDivider
+                observationCell(label: "ORBIT", value: object.orbitClass)
+            }
+
+            Text(observationSentence(ephemeris))
+                .font(Typography.archiveNarrative)
+                .tracking(0.25)
+                .foregroundStyle(Palette.inkMid.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 12)
+        .background(
+            object.identityTint.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(object.identityTint.opacity(0.25), lineWidth: 0.55)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(observationSentence(ephemeris))
+    }
+
+    private func observationCell(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(Typography.statusTag)
+                .tracking(0.85)
+                .foregroundStyle(Palette.inkLow.opacity(0.7))
+            Text(value)
+                .font(Typography.archiveDataValue)
+                .tracking(0.25)
+                .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var observationDivider: some View {
+        Rectangle()
+            .fill(Palette.inkFaint.opacity(0.25))
+            .frame(width: 0.5, height: 28)
+            .padding(.horizontal, 8)
+    }
+
+    private func normalizedDegrees(_ radians: Double) -> Double {
+        let degrees = (radians * 180 / .pi).truncatingRemainder(dividingBy: 360)
+        return degrees >= 0 ? degrees : degrees + 360
+    }
+
+    private func observationSentence(_ ephemeris: Ephemeris) -> String {
+        let azimuth = normalizedDegrees(ephemeris.azimuth)
+        let directions = ["正北", "东北", "正东", "东南", "正南", "西南", "正西", "西北"]
+        let index = Int((azimuth + 22.5) / 45).quotientAndRemainder(dividingBy: 8).remainder
+        let visibility = ephemeris.elevation > 0
+            ? "位于地平线上方"
+            : "当前处于几何地平线下"
+        return "此刻目标在\(directions[index])方向，\(visibility)。肉眼可见性还取决于日照、相位、天气与目标姿态。"
+    }
+
+    private func chapterDisclosure(_ chapter: SatelliteStory.Chapter) -> some View {
+        let expanded = expandedChapterID == chapter.id
+        return DisclosureGroup(
+            isExpanded: Binding(
+                get: { expandedChapterID == chapter.id },
+                set: { expandedChapterID = $0 ? chapter.id : nil }
+            )
+        ) {
+            Text(chapter.body)
+                .font(Typography.readingCompact)
+                .tracking(Typography.readingCompactTracking)
+                .lineSpacing(4)
+                .foregroundStyle(Palette.inkMid.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+        } label: {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(expanded ? object.identityTint : Palette.inkFaint)
+                    .frame(width: 4, height: 4)
+                Text(chapter.title)
+                    .font(Typography.guide)
+                    .tracking(0.55)
+                    .foregroundStyle(Palette.inkHigh.opacity(expanded ? 0.9 : 0.78))
+            }
+            .frame(minHeight: 38)
+        }
+        .tint(object.identityTint.opacity(0.72))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.24))
+                .frame(height: 0.5)
+        }
+    }
+
+    private func compactDisclosure<Content: View>(
+        title: String,
+        detail: String,
+        isExpanded: Binding<Bool>,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        DisclosureGroup(isExpanded: isExpanded) {
+            content()
+        } label: {
+            HStack(spacing: 10) {
+                Text(title)
+                    .font(Typography.guide)
+                    .tracking(0.55)
+                    .foregroundStyle(Palette.inkHigh.opacity(0.8))
+                Spacer(minLength: 8)
+                Text(detail)
+                    .font(Typography.statusTag)
+                    .tracking(0.4)
+                    .foregroundStyle(Palette.inkLow.opacity(0.58))
+            }
+            .frame(minHeight: 42)
+        }
+        .tint(object.identityTint.opacity(0.7))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.25))
+                .frame(height: 0.5)
         }
     }
 
