@@ -164,13 +164,12 @@ struct SkyOverviewView: View {
     var onScaleReturnChanged: (Double) -> Void = { _ in }
     var onScaleReturnEnded: (Bool) -> Void = { _ in }
 
-    @State private var yaw: Double = -0.42
-    @State private var settledYaw: Double = -0.42
-    @State private var pitch: Double = 0.28
-    @State private var settledPitch: Double = 0.28
-    /// 双指旋转只改变观察平面中的球体倾角；经纬旋转仍由单指 yaw / pitch 控制。
-    @State private var roll: Double = 0
-    @State private var settledRoll: Double = 0
+    /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
+    /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
+    @State private var orientation = Self.defaultOrientation
+    @State private var settledOrientation = Self.defaultOrientation
+    @State private var orbitGestureStartOrientation = Self.defaultOrientation
+    @State private var rotationGestureStartOrientation = Self.defaultOrientation
     @State private var zoom: CGFloat = 1
     @State private var settledZoom: CGFloat = 1
     @State private var scaleGestureActive = false
@@ -210,22 +209,21 @@ struct SkyOverviewView: View {
 
     /// 转场初段仍会对设备姿态产生很轻的响应；接近全局尺度后固定到进入时的
     /// 观察方向，并把控制权完整交给触摸旋转。
-    private var renderedYaw: Double {
-        guard let entryPointing else { return yaw }
-        let delta = Self.shortestAngle(
+    private var renderedOrientation: simd_quatd {
+        guard let entryPointing else { return orientation }
+        let azimuthDelta = Self.shortestAngle(
             from: entryPointing.azimuth,
             to: session.pointing.azimuth
         )
-        return yaw - delta * 0.34 * (1 - controlHandoff)
+        let elevationDelta = session.pointing.elevation - entryPointing.elevation
+        let handoff = 1 - controlHandoff
+        let pointingAdjustment = Self.orientation(
+            yaw: -azimuthDelta * 0.34 * handoff,
+            pitch: elevationDelta * 0.28 * handoff,
+            roll: 0
+        )
+        return simd_normalize(pointingAdjustment * orientation)
     }
-
-    private var renderedPitch: Double {
-        guard let entryPointing else { return pitch }
-        let delta = session.pointing.elevation - entryPointing.elevation
-        return Self.clampedPitch(pitch + delta * 0.28 * (1 - controlHandoff))
-    }
-
-    private var renderedRoll: Double { roll }
 
     private var renderingSimplified: Bool {
         orbitGestureActive
@@ -273,9 +271,7 @@ struct SkyOverviewView: View {
                         orbitalPosition: ephemeris.orbitalPosition,
                         center: geometry.center,
                         radius: geometry.radius,
-                        yaw: renderedYaw,
-                        pitch: renderedPitch,
-                        roll: renderedRoll,
+                        orientation: renderedOrientation,
                         zoom: zoom
                     ) else { return }
                     samples.append(RenderSample(
@@ -328,6 +324,11 @@ struct SkyOverviewView: View {
                         simplified: renderingSimplified
                     )
                     drawFocusedObject(field, samples: samples)
+                    drawObserverVisibilityOverlay(
+                        field,
+                        geometry: geometry,
+                        simplified: renderingSimplified
+                    )
                     drawObserver(
                         field,
                         geometry: geometry,
@@ -348,7 +349,7 @@ struct SkyOverviewView: View {
                 )
             }
             .contentShape(Rectangle())
-            .gesture(orbitGesture)
+            .gesture(orbitGesture(in: proxy.size))
             .simultaneousGesture(magnificationGesture)
             .simultaneousGesture(rotationGesture)
             .simultaneousGesture(
@@ -368,12 +369,8 @@ struct SkyOverviewView: View {
                 coastlineStore.prepare()
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("--previewOverviewTransform") {
-                    yaw = 0.72
-                    settledYaw = yaw
-                    pitch = -0.36
-                    settledPitch = pitch
-                    roll = 0.18
-                    settledRoll = roll
+                    orientation = Self.orientation(yaw: 0.72, pitch: -0.36, roll: 0.18)
+                    settledOrientation = orientation
                     zoom = 1.26
                     settledZoom = zoom
                 }
@@ -406,7 +403,7 @@ struct SkyOverviewView: View {
 
     // MARK: - 交互
 
-    private var orbitGesture: some Gesture {
+    private func orbitGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 3)
             .onChanged { value in
                 guard interactive,
@@ -416,17 +413,24 @@ struct SkyOverviewView: View {
                 if !orbitGestureActive {
                     cancelSpatialInertia()
                     orbitGestureActive = true
+                    orbitGestureStartOrientation = orientation
                     beginRenderInteraction()
                     cancelObserverLabelEmphasis()
                     markGestureHintsSeen()
                 }
-                let rotation = Self.dragRotationDelta(
-                    translation: value.translation
+                let geometry = renderedGeometry(in: size)
+                let radius = Self.arcballRadius(in: size, geometry: geometry)
+                let currentLocation = CGPoint(
+                    x: value.startLocation.x + value.translation.width,
+                    y: value.startLocation.y + value.translation.height
                 )
-                yaw = settledYaw + rotation.yaw
-                pitch = Self.clampedPitch(
-                    settledPitch + rotation.pitch
+                let delta = Self.arcballRotation(
+                    from: value.startLocation,
+                    to: currentLocation,
+                    center: geometry.center,
+                    radius: radius
                 )
+                orientation = simd_normalize(delta * orbitGestureStartOrientation)
             }
             .onEnded { value in
                 guard interactive,
@@ -435,13 +439,16 @@ struct SkyOverviewView: View {
                 else { return }
                 orbitGestureActive = false
                 startOrbitInertia(
-                    yawVelocity: SpatialMotion.limitedAngularVelocity(
-                        pointsPerSecond: value.velocity.width,
-                        sensitivity: SpatialMotion.dragYawSensitivity
-                    ),
-                    pitchVelocity: SpatialMotion.limitedAngularVelocity(
-                        pointsPerSecond: value.velocity.height,
-                        sensitivity: SpatialMotion.dragPitchSensitivity
+                    angularVelocity: SIMD3(
+                        SpatialMotion.limitedAngularVelocity(
+                            pointsPerSecond: value.velocity.height,
+                            sensitivity: SpatialMotion.dragPitchSensitivity
+                        ),
+                        SpatialMotion.limitedAngularVelocity(
+                            pointsPerSecond: value.velocity.width,
+                            sensitivity: SpatialMotion.dragYawSensitivity
+                        ),
+                        0
                     )
                 )
             }
@@ -457,19 +464,27 @@ struct SkyOverviewView: View {
                     cancelSpatialInertia()
                     orbitGestureActive = false
                     rotationGestureActive = true
+                    rotationGestureStartOrientation = orientation
                     beginRenderInteraction()
                     cancelObserverLabelEmphasis()
                     markGestureHintsSeen()
                 }
-                roll = settledRoll + value.rotation.radians
+                let delta = simd_quatd(
+                    angle: -value.rotation.radians,
+                    axis: SIMD3(0, 0, 1)
+                )
+                orientation = simd_normalize(delta * rotationGestureStartOrientation)
             }
             .onEnded { value in
                 guard interactive else { return }
                 rotationGestureActive = false
                 if scaleGestureActive {
-                    settledRoll = roll
+                    settledOrientation = orientation
                 } else {
-                    startRollInertia(angularVelocity: value.velocity.radians)
+                    startOrientationInertia(
+                        angularVelocity: SIMD3(0, 0, -value.velocity.radians),
+                        maximumSpeed: 3.2
+                    )
                 }
             }
     }
@@ -538,31 +553,65 @@ struct SkyOverviewView: View {
     private func resetView() {
         guard interactive else { return }
         cancelSpatialInertia()
-        settledYaw = -0.42
-        settledPitch = 0.28
-        settledRoll = 0
+        let startingOrientation = orientation
+        settledOrientation = Self.defaultOrientation
         settledZoom = 1
         scaleModified = false
         beginRenderInteraction()
         withAnimation(Motion.fieldReset) {
-            yaw = settledYaw
-            pitch = settledPitch
-            roll = settledRoll
             zoom = settledZoom
         }
-        recoverRenderDetails(after: transitionMotionEnabled ? 0.48 : 0.08)
+        guard transitionMotionEnabled else {
+            orientation = settledOrientation
+            recoverRenderDetails(after: 0.08)
+            return
+        }
+
+        spatialMotionEvent &+= 1
+        let event = spatialMotionEvent
+        spatialInertiaActive = true
+        Task { @MainActor in
+            let start = Date()
+            let duration = 0.46
+            while true {
+                guard event == spatialMotionEvent,
+                      !orbitGestureActive,
+                      !scaleGestureActive,
+                      !rotationGestureActive
+                else { return }
+                let elapsed = Date().timeIntervalSince(start)
+                let linear = min(1, max(0, elapsed / duration))
+                let eased = linear * linear * (3 - 2 * linear)
+                orientation = simd_slerp(
+                    startingOrientation,
+                    Self.defaultOrientation,
+                    eased
+                )
+                if linear >= 1 { break }
+                try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
+            }
+            guard event == spatialMotionEvent else { return }
+            orientation = Self.defaultOrientation
+            settledOrientation = orientation
+            spatialInertiaActive = false
+            recoverRenderDetails(after: 0.08)
+        }
     }
 
-    private func startOrbitInertia(
-        yawVelocity: Double,
-        pitchVelocity: Double
+    private func startOrbitInertia(angularVelocity: SIMD3<Double>) {
+        startOrientationInertia(angularVelocity: angularVelocity, maximumSpeed: 4.2)
+    }
+
+    private func startOrientationInertia(
+        angularVelocity: SIMD3<Double>,
+        maximumSpeed: Double
     ) {
-        let initialSpeed = hypot(yawVelocity, pitchVelocity)
+        let rawSpeed = simd_length(angularVelocity)
+        let initialSpeed = min(maximumSpeed, rawSpeed)
         guard transitionMotionEnabled,
               initialSpeed > SpatialMotion.minimumAngularVelocity
         else {
-            settledYaw = yaw
-            settledPitch = pitch
+            settledOrientation = orientation
             recoverRenderDetails(after: 0.08)
             emphasizeObserverLabel()
             return
@@ -574,76 +623,10 @@ struct SkyOverviewView: View {
         beginRenderInteraction()
 
         Task { @MainActor in
-            var horizontalVelocity = yawVelocity
-            var verticalVelocity = pitchVelocity
+            var velocity = angularVelocity * (initialSpeed / max(rawSpeed, 0.000_001))
             var previousDate = Date()
 
-            while hypot(horizontalVelocity, verticalVelocity)
-                    > SpatialMotion.minimumAngularVelocity {
-                try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
-                guard event == spatialMotionEvent,
-                      !orbitGestureActive,
-                      !scaleGestureActive,
-                      !rotationGestureActive
-                else { return }
-
-                let now = Date()
-                let deltaTime = min(
-                    0.05,
-                    max(0.008, now.timeIntervalSince(previousDate))
-                )
-                previousDate = now
-
-                let pitchResistance = SpatialMotion.boundaryVelocityScale(
-                    value: pitch,
-                    velocity: verticalVelocity,
-                    lowerBound: -1.28,
-                    upperBound: 1.28,
-                    slowZone: 0.24
-                )
-                horizontalVelocity *= SpatialMotion.decayFactor(
-                    rate: SpatialMotion.rotationDecay,
-                    deltaTime: deltaTime
-                )
-                verticalVelocity *= SpatialMotion.decayFactor(
-                    rate: SpatialMotion.rotationDecay,
-                    deltaTime: deltaTime
-                ) * pitchResistance
-
-                yaw += horizontalVelocity * deltaTime
-                pitch = Self.clampedPitch(
-                    pitch + verticalVelocity * deltaTime
-                )
-            }
-
-            guard event == spatialMotionEvent else { return }
-            settledYaw = yaw
-            settledPitch = pitch
-            spatialInertiaActive = false
-            recoverRenderDetails(after: 0.1)
-            emphasizeObserverLabel(after: 0.08)
-        }
-    }
-
-    private func startRollInertia(angularVelocity: Double) {
-        let limitedVelocity = min(3.2, max(-3.2, angularVelocity))
-        guard transitionMotionEnabled,
-              abs(limitedVelocity) > SpatialMotion.minimumAngularVelocity
-        else {
-            settledRoll = roll
-            recoverRenderDetails(after: 0.08)
-            return
-        }
-
-        spatialMotionEvent &+= 1
-        let event = spatialMotionEvent
-        spatialInertiaActive = true
-        beginRenderInteraction()
-
-        Task { @MainActor in
-            var velocity = limitedVelocity
-            var previousDate = Date()
-            while abs(velocity) > SpatialMotion.minimumAngularVelocity {
+            while simd_length(velocity) > SpatialMotion.minimumAngularVelocity {
                 try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
                 guard event == spatialMotionEvent,
                       !orbitGestureActive,
@@ -661,14 +644,20 @@ struct SkyOverviewView: View {
                     rate: SpatialMotion.rotationDecay,
                     deltaTime: deltaTime
                 )
-                roll += velocity * deltaTime
+                let speed = simd_length(velocity)
+                guard speed > 0 else { break }
+                let delta = simd_quatd(
+                    angle: speed * deltaTime,
+                    axis: velocity / speed
+                )
+                orientation = simd_normalize(delta * orientation)
             }
 
             guard event == spatialMotionEvent else { return }
-            roll = roll.truncatingRemainder(dividingBy: 2 * .pi)
-            settledRoll = roll
+            settledOrientation = orientation
             spatialInertiaActive = false
             recoverRenderDetails(after: 0.1)
+            emphasizeObserverLabel(after: 0.08)
         }
     }
 
@@ -735,9 +724,7 @@ struct SkyOverviewView: View {
     private func cancelSpatialInertia() {
         spatialMotionEvent &+= 1
         spatialInertiaActive = false
-        settledYaw = yaw
-        settledPitch = pitch
-        settledRoll = roll
+        settledOrientation = orientation
         settledZoom = zoom
     }
 
@@ -806,12 +793,77 @@ struct SkyOverviewView: View {
         emphasizeObserverLabel()
     }
 
-    nonisolated private static func clampedPitch(_ value: Double) -> Double {
-        min(1.28, max(-1.28, value))
+    nonisolated private static let defaultOrientation = orientation(
+        yaw: -0.42,
+        pitch: 0.28,
+        roll: 0
+    )
+
+    /// 与旧投影次序一致：先经度、再俯仰、最后沿屏幕视轴滚转。
+    nonisolated static func orientation(
+        yaw: Double,
+        pitch: Double,
+        roll: Double
+    ) -> simd_quatd {
+        let yawRotation = simd_quatd(angle: yaw, axis: SIMD3(0, 1, 0))
+        let pitchRotation = simd_quatd(angle: pitch, axis: SIMD3(1, 0, 0))
+        let rollRotation = simd_quatd(angle: -roll, axis: SIMD3(0, 0, 1))
+        return simd_normalize(rollRotation * pitchRotation * yawRotation)
     }
 
-    /// 地球仪采用“抓住球体表面”的直接操控：手指向右时经度内容跟随向右，
-    /// 手指向下时纬度内容跟随向下。惯性速度使用同一符号约定。
+    /// Shoemake Arcball：把手指位置映射到虚拟球面，再由两条球面向量生成
+    /// 唯一旋转四元数。越过极点时继续转动，不存在纬度夹紧或万向节死角。
+    nonisolated static func arcballRotation(
+        from start: CGPoint,
+        to end: CGPoint,
+        center: CGPoint,
+        radius: CGFloat
+    ) -> simd_quatd {
+        let from = arcballVector(at: start, center: center, radius: radius)
+        let to = arcballVector(at: end, center: center, radius: radius)
+        let dot = min(1, max(-1, simd_dot(from, to)))
+        let cross = simd_cross(from, to)
+        let crossLength = simd_length(cross)
+        guard crossLength > 0.000_001 else {
+            if dot > 0 { return simd_quatd(angle: 0, axis: SIMD3(0, 0, 1)) }
+            let fallback = abs(from.x) < 0.8
+                ? simd_cross(from, SIMD3(1, 0, 0))
+                : simd_cross(from, SIMD3(0, 1, 0))
+            return simd_quatd(angle: .pi, axis: simd_normalize(fallback))
+        }
+        return simd_quatd(
+            angle: acos(dot),
+            axis: cross / crossLength
+        )
+    }
+
+    nonisolated private static func arcballVector(
+        at point: CGPoint,
+        center: CGPoint,
+        radius: CGFloat
+    ) -> SIMD3<Double> {
+        let safeRadius = max(1, Double(radius))
+        let x = Double(point.x - center.x) / safeRadius
+        let y = Double(center.y - point.y) / safeRadius
+        let lengthSquared = x * x + y * y
+        if lengthSquared <= 1 {
+            return SIMD3(x, y, sqrt(max(0, 1 - lengthSquared)))
+        }
+        let scale = 1 / sqrt(lengthSquared)
+        return SIMD3(x * scale, y * scale, 0)
+    }
+
+    nonisolated private static func arcballRadius(
+        in size: CGSize,
+        geometry: GlobeGeometry
+    ) -> CGFloat {
+        min(
+            min(size.width, size.height) * 0.46,
+            max(140, geometry.radius * CGFloat(maximumOrbitDisplayRadius))
+        )
+    }
+
+    /// 方向回归测试仍使用屏幕位移语义；实际交互由 Arcball 四元数承担。
     nonisolated static func dragRotationDelta(
         translation: CGSize
     ) -> (yaw: Double, pitch: Double) {
@@ -895,6 +947,22 @@ struct SkyOverviewView: View {
         roll: Double = 0,
         zoom: CGFloat
     ) -> Projected3D? {
+        project(
+            orbitalPosition: orbitalPosition,
+            center: center,
+            radius: radius,
+            orientation: orientation(yaw: yaw, pitch: pitch, roll: roll),
+            zoom: zoom
+        )
+    }
+
+    nonisolated static func project(
+        orbitalPosition: SIMD3<Double>,
+        center: CGPoint,
+        radius: CGFloat,
+        orientation: simd_quatd,
+        zoom: CGFloat
+    ) -> Projected3D? {
         let magnitude = Self.magnitude(of: orbitalPosition)
         guard magnitude > 1 else { return nil }
         let altitude = max(0, magnitude - 6378.137)
@@ -910,9 +978,7 @@ struct SkyOverviewView: View {
             displayRadius: displayRadius,
             center: center,
             radius: radius,
-            yaw: yaw,
-            pitch: pitch,
-            roll: roll,
+            orientation: orientation,
             zoom: zoom
         )
     }
@@ -922,30 +988,17 @@ struct SkyOverviewView: View {
         displayRadius: Double,
         center: CGPoint,
         radius: CGFloat,
-        yaw: Double,
-        pitch: Double,
-        roll: Double,
+        orientation: simd_quatd,
         zoom: CGFloat
     ) -> Projected3D {
-        let cy = cos(yaw)
-        let sy = sin(yaw)
-        let cp = cos(pitch)
-        let sp = sin(pitch)
-        let x = direction.x * cy + direction.z * sy
-        let firstDepth = -direction.x * sy + direction.z * cy
-        let y = direction.y * cp - firstDepth * sp
-        let depth = direction.y * sp + firstDepth * cp
-        let cr = cos(roll)
-        let sr = sin(roll)
-        let screenX = x * cr + y * sr
-        let screenY = y * cr - x * sr
+        let transformed = orientation.act(direction)
         let scale = Double(radius * zoom) * displayRadius
         return Projected3D(
             point: CGPoint(
-                x: center.x + CGFloat(screenX * scale),
-                y: center.y - CGFloat(screenY * scale)
+                x: center.x + CGFloat(transformed.x * scale),
+                y: center.y - CGFloat(transformed.y * scale)
             ),
-            depth: depth * displayRadius
+            depth: transformed.z * displayRadius
         )
     }
 
@@ -1033,9 +1086,7 @@ struct SkyOverviewView: View {
                 displayRadius: displayRadius,
                 center: geometry.center,
                 radius: geometry.radius,
-                yaw: renderedYaw,
-                pitch: renderedPitch,
-                roll: renderedRoll,
+                orientation: renderedOrientation,
                 zoom: zoom
             )
         }
@@ -1138,9 +1189,7 @@ struct SkyOverviewView: View {
                     orbitalPosition: point.position,
                     center: geometry.center,
                     radius: geometry.radius,
-                    yaw: renderedYaw,
-                    pitch: renderedPitch,
-                    roll: renderedRoll,
+                    orientation: renderedOrientation,
                     zoom: zoom
                 ) else { return nil }
                 return (projection, point.at)
@@ -1398,9 +1447,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    yaw: renderedYaw,
-                    pitch: renderedPitch,
-                    roll: renderedRoll,
+                    orientation: renderedOrientation,
                     zoom: zoom
                 )
             }
@@ -1421,9 +1468,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    yaw: renderedYaw,
-                    pitch: renderedPitch,
-                    roll: renderedRoll,
+                    orientation: renderedOrientation,
                     zoom: zoom
                 )
             }
@@ -1459,9 +1504,7 @@ struct SkyOverviewView: View {
                         displayRadius: Self.earthDisplayRadius,
                         center: geometry.center,
                         radius: geometry.radius,
-                        yaw: renderedYaw,
-                        pitch: renderedPitch,
-                        roll: renderedRoll,
+                        orientation: renderedOrientation,
                         zoom: zoom
                     )
                 }
@@ -1492,9 +1535,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    yaw: renderedYaw,
-                    pitch: renderedPitch,
-                    roll: renderedRoll,
+                    orientation: renderedOrientation,
                     zoom: zoom
                 )
             }
@@ -1556,9 +1597,7 @@ struct SkyOverviewView: View {
             displayRadius: Self.earthDisplayRadius,
             center: geometry.center,
             radius: geometry.radius,
-            yaw: renderedYaw,
-            pitch: renderedPitch,
-            roll: renderedRoll,
+            orientation: renderedOrientation,
             zoom: zoom
         )
         guard centerProjection.depth > -0.02 else { return }
@@ -1584,9 +1623,7 @@ struct SkyOverviewView: View {
                 displayRadius: Self.earthDisplayRadius,
                 center: geometry.center,
                 radius: geometry.radius,
-                yaw: renderedYaw,
-                pitch: renderedPitch,
-                roll: renderedRoll,
+                orientation: renderedOrientation,
                 zoom: zoom
             )
         }
@@ -1630,22 +1667,100 @@ struct SkyOverviewView: View {
             )
         )
 
-        if !simplified,
-           presence > 0.78,
-           centerProjection.depth > 0.12,
-           let labelAnchor = ring
-               .filter({ $0.depth >= 0 })
-               .min(by: { $0.point.y < $1.point.y }) {
-            context.draw(
-                Text("默认视域")
-                    .font(Typography.statusTag)
-                    .tracking(0.55)
-                    .foregroundStyle(Palette.signal.opacity(0.62)),
-                at: CGPoint(
-                    x: labelAnchor.point.x,
-                    y: labelAnchor.point.y - 7
-                ),
-                anchor: .bottom
+    }
+
+    /// 可见范围的面填充留在地球表面，轮廓则在卫星层之上再描一次。
+    /// 深色底线先清出一圈视觉缝隙，避免高密度卫星把地表范围切碎。
+    private func drawObserverVisibilityOverlay(
+        _ context: GraphicsContext,
+        geometry: GlobeGeometry,
+        simplified: Bool
+    ) {
+        guard surfaceDetailPresence > 0.01,
+              let ring = observerVisibilityRing(
+                  geometry: geometry,
+                  sampleCount: simplified ? 32 : 64
+              )
+        else { return }
+
+        strokeSegments(
+            context,
+            projected: ring,
+            front: true,
+            color: Palette.voidBlack.opacity(0.82 * surfaceDetailPresence),
+            style: StrokeStyle(
+                lineWidth: simplified ? 2.2 : 2.6,
+                lineCap: .round
+            )
+        )
+        strokeSegments(
+            context,
+            projected: ring,
+            front: true,
+            color: Palette.signal.opacity(
+                (simplified ? 0.68 : 0.82) * surfaceDetailPresence
+            ),
+            style: StrokeStyle(
+                lineWidth: simplified ? 0.82 : 1.02,
+                lineCap: .round,
+                dash: [2.2, 2.8]
+            )
+        )
+
+        guard !simplified,
+              let labelAnchor = ring
+                  .filter({ $0.depth >= 0 })
+                  .min(by: { $0.point.y < $1.point.y })
+        else { return }
+        let labelCenter = CGPoint(x: labelAnchor.point.x, y: labelAnchor.point.y - 13)
+        let labelRect = CGRect(
+            x: labelCenter.x - 30,
+            y: labelCenter.y - 8,
+            width: 60,
+            height: 16
+        )
+        let labelShape = RoundedRectangle(cornerRadius: 7, style: .continuous)
+            .path(in: labelRect)
+        context.fill(labelShape, with: .color(Palette.voidBlack.opacity(0.78)))
+        context.stroke(
+            labelShape,
+            with: .color(Palette.signal.opacity(0.34 * surfaceDetailPresence)),
+            style: StrokeStyle(lineWidth: 0.5)
+        )
+        context.draw(
+            Text("默认视域")
+                .font(Typography.statusTag)
+                .tracking(0.5)
+                .foregroundStyle(Palette.inkHigh.opacity(0.82 * surfaceDetailPresence)),
+            at: labelCenter,
+            anchor: .center
+        )
+    }
+
+    private func observerVisibilityRing(
+        geometry: GlobeGeometry,
+        sampleCount: Int
+    ) -> [Projected3D]? {
+        guard let up = observerSurfaceDirection() else { return nil }
+        var tangent = simd_cross(SIMD3<Double>(0, 0, 1), up)
+        if simd_length(tangent) < 1e-6 {
+            tangent = SIMD3(1, 0, 0)
+        } else {
+            tangent = simd_normalize(tangent)
+        }
+        let bitangent = simd_normalize(simd_cross(up, tangent))
+        let angularRadius = 28.0 * Double.pi / 180
+        return (0 ... sampleCount).map { index in
+            let angle = Double(index) / Double(sampleCount) * 2 * Double.pi
+            let surfaceDirection = up * cos(angularRadius)
+                + (tangent * cos(angle) + bitangent * sin(angle)) * sin(angularRadius)
+            return Self.projectDirection(
+                surfaceDirection,
+                displayRadius: Self.earthDisplayRadius,
+                center: geometry.center,
+                radius: geometry.radius,
+                orientation: renderedOrientation,
+                zoom: zoom
             )
         }
     }
@@ -1661,24 +1776,36 @@ struct SkyOverviewView: View {
               projected.depth >= 0
         else { return }
         let point = projected.point
-        let alpha = (simplified ? 0.72 : 1.0) * surfaceDetailPresence
+        let alpha = (simplified ? 0.9 : 1.0) * surfaceDetailPresence
         guard alpha > 0.01 else { return }
         let pulse = simplified
             ? 1
             : 1 + CGFloat(sin(motionTime * 1.25)) * 0.055
-        let ringRadius: CGFloat = 7.2 * pulse
+        let ringRadius: CGFloat = 9.2 * pulse
+
+        // 地表定位符始终位于点云之上；先清出一枚低调暗盘，保证它不会被卫星
+        // 光核切碎，同时仍能看到下面的大陆和视域轮廓关系。
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: point.x - 11,
+                y: point.y - 11,
+                width: 22,
+                height: 22
+            )),
+            with: .color(Palette.voidBlack.opacity(0.78 * alpha))
+        )
 
         if !simplified {
             context.drawLayer { glow in
                 glow.addFilter(.blur(radius: 4))
                 glow.fill(
                     Path(ellipseIn: CGRect(
-                        x: point.x - 7,
-                        y: point.y - 7,
-                        width: 14,
-                        height: 14
+                        x: point.x - 10,
+                        y: point.y - 10,
+                        width: 20,
+                        height: 20
                     )),
-                    with: .color(Palette.signal.opacity(0.18 * alpha))
+                    with: .color(Palette.signal.opacity(0.24 * alpha))
                 )
             }
         }
@@ -1689,37 +1816,54 @@ struct SkyOverviewView: View {
                 width: ringRadius * 2,
                 height: ringRadius * 2
             )),
-            with: .color(Palette.signal.opacity(0.82 * alpha)),
+            with: .color(Palette.signal.opacity(0.96 * alpha)),
             style: StrokeStyle(
-                lineWidth: 0.7,
-                dash: [1.2, 2.2],
+                lineWidth: 0.9,
+                dash: [1.8, 2.3],
                 dashPhase: CGFloat(motionTime * 1.6)
             )
         )
         var diamond = Path()
-        diamond.move(to: CGPoint(x: point.x, y: point.y - 3.4))
-        diamond.addLine(to: CGPoint(x: point.x + 3.4, y: point.y))
-        diamond.addLine(to: CGPoint(x: point.x, y: point.y + 3.4))
-        diamond.addLine(to: CGPoint(x: point.x - 3.4, y: point.y))
+        diamond.move(to: CGPoint(x: point.x, y: point.y - 4.2))
+        diamond.addLine(to: CGPoint(x: point.x + 4.2, y: point.y))
+        diamond.addLine(to: CGPoint(x: point.x, y: point.y + 4.2))
+        diamond.addLine(to: CGPoint(x: point.x - 4.2, y: point.y))
         diamond.closeSubpath()
-        context.fill(diamond, with: .color(Palette.signal.opacity(0.2 * alpha)))
+        context.fill(diamond, with: .color(Palette.signal.opacity(0.42 * alpha)))
         context.stroke(
             diamond,
-            with: .color(Palette.inkHigh.opacity(0.9 * alpha)),
-            style: StrokeStyle(lineWidth: 0.72)
+            with: .color(Palette.inkHigh.opacity(0.98 * alpha)),
+            style: StrokeStyle(lineWidth: 0.9)
         )
         let labelTint = observerLabelEmphasized ? Palette.signal : Palette.inkMid
         let baseLabelOpacity = observerLabelEmphasized
             ? 0.9
-            : (simplified ? 0.26 : 0.62)
+            : (simplified ? 0.68 : 0.78)
         let labelOpacity = baseLabelOpacity * surfaceDetailPresence
+        var leader = Path()
+        leader.move(to: CGPoint(x: point.x + 8, y: point.y - 6))
+        leader.addLine(to: CGPoint(x: point.x + 14, y: point.y - 11))
+        context.stroke(
+            leader,
+            with: .color(Palette.signal.opacity(0.62 * alpha)),
+            style: StrokeStyle(lineWidth: 0.62, lineCap: .round)
+        )
+        let labelRect = CGRect(x: point.x + 13, y: point.y - 22, width: 58, height: 18)
+        let labelShape = RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .path(in: labelRect)
+        context.fill(labelShape, with: .color(Palette.voidBlack.opacity(0.82 * alpha)))
+        context.stroke(
+            labelShape,
+            with: .color(Palette.signal.opacity(0.28 * alpha)),
+            style: StrokeStyle(lineWidth: 0.5)
+        )
         context.draw(
             Text("当前位置")
                 .font(Typography.statusTag)
                 .tracking(0.55)
                 .foregroundStyle(labelTint.opacity(labelOpacity)),
-            at: CGPoint(x: point.x + 12, y: point.y - 8),
-            anchor: .leading
+            at: CGPoint(x: labelRect.midX, y: labelRect.midY),
+            anchor: .center
         )
     }
 
@@ -1730,9 +1874,7 @@ struct SkyOverviewView: View {
             displayRadius: Self.earthDisplayRadius,
             center: geometry.center,
             radius: geometry.radius,
-            yaw: renderedYaw,
-            pitch: renderedPitch,
-            roll: renderedRoll,
+            orientation: renderedOrientation,
             zoom: zoom
         )
     }

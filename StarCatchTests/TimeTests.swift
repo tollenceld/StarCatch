@@ -1,6 +1,7 @@
 import XCTest
 @testable import StarCatch
 import SatelliteKit
+import simd
 
 /// 时间维度：观测时钟 + 任意时刻推算 + 过境预报。
 @MainActor
@@ -803,6 +804,21 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(rolled.point.x, center.x, accuracy: 0.001)
         XCTAssertGreaterThan(rolled.point.y, center.y)
         XCTAssertEqual(rolled.depth, level.depth, accuracy: 0.000_001)
+    }
+
+    func testOverviewArcballCanRotateFreelyPastEitherPole() {
+        let center = CGPoint(x: 120, y: 160)
+        let quarterTurn = SkyOverviewView.arcballRotation(
+            from: center,
+            to: CGPoint(x: center.x, y: center.y - 100),
+            center: center,
+            radius: 100
+        )
+        let halfTurn = simd_normalize(quarterTurn * quarterTurn)
+        let rotatedFront = halfTurn.act(SIMD3<Double>(0, 0, 1))
+
+        XCTAssertEqual(simd_length(rotatedFront), 1, accuracy: 0.000_001)
+        XCTAssertLessThan(rotatedFront.z, -0.999)
     }
 
     func testOverviewKeepsTheSameSatelliteSetDuringInteraction() {

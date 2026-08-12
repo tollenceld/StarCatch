@@ -871,14 +871,24 @@ struct SkyView: View {
         }
     }
 
-    /// 顶部详情和筛选共享同一块空白区域关闭层；实际控件绘制在它上方。
+    /// 顶部详情、筛选和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
+    /// 这一层之上，因此点击内容仍执行自身动作，点击天空空白则只收起当前浮层。
     @ViewBuilder
     private var transientDismissLayer: some View {
-        if filterExpanded || topPanel != nil {
+        if filterExpanded
+            || topPanel != nil
+            || (lockedDetailPresented
+                && retainedDetailObjectID != nil
+                && !overviewChromeVisible) {
             Color.black.opacity(0.001)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    if lockedDetailPresented,
+                       retainedDetailObjectID != nil,
+                       !overviewChromeVisible {
+                        hideLockedDetail()
+                    }
                     withAnimation(Motion.interfaceCollapse) {
                         filterExpanded = false
                         topPanel = nil

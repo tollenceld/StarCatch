@@ -24,10 +24,10 @@ struct TimeDial: View {
     @State private var lastDragX: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 3) {
             readout
             ruler
-                .frame(height: 44)
+                .frame(height: 48)
         }
         .padding(.horizontal, 18)
         .padding(.top, 9)
@@ -80,12 +80,8 @@ struct TimeDial: View {
     // MARK: - 紧凑读数
 
     private var readout: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            dragHint
-
-            Spacer(minLength: 6)
-
-            Text("完整范围  ±24H")
+        HStack(alignment: .center, spacing: 8) {
+            Text("−24 H")
                 .font(Typography.statusTag)
                 .tracking(0.7)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
@@ -94,6 +90,14 @@ struct TimeDial: View {
             Spacer(minLength: 6)
 
             timeStatus
+
+            Spacer(minLength: 6)
+
+            Text("+24 H")
+                .font(Typography.statusTag)
+                .tracking(0.7)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                .lineLimit(1)
         }
         .frame(minHeight: 20)
     }
@@ -104,7 +108,7 @@ struct TimeDial: View {
                 .fill(Palette.signal.opacity(clock.isLive ? 0.76 : 0.46))
                 .frame(width: 4, height: 4)
 
-            Text(clock.relativeOffsetLabel)
+            Text(clock.isLive ? "此刻" : clock.relativeOffsetLabel)
                 .font(Typography.statusTag)
                 .tracking(clock.isLive ? Typography.statusTagTracking : 0.7)
                 .foregroundStyle(
@@ -116,22 +120,6 @@ struct TimeDial: View {
         }
     }
 
-    private var dragHint: some View {
-        HStack(spacing: 5) {
-            Text("‹")
-            Text(hasInteracted ? "拖动" : "拖动时间")
-            Text("›")
-        }
-        .font(Typography.statusTag)
-        .tracking(Typography.statusTagTracking)
-        .foregroundStyle(
-            Palette.inkLow.opacity(
-                hasInteracted ? Palette.Level.readableSecondary : Palette.Level.present
-            )
-        )
-        .allowsHitTesting(false)
-    }
-
     private var accessibilityValue: String {
         clock.isLive ? "实时，\(clock.utcLabel())" : "\(clock.offsetLabel)，\(clock.utcLabel())"
     }
@@ -141,7 +129,7 @@ struct TimeDial: View {
     private var ruler: some View {
         Canvas { context, size in
             let midX = size.width / 2
-            let baselineY = size.height * 0.61
+            let baselineY = size.height * 0.52
             let pxPerSecond = 1.0 / Self.secondsPerPoint
             let shift = clock.offset * pxPerSecond
             let halfWindow = Double(size.width) / 2 * Self.secondsPerPoint
@@ -171,6 +159,18 @@ struct TimeDial: View {
                     with: .color(tint.opacity(alpha)),
                     style: StrokeStyle(lineWidth: isMajor ? 0.86 : 0.66, lineCap: .round)
                 )
+                if isMajor,
+                   x >= 18,
+                   x <= size.width - 18 {
+                    context.draw(
+                        Text(relativeTickLabel(seconds: t))
+                            .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                            .tracking(0.45)
+                            .foregroundStyle(Palette.inkLow.opacity(0.72 * activity)),
+                        at: CGPoint(x: x, y: baselineY + 14),
+                        anchor: .top
+                    )
+                }
                 t += Self.minorTick
             }
 
@@ -217,32 +217,38 @@ struct TimeDial: View {
             marker.closeSubpath()
             context.fill(marker, with: .color(Palette.signal.opacity(0.82)))
         }
-        .overlay(alignment: .top) {
-            GeometryReader { proxy in
-                let halfWindow = Double(proxy.size.width) / 2 * Self.secondsPerPoint
-                let scale = scaleWindowLabel(seconds: halfWindow)
-                HStack {
-                    Text("可见 −\(scale)")
-                    Spacer()
-                    Text("+\(scale) 可见")
-                }
-                .font(.system(size: 7.5, weight: .medium, design: .monospaced))
-                .tracking(0.8)
-                .foregroundStyle(Palette.inkLow.opacity(0.68))
-                .padding(.horizontal, 2)
-                .allowsHitTesting(false)
+        .overlay(alignment: .topLeading) {
+            if !hasInteracted {
+                Label("左右拖动时间", systemImage: "arrow.left.and.right")
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(Palette.inkMid.opacity(0.84))
+                    .padding(.horizontal, 7)
+                    .frame(height: 18)
+                    .background(
+                        Palette.voidBlack.opacity(0.72),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .stroke(Palette.inkFaint.opacity(0.3), lineWidth: 0.5)
+                    }
+                    .allowsHitTesting(false)
             }
         }
     }
 
-    private func scaleWindowLabel(seconds: TimeInterval) -> String {
-        let totalMinutes = max(1, Int((seconds / 60).rounded()))
-        if totalMinutes >= 60 {
-            let hours = totalMinutes / 60
-            let minutes = totalMinutes % 60
-            return minutes == 0 ? "\(hours) H" : "\(hours)H \(minutes)M"
+    private func relativeTickLabel(seconds: TimeInterval) -> String {
+        guard abs(seconds) >= 1 else { return "LIVE" }
+        let sign = seconds < 0 ? "−" : "+"
+        let minutes = Int((abs(seconds) / 60).rounded())
+        if minutes >= 60 {
+            let hours = minutes / 60
+            let remainder = minutes % 60
+            return remainder == 0
+                ? "\(sign)\(hours)H"
+                : "\(sign)\(hours)H\(remainder)"
         }
-        return "\(totalMinutes) MIN"
+        return "\(sign)\(minutes)M"
     }
 
     // MARK: - 拖动
