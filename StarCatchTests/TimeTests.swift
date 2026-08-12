@@ -1005,6 +1005,28 @@ final class TimeTests: XCTestCase {
         let direct = try sat.topPosition(julianDays: jd, observer: geo)
         XCTAssertEqual(eph.azimuth, direct.azim * .pi / 180, accuracy: 1e-9)
         XCTAssertEqual(eph.elevation, direct.elev * .pi / 180, accuracy: 1e-9)
+        let geodetic = try sat.geoPosition(julianDays: jd)
+        XCTAssertEqual(eph.altitudeKm, geodetic.alt, accuracy: 1e-9)
+    }
+
+    func testLocalSkyAvoidsFullCatalogPropagationUntilOverviewNeedsIt() {
+        let session = SkySession(catalog: Self.store)
+        XCTAssertEqual(
+            session.ephemeris.activePropagationObjectCount,
+            session.displayObjects.count
+        )
+        XCTAssertLessThan(session.displayObjects.count, session.visibleObjects.count)
+
+        session.setOverviewPropagationActive(true)
+        XCTAssertEqual(
+            session.ephemeris.activePropagationObjectCount,
+            session.visibleObjects.count
+        )
+        session.setOverviewPropagationActive(false)
+        XCTAssertEqual(
+            session.ephemeris.activePropagationObjectCount,
+            session.displayObjects.count
+        )
     }
 
     func testSnapshotIsDeterministicForSameInstant() {

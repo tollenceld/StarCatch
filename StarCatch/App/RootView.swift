@@ -234,6 +234,8 @@ struct RootView: View {
     /// --markManualSeen 强制视为已看过手册，直接进 sky；
     /// --emptySky 把模拟器初始指向移到空域；
     /// --focusVisibleObject 将模拟器准星置于当前观测时刻最高的目标；
+    /// --profileFirstFocus 等待首批后台星历到达后再对准目标，用于性能取证且不
+    /// 把调试器自己的同步全目录传播混入“第一次对焦”样本；
     /// --previewTimeScrub 持续拨动并保持天空球（仅用于视觉审计）；
     /// --previewOverviewExit 自动拨动后退出天空球；
     /// --openOverview 直接打开常驻全局星图；
@@ -290,6 +292,29 @@ struct RootView: View {
                     azimuth: target.azimuth,
                     elevation: target.elevation
                 )
+            }
+        }
+        if args.contains("--profileFirstFocus"), let manual = session.manualProvider {
+            Task { @MainActor in
+                // 等待首批 utility 星历提交；只读批量缓存，不触发同步 SGP4。
+                try? await Task.sleep(for: .milliseconds(1_500))
+                let observation = clock.observationTime()
+                let target = session.displayObjects
+                    .compactMap { object in
+                        session.ephemeris.cachedEphemeris(
+                            object.id,
+                            at: observation,
+                            live: clock.isLive
+                        )
+                    }
+                    .filter { $0.elevation > 0 }
+                    .max { $0.elevation < $1.elevation }
+                if let target {
+                    manual.focusForPreview(
+                        azimuth: target.azimuth,
+                        elevation: target.elevation
+                    )
+                }
             }
         }
         if args.contains("--previewTimeScrub") {

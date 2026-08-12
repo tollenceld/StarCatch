@@ -39,7 +39,8 @@ StarCatch 是一款面向 iPhone 的人造天体观察应用。用户举起手�
 | 设备方向 | iPhone、竖屏、全屏 |
 | 应用版本 | 1.0（Build 1） |
 
-项目只有一个运行时第三方 Swift Package：SatelliteKit。工程声明从 2.1.0 起，用于本地 SGP4 轨道传播。
+项目只有一个运行时第三方 Swift Package：SatelliteKit。工程精确锁定 2.1.2，
+用于本地 SGP4 轨道传播；升级前必须通过 Vallado 近地与深空标准向量回归测试。
 
 ## 3. 已完成的用户功能
 

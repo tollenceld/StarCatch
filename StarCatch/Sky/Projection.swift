@@ -116,7 +116,11 @@ struct Projection {
         for angularDistance: Double,
         magnification: CGFloat
     ) -> Double {
-        atan(tan(angularDistance) * max(1, Double(magnification)))
+        let scale = max(
+            Double(ObservationScale.minimumLocalMagnification),
+            Double(magnification)
+        )
+        return atan(tan(angularDistance) * scale)
     }
 
     /// 渐隐区间：角距 60° 开始渐隐，70° 完全不可见。
@@ -193,10 +197,16 @@ struct Projection {
     }
 
     /// 捕获状态机只需要目标与准星的球面角距，不需要完整屏幕坐标。单独入口避免
-    /// 10fps 捕获扫描重复执行透视映射和可见度计算。
+    /// 30Hz 捕获扫描重复执行透视映射和可见度计算。
     func angularDistance(azimuth: Double, elevation: Double) -> Double {
+        acos(cosineOfAngularDistance(azimuth: azimuth, elevation: elevation))
+    }
+
+    /// 候选扫描先比较点积，只对最终最近目标执行一次 acos。数千颗目标以
+    /// 30Hz 扫描时，这能显著降低主线程三角函数成本。
+    func cosineOfAngularDistance(azimuth: Double, elevation: Double) -> Double {
         let target = targetVector(azimuth: azimuth, elevation: elevation)
-        return acos(max(-1, min(1, simd_dot(target, bore))))
+        return max(-1, min(1, simd_dot(target, bore)))
     }
 
     private func targetVector(azimuth: Double, elevation: Double) -> simd_double3 {

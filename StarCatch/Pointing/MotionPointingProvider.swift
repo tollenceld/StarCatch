@@ -7,7 +7,8 @@ import simd
 ///
 /// 使用 `.xTrueNorthZVertical` 参考系（X 指真北，需要定位服务算磁偏角）；
 /// 定位不可用时降级 `.xArbitraryCorrectedZVertical` 并标记 uncalibrated。
-/// 四元数经 slerp 低通（τ = Motion.pointingSmoothing）防抖。
+/// 四元数经自适应 slerp 低通防抖：静止时抑制磁力计微抖，转动时主动缩短
+/// 时间常数，避免固定低通让卫星点位明显落后于手机。
 final class MotionPointingProvider: PointingProvider {
     @Published private(set) var pointing: Pointing = .initial
     @Published private(set) var confidence: HeadingConfidence = .uncalibrated
@@ -17,6 +18,7 @@ final class MotionPointingProvider: PointingProvider {
     private var smoothed = simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
     private var hasSample = false
     private var usingTrueNorth = false
+    private var lastMotionTimestamp: TimeInterval?
 
     func start() {
         start(prefersTrueNorth: true)
@@ -32,6 +34,7 @@ final class MotionPointingProvider: PointingProvider {
         }
         manager.stopDeviceMotionUpdates()
         hasSample = false
+        lastMotionTimestamp = nil
         manager.deviceMotionUpdateInterval = 1.0 / 60.0
         // 让系统在磁场需要校准时显示标准的设备转动提示，而不是继续假装高精度。
         manager.showsDeviceMovementDisplay = true
@@ -70,6 +73,7 @@ final class MotionPointingProvider: PointingProvider {
     func stop() {
         manager.stopDeviceMotionUpdates()
         hasSample = false
+        lastMotionTimestamp = nil
         availability = .idle
     }
 
@@ -104,17 +108,52 @@ final class MotionPointingProvider: PointingProvider {
         let raw = simd_quatd(ix: q.x, iy: q.y, iz: q.z, r: q.w)
 
         if hasSample {
-            // slerp 低通：dt 取更新周期，τ = pointingSmoothing
-            let dt = manager.deviceMotionUpdateInterval
-            let alpha = 1 - exp(-dt / Motion.pointingSmoothing)
+            // Core Motion 的 timestamp 是单调时钟。主线程偶发繁忙时不能继续假定
+            // 每帧恰好 1/60 秒，否则滤波会在恢复后仍额外落后数帧。
+            let measuredDelta = lastMotionTimestamp.map { motion.timestamp - $0 }
+                ?? manager.deviceMotionUpdateInterval
+            let dt = min(0.1, max(1.0 / 240.0, measuredDelta))
+            let angularVelocity = sqrt(
+                motion.rotationRate.x * motion.rotationRate.x
+                    + motion.rotationRate.y * motion.rotationRate.y
+                    + motion.rotationRate.z * motion.rotationRate.z
+            )
+            let alpha = Self.smoothingAlpha(
+                deltaTime: dt,
+                angularVelocity: angularVelocity
+            )
             smoothed = simd_slerp(smoothed, raw, alpha)
         } else {
             smoothed = raw
             hasSample = true
         }
+        lastMotionTimestamp = motion.timestamp
 
         pointing = Self.pointing(from: smoothed)
         setAvailability(.tracking)
+    }
+
+    /// Core Motion 姿态本身已经是传感器融合结果；这里只保留用于视觉稳定的薄层。
+    /// 约 2.3°/s 以下使用 120ms 稳态滤波，超过约 31.5°/s 时收敛到 12ms，
+    /// 中间用 smoothstep 连续交接，避免滤波参数本身造成速度断点。
+    nonisolated static func smoothingTimeConstant(angularVelocity: Double) -> Double {
+        let settledSpeed = 0.04
+        let movingSpeed = 0.55
+        let maximum = 0.12
+        let minimum = 0.012
+        let raw = (max(0, angularVelocity) - settledSpeed) / (movingSpeed - settledSpeed)
+        let t = min(1, max(0, raw))
+        let eased = t * t * (3 - 2 * t)
+        return maximum + (minimum - maximum) * eased
+    }
+
+    nonisolated static func smoothingAlpha(
+        deltaTime: TimeInterval,
+        angularVelocity: Double
+    ) -> Double {
+        let dt = max(0, deltaTime)
+        let tau = smoothingTimeConstant(angularVelocity: angularVelocity)
+        return 1 - exp(-dt / tau)
     }
 
     /// 姿态四元数 → Pointing。

@@ -1,4 +1,5 @@
 import CoreGraphics
+import CoreLocation
 import CoreMotion
 import simd
 import XCTest
@@ -429,6 +430,13 @@ final class OrbitTests: XCTestCase {
         )
     }
 
+    func testWideFieldKeepsCaptureRadiusConsistentWithRenderedScale() {
+        let angle = 4 * Double.pi / 180
+        let wide = Projection.captureAngle(for: angle, magnification: 0.52)
+        XCTAssertEqual(wide, 2.08 * .pi / 180, accuracy: 0.01 * .pi / 180)
+        XCTAssertLessThan(wide, 2.5 * .pi / 180)
+    }
+
     func testLockedMarkerCrossesScreenEdgeContinuously() throws {
         let bounds = CGRect(x: 22, y: 72, width: 346, height: 660)
         let justInside = try XCTUnwrap(TargetRelationshipGeometry.marker(
@@ -544,6 +552,111 @@ final class OrbitTests: XCTestCase {
         XCTAssertTrue(pointing.azimuth.isFinite)
         XCTAssertEqual(pointing.elevation, .pi / 2, accuracy: 0.001)
         XCTAssertTrue(pointing.roll.isFinite)
+    }
+
+    func testAdaptivePointingFilterIsStableAtRestAndResponsiveInMotion() {
+        let restTau = MotionPointingProvider.smoothingTimeConstant(angularVelocity: 0)
+        let movingTau = MotionPointingProvider.smoothingTimeConstant(angularVelocity: 1)
+        XCTAssertGreaterThan(restTau, movingTau * 8)
+
+        let restAlpha = MotionPointingProvider.smoothingAlpha(
+            deltaTime: 1.0 / 60.0,
+            angularVelocity: 0
+        )
+        let movingAlpha = MotionPointingProvider.smoothingAlpha(
+            deltaTime: 1.0 / 60.0,
+            angularVelocity: 1
+        )
+        XCTAssertLessThan(restAlpha, 0.2)
+        XCTAssertGreaterThan(movingAlpha, 0.7)
+    }
+
+    func testLocationSelectionRejectsStaleSamplesAndPrefersAccuracy() throws {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let stale = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 31.2, longitude: 121.5),
+            altitude: 5,
+            horizontalAccuracy: 10,
+            verticalAccuracy: 10,
+            timestamp: now.addingTimeInterval(-600)
+        )
+        let coarse = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 31.21, longitude: 121.51),
+            altitude: 5,
+            horizontalAccuracy: 2_000,
+            verticalAccuracy: 30,
+            timestamp: now.addingTimeInterval(-2)
+        )
+        let precise = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 31.22, longitude: 121.52),
+            altitude: 7,
+            horizontalAccuracy: 80,
+            verticalAccuracy: 12,
+            timestamp: now.addingTimeInterval(-8)
+        )
+
+        let selected = try XCTUnwrap(
+            ObserverLocation.bestUsableLocation(
+                from: [stale, coarse, precise],
+                now: now
+            )
+        )
+        XCTAssertEqual(selected.coordinate.latitude, precise.coordinate.latitude)
+        XCTAssertEqual(selected.horizontalAccuracy, 80)
+        XCTAssertNil(
+            ObserverLocation.bestUsableLocation(from: [stale], now: now)
+        )
+
+        let tooCoarse = CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 31.2, longitude: 121.5),
+            altitude: 5,
+            horizontalAccuracy: 20_000,
+            verticalAccuracy: 50,
+            timestamp: now.addingTimeInterval(-1)
+        )
+        XCTAssertNil(
+            ObserverLocation.bestUsableLocation(from: [tooCoarse], now: now)
+        )
+    }
+
+    /// Vallado/CelesTrak 官方 SGP4 验证案例 00005：避免只拿应用内部结果互相印证。
+    func testSatelliteKitMatchesValladoReferenceVector() throws {
+        let line1 = "1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753"
+        let line2 = "2 00005  34.2682 348.7242 1859667 331.7664  19.3264 10.82419157413667"
+        let elements = try Elements("VANGUARD 1", line1, line2)
+        let state = try selectPropagator(tle: elements)
+            .getPVCoordinates(minsAfterEpoch: 0)
+        XCTAssertEqual(state.position.x / 1_000, 7_022.46529266, accuracy: 0.000_02)
+        XCTAssertEqual(state.position.y / 1_000, -1_400.08296755, accuracy: 0.000_02)
+        XCTAssertEqual(state.position.z / 1_000, 0.03995155, accuracy: 0.000_02)
+        XCTAssertEqual(state.velocity.x / 1_000, 1.893841015, accuracy: 0.000_000_02)
+        XCTAssertEqual(state.velocity.y / 1_000, 6.405893759, accuracy: 0.000_000_02)
+        XCTAssertEqual(state.velocity.z / 1_000, 4.534807250, accuracy: 0.000_000_02)
+    }
+
+    /// Vallado/CelesTrak 官方深空验证案例 04632：覆盖周期约 20 小时的 SDP4 分支，
+    /// 避免只验证近地传播而让 GEO/高椭圆目标悄然偏离。
+    func testSatelliteKitMatchesValladoDeepSpaceReferenceVector() throws {
+        let line1 = "1 04632U 70093B   04031.91070959 -.00000084  00000-0  10000-3 0  9955"
+        let line2 = "2 04632  11.4628 273.1101 1450506 207.6000 143.9350  1.20231981 44145"
+        let elements = try Elements("DELTA 1 DEB", line1, line2)
+        let propagator = try selectPropagator(tle: elements)
+
+        let epoch = try propagator.getPVCoordinates(minsAfterEpoch: 0)
+        XCTAssertEqual(epoch.position.x / 1_000, 2_334.11450085, accuracy: 0.000_03)
+        XCTAssertEqual(epoch.position.y / 1_000, -41_920.44035349, accuracy: 0.000_03)
+        XCTAssertEqual(epoch.position.z / 1_000, -0.03867437, accuracy: 0.000_03)
+        XCTAssertEqual(epoch.velocity.x / 1_000, 2.826321032, accuracy: 0.000_000_03)
+        XCTAssertEqual(epoch.velocity.y / 1_000, -0.065091664, accuracy: 0.000_000_03)
+        XCTAssertEqual(epoch.velocity.z / 1_000, 0.570936053, accuracy: 0.000_000_03)
+
+        let earlier = try propagator.getPVCoordinates(minsAfterEpoch: -5_184)
+        XCTAssertEqual(earlier.position.x / 1_000, -29_020.02587128, accuracy: 0.000_04)
+        XCTAssertEqual(earlier.position.y / 1_000, 13_819.84419063, accuracy: 0.000_04)
+        XCTAssertEqual(earlier.position.z / 1_000, -5_713.33679183, accuracy: 0.000_04)
+        XCTAssertEqual(earlier.velocity.x / 1_000, -1.768068390, accuracy: 0.000_000_04)
+        XCTAssertEqual(earlier.velocity.y / 1_000, -3.235371192, accuracy: 0.000_000_04)
+        XCTAssertEqual(earlier.velocity.z / 1_000, -0.395206135, accuracy: 0.000_000_04)
     }
 }
 

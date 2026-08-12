@@ -26,6 +26,7 @@ final class SkySession: ObservableObject {
     @Published private(set) var displayObjects: [CatalogObject] = []
     @Published private(set) var overviewObjects: [CatalogObject] = []
     @Published private(set) var visibleTrailObjects: [CatalogObject] = []
+    private var overviewPropagationActive = false
 
     /// TLE 快照龄期（天）—— 档案层的 EPOCH AGE 字段。
     var tleAgeDays: Int {
@@ -68,6 +69,10 @@ final class SkySession: ObservableObject {
             bind(manual)
         }
         #endif
+
+        // 首次进入天空只传播确实会绘制、可捕获的目标，避免完整 16k 目录任务
+        // 与用户第一次对焦争抢 CPU。进入全局星图前再切换到完整目录。
+        ephemeris.setPropagationObjects(displayObjects)
 
         observer.$coordinates
             .receive(on: DispatchQueue.main)
@@ -198,6 +203,14 @@ final class SkySession: ObservableObject {
         applyCatalogSelection()
     }
 
+    /// 局部天空只需要显示采样；全局星图才需要完整筛选结果。切换只改变后续
+    /// 后台帧，已有样本会保留，因此尺度过渡不会先清空再重建点云。
+    func setOverviewPropagationActive(_ active: Bool) {
+        guard overviewPropagationActive != active else { return }
+        overviewPropagationActive = active
+        ephemeris.setPropagationObjects(active ? visibleObjects : displayObjects)
+    }
+
     private func applyCatalogSelection() {
         let grouped = Dictionary(grouping: catalogFilters, by: \.group)
         let objects = catalog.objects.filter { object in
@@ -216,7 +229,9 @@ final class SkySession: ObservableObject {
         displayObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 8)
         overviewObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 14)
         visibleTrailObjects = Self.makeTrailSample(from: overviewObjects)
-        ephemeris.setPropagationObjects(objects)
+        ephemeris.setPropagationObjects(
+            overviewPropagationActive ? visibleObjects : displayObjects
+        )
     }
 
     /// 完整数据保留在 `visibleObjects`；默认绘制对大型星座分别做确定性抽样。

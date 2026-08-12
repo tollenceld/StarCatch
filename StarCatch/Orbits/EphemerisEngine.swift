@@ -47,6 +47,7 @@ final class EphemerisEngine: ObservableObject {
     private var frozenTask: Task<Void, Never>?
     private var pendingFrozenDate: Date?
     private var frozenSnapshotTime: Date?
+    private var isRunning = false
 
     private struct PreciseKey: Hashable {
         let objectId: String
@@ -59,6 +60,9 @@ final class EphemerisEngine: ObservableObject {
     /// 时间轴只保留最新请求；四分之一秒桶避免手指细微抖动造成重复任务。
     private let frozenBucketInterval: TimeInterval = 0.25
 
+    /// 测试与仪器诊断使用；不暴露对象内容，避免界面绕过目录所有权。
+    var activePropagationObjectCount: Int { propagationObjectIDs.count }
+
     init(store: CatalogStore, observer: ObserverLocation.Coordinates) {
         self.store = store
         self.observer = observer
@@ -69,13 +73,14 @@ final class EphemerisEngine: ObservableObject {
         guard coordinates != observer else { return }
         observer = coordinates
         preciseCache.removeAll(keepingCapacity: true)
-        requestLiveFrame()
+        if isRunning { requestLiveFrame() }
         if let frozenSnapshotTime {
             prepareSnapshot(at: frozenSnapshotTime)
         }
     }
 
     func start() {
+        isRunning = true
         requestLiveFrame()
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
@@ -84,6 +89,7 @@ final class EphemerisEngine: ObservableObject {
     }
 
     func stop() {
+        isRunning = false
         timer?.invalidate()
         timer = nil
         liveTask?.cancel()
@@ -110,7 +116,7 @@ final class EphemerisEngine: ObservableObject {
         frozenSnapshotTime = nil
         frozenSnapshot.removeAll(keepingCapacity: true)
         preciseCache.removeAll(keepingCapacity: true)
-        requestLiveFrame()
+        if isRunning { requestLiveFrame() }
     }
 
     /// LIVE 观测的插值量。完整帧之间保留连续运动。
@@ -362,6 +368,8 @@ final class EphemerisEngine: ObservableObject {
                 azimuth: topocentric.azim * .pi / 180,
                 elevation: topocentric.elev * .pi / 180,
                 rangeKm: topocentric.dist,
+                // 批量帧只用于空间绘制；避免为数千点再做一次地理坐标迭代。
+                // 用户可见的精确高度由单目标 preciseEphemeris 提供。
                 altitudeKm: position.magnitude() - 6378.137,
                 velocityKmS: 0,
                 orbitalPosition: SIMD3(position.x, position.y, position.z)
@@ -396,7 +404,10 @@ final class EphemerisEngine: ObservableObject {
             azimuth: topocentric.azim * .pi / 180,
             elevation: topocentric.elev * .pi / 180,
             rangeKm: topocentric.dist,
-            altitudeKm: position.magnitude() - 6378.137,
+            altitudeKm: eci2geo(
+                julianDays: julianDays,
+                celestial: position
+            ).alt,
             velocityKmS: velocity.magnitude(),
             orbitalPosition: SIMD3(position.x, position.y, position.z)
         )

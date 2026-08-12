@@ -23,7 +23,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationDefaultAccuracyReduced</key>
-	<true/>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。</string>
 	<key>NSMotionUsageDescription</key>

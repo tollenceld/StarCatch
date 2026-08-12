@@ -60,9 +60,6 @@ enum Motion {
     /// 捕捉强度低通时间常数（角距 → 亮度的平滑）。
     static let strengthSmoothing: Double = 0.3
 
-    /// 姿态 slerp 低通时间常数。
-    static let pointingSmoothing: Double = 0.15
-
     /// 呼吸调制系数：sin 波 → 透明度乘数。
     static func breath(at time: TimeInterval, phase: Double = 0) -> Double {
         1.0 + breathAmplitude * sin((time / breathPeriod) * 2 * .pi + phase)

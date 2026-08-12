@@ -64,7 +64,10 @@ def check_info_plist() -> None:
     )
     require(bool(info.get("NSLocationWhenInUseUsageDescription")), "缺少定位用途说明")
     require(bool(info.get("NSMotionUsageDescription")), "缺少运动用途说明")
-    require(info.get("NSLocationDefaultAccuracyReduced") is True, "定位应默认请求近似精度")
+    require(
+        info.get("NSLocationDefaultAccuracyReduced") is False,
+        "低轨指向需要默认申请完整定位精度",
+    )
     require(info.get("ITSAppUsesNonExemptEncryption") is False, "加密出口声明必须明确为 false")
 
 

@@ -9,7 +9,9 @@ options:
 packages:
   SatelliteKit:
     url: https://github.com/gavineadie/SatelliteKit.git
-    from: "2.1.0"
+    # Keep numerical behavior reproducible; OrbitTests checks Vallado's canonical
+    # SGP4 vector before this dependency is upgraded.
+    exactVersion: "2.1.2"
 
 targets:
   StarCatch:
@@ -56,7 +58,9 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSLocationWhenInUseUsageDescription: 用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。
-        NSLocationDefaultAccuracyReduced: true
+        # 低轨目标会产生明显视差；默认申请完整精度，但用户仍可在系统中选择近似位置。
+        # 坐标只在设备内参与 SGP4 拓扑转换，不上传也不持久化。
+        NSLocationDefaultAccuracyReduced: false
         NSMotionUsageDescription: 用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。
         UIRequiresFullScreen: true
         UIStatusBarHidden: true

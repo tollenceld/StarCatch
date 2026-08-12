@@ -62,6 +62,11 @@ final class CaptureStateMachine: ObservableObject {
     static let acquireExitDwell: TimeInterval = 0.75
     static let replacementDwell: TimeInterval = 1.15
 
+    /// 主天空按 30Hz 采样准星附近目标。90°/s 的快速转动在相邻样本间约跨越 3°，
+    /// 配合 4° 退出迟滞仍不会把一次普通手持扫过直接判成离开；更高频率只会让
+    /// 数千目标的候选扫描与 60Hz 绘制争抢主线程。
+    static let samplingInterval: TimeInterval = 1.0 / 30.0
+
     private var exitCandidateSince: Date?
     private var lastUpdate: Date?
 

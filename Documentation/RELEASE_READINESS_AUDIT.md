@@ -12,7 +12,8 @@ StarCatch 已达到 **Release Candidate** 工程状态：Release 模拟器构建
 ## 仓库内已验证
 
 - 运行时无账号、广告、分析、跟踪、支付、推送或业务后端；轨道计算与记录均在设备上完成。
-- 定位仅请求 When In Use，并默认使用近似精度；拒绝后有明确假定坐标降级。
+- 定位仅请求 When In Use；为避免低轨视差默认申请完整精度，所有计算仍在设备内，
+  用户选择近似位置时会显示低精度提示，拒绝后有明确假定坐标降级。
 - `PrivacyInfo.xcprivacy` 声明不跟踪、不收集，并为 UserDefaults 提供 `CA92.1` 理由。
 - App Icon 为 1024×1024 RGB PNG，无 Alpha；应用只支持 iPhone 竖屏。
 - SatelliteKit 锁定至 2.1.2 和固定 revision；第三方软件与数据物料已记录。

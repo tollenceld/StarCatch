@@ -164,9 +164,17 @@ struct SkyView: View {
                     // 全览拖动中冻结捕捉；镜头回到天空后，无论 LIVE 或历史时刻都恢复观测。
                     if !clock.isScrubbing,
                        !overviewCommitted,
-                       frameTime - lastCaptureSample >= 0.1 {
+                       frameTime - lastCaptureSample >= CaptureStateMachine.samplingInterval {
                         lastCaptureSample = frameTime
-                        let sample = captureSample(at: obsTime, in: geo.size)
+                        let sample: CaptureSample
+                        switch session.pointingAvailability {
+                        case .tracking, .manual:
+                            sample = captureSample(at: obsTime, in: geo.size)
+                        case .idle, .starting, .unavailable:
+                            // 初始 Pointing 是一个占位方向；传感器尚未给出第一帧时
+                            // 绝不能因为该方向恰好经过目标而弹出“已识别”资料。
+                            sample = CaptureSample(nearest: nil, trackedDistance: nil)
+                        }
                         capture.update(
                             nearest: sample.nearest,
                             trackedDistance: sample.trackedDistance,
@@ -392,6 +400,7 @@ struct SkyView: View {
             }
         }
         .onChange(of: persistentOverviewPresented) { _, presented in
+            session.setOverviewPropagationActive(presented)
             if presented {
                 overviewTrails.clear()
                 screenTrails.clear()
@@ -1357,6 +1366,9 @@ struct SkyView: View {
         if session.observer.coordinates.assumed {
             return "位置为估算值"
         }
+        if session.observer.coordinates.horizontalAccuracyMeters > 2_000 {
+            return "位置精度较低 · 方向仅供参考"
+        }
         if session.tleAgeDays > 14 {
             return "轨道数据已 \(session.tleAgeDays) 天"
         }
@@ -1376,9 +1388,11 @@ struct SkyView: View {
             screenSize: size,
             verticalFOV: fieldVerticalFOV
         )
-        var nearest: (objectId: String, angularDistance: Double)?
-        var trackedDistance: Double?
+        var nearestID: String?
+        var nearestCosine = -1.0
+        var trackedCosine: Double?
         let trackedID = capture.engagedObjectId
+        let fadeEndCosine = cos(Projection.fadeEnd)
 
         func consider(_ object: CatalogObject) {
             guard let eph = session.ephemeris.cachedEphemeris(
@@ -1388,21 +1402,18 @@ struct SkyView: View {
             ),
                   eph.elevation > 0
             else { return }
-            let angularDistance = projection.angularDistance(
+            let cosine = projection.cosineOfAngularDistance(
                 azimuth: eph.azimuth,
                 elevation: eph.elevation
             )
-            guard angularDistance < Projection.fadeEnd else { return }
-            let captureAngle = Projection.captureAngle(
-                for: angularDistance,
-                magnification: fieldMagnification
-            )
+            guard cosine > fadeEndCosine else { return }
             if object.id == trackedID {
-                trackedDistance = captureAngle
+                trackedCosine = cosine
             }
 
-            if nearest == nil || captureAngle < nearest!.angularDistance {
-                nearest = (object.id, captureAngle)
+            if cosine > nearestCosine {
+                nearestCosine = cosine
+                nearestID = object.id
             }
         }
 
@@ -1410,6 +1421,21 @@ struct SkyView: View {
         // 状态机的 trackedDistance 会保持当前目标粘性，邻近星座成员不会造成闪换。
         for object in session.displayObjects {
             consider(object)
+        }
+        let nearest = nearestID.map { id in
+            (
+                objectId: id,
+                angularDistance: Projection.captureAngle(
+                    for: acos(nearestCosine),
+                    magnification: fieldMagnification
+                )
+            )
+        }
+        let trackedDistance = trackedCosine.map {
+            Projection.captureAngle(
+                for: acos($0),
+                magnification: fieldMagnification
+            )
         }
         return CaptureSample(nearest: nearest, trackedDistance: trackedDistance)
     }
@@ -2074,6 +2100,7 @@ struct SkyView: View {
         if let precise = engagedPreciseEphemeris,
            precise.objectId == objectID {
             current.velocityKmS = precise.velocityKmS
+            current.altitudeKm = precise.altitudeKm
         }
         return current
     }

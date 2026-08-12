@@ -14,8 +14,13 @@ writes the bundled `StarCatch/Resources/catalog.json` snapshot.
 From the repository root:
 
 ```sh
-python3 Scripts/update_catalog.py --refresh-groups
+python3 Scripts/update_catalog.py --refresh-active
 ```
+
+The normal release refresh performs one `GROUP=active` download and preserves the
+previous snapshot's reviewed category assignments. This follows CelesTrak's request
+to avoid repeatedly downloading overlapping groups. `--refresh-groups` is reserved
+for an intentional classification-maintenance pass, not routine releases.
 
 For a reproducible build from an already downloaded active snapshot:
 
