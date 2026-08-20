@@ -240,7 +240,7 @@ final class OrbitTests: XCTestCase {
         )
         let otherArchive = try XCTUnwrap(otherStarlink.deepArchiveStory)
         XCTAssertNotEqual(starlink.archiveNarrative, otherStarlink.archiveNarrative)
-        XCTAssertEqual(starlinkArchive.lead, otherArchive.lead)
+        XCTAssertNotEqual(starlinkArchive.lead, otherArchive.lead)
         XCTAssertNotEqual(starlinkArchive.program, otherArchive.program)
         XCTAssertNotEqual(starlinkArchive.chapters.first?.body, otherArchive.chapters.first?.body)
 
@@ -305,11 +305,27 @@ final class OrbitTests: XCTestCase {
         XCTAssertNotNil(sharedLaunch)
     }
 
-    func testEveryCatalogObjectHasUniqueFirstLayerCopy() {
+    func testEveryCatalogObjectHasLanguageNeutralArchivePresentation() throws {
         let store = Self.store
-        XCTAssertEqual(Set(store.objects.map(\.poetic)).count, store.objects.count)
-        XCTAssertFalse(store.objects.contains { $0.poetic.contains("待核实") })
-        XCTAssertFalse(store.objects.contains { $0.poetic.contains("掌握更准确") })
+        let encoder = JSONEncoder()
+        for object in store.objects {
+            let english = try XCTUnwrap(
+                object.deepArchivePresentation(language: .english)?.story
+            )
+            let chinese = try XCTUnwrap(
+                object.deepArchivePresentation(language: .simplifiedChinese)?.story
+            )
+            XCTAssertEqual(english.noradID, object.noradId)
+            XCTAssertEqual(chinese.noradID, object.noradId)
+            let englishText = String(
+                decoding: try encoder.encode(english),
+                as: UTF8.self
+            )
+            XCTAssertFalse(
+                englishText.unicodeScalars.contains { $0.properties.isIdeographic },
+                "N\(object.noradId) 的英文档案不应残留中文信息文本"
+            )
+        }
     }
 
     func testPackagedCatalogHasPlausiblePublicIdentifiers() {

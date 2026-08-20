@@ -42,12 +42,13 @@ struct AppBackControl: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: ContentTopBarMetrics.itemSpacing) {
-                Image(systemName: "chevron.left")
-                    .font(.caption.weight(.semibold))
-                    .frame(width: ContentTopBarMetrics.iconWidth)
-                Text(title)
-                    .lineLimit(1)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: ContentTopBarMetrics.itemSpacing) {
+                    backIcon
+                    Text(title)
+                        .lineLimit(1)
+                }
+                backIcon
             }
             .font(Typography.guide)
             .tracking(Typography.guideTracking)
@@ -60,7 +61,13 @@ struct AppBackControl: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("返回\(title)")
+        .accessibilityLabel(L10n.format("navigation.back", title))
+    }
+
+    private var backIcon: some View {
+        Image(systemName: "chevron.left")
+            .font(.caption.weight(.semibold))
+            .frame(width: ContentTopBarMetrics.iconWidth)
     }
 }
 
@@ -144,22 +151,21 @@ struct ArchiveTopBar: View {
     var onDestructiveMenuAction: (() -> Void)? = nil
 
     var body: some View {
-        ZStack {
+        HStack(spacing: 0) {
+            AppBackControl(title: backTitle, action: onBack)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
             Text(title)
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-                .frame(maxWidth: 128)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
 
-            HStack(spacing: 16) {
-                AppBackControl(title: backTitle, action: onBack)
-
-                Spacer(minLength: 12)
-
-                trailingContent
-            }
+            trailingContent
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, ContentTopBarMetrics.horizontalMargin)
         .frame(height: ContentTopBarMetrics.height)
@@ -186,7 +192,7 @@ struct ArchiveTopBar: View {
             } label: {
                 trailingLabel(color: Palette.inkLow.opacity(Palette.Level.secondary))
             }
-            .accessibilityLabel("更多观测记录操作")
+            .accessibilityLabel(L10n.text("observations.more.accessibility"))
         } else if let onTrailingAction, let trailingTitle {
             Button(action: onTrailingAction) {
                 trailingLabel(
@@ -198,10 +204,7 @@ struct ArchiveTopBar: View {
             .accessibilityLabel(trailingTitle)
         } else {
             Color.clear
-                .frame(
-                    width: ContentTopBarMetrics.controlHeight,
-                    height: ContentTopBarMetrics.controlHeight
-                )
+                .frame(height: ContentTopBarMetrics.controlHeight)
                 .accessibilityHidden(true)
         }
     }

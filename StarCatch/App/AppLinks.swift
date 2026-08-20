@@ -4,7 +4,12 @@ import Foundation
 enum AppLinks {
     static let project = URL(string: "https://github.com/tollenceld/StarCatch")!
     static let support = URL(string: "https://github.com/tollenceld/StarCatch/issues")!
-    static let privacyPolicy = URL(
-        string: "https://github.com/tollenceld/StarCatch/blob/main/PRIVACY_POLICY.md"
-    )!
+    static func privacyPolicy(for language: SupportedLanguage = .current) -> URL {
+        let file = language == .simplifiedChinese
+            ? "PRIVACY_POLICY.md"
+            : "PRIVACY_POLICY_EN.md"
+        return URL(
+            string: "https://github.com/tollenceld/StarCatch/blob/main/\(file)"
+        )!
+    }
 }

@@ -51,6 +51,8 @@ struct InstrumentPanel: View {
     }
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var language: SupportedLanguage { .current }
+    private func copy(_ key: String) -> String { L10n.text(key, language: language) }
     private var navigationAnimation: Animation {
         suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceExpand
     }
@@ -151,14 +153,14 @@ struct InstrumentPanel: View {
             }
         }
         .confirmationDialog(
-            "清除全部观测记录？",
+            copy("observations.clear.confirmation"),
             isPresented: $confirmClearLog,
             titleVisibility: .visible
         ) {
-            Button("清除记录", role: .destructive) { log.clear() }
-            Button("取消", role: .cancel) {}
+            Button(copy("observations.clear"), role: .destructive) { log.clear() }
+            Button(copy("action.cancel"), role: .cancel) {}
         } message: {
-            Text("显示偏好与手册状态不会被清除。")
+            Text(copy("observations.clear.note"))
         }
     }
 
@@ -166,33 +168,33 @@ struct InstrumentPanel: View {
 
     private var panelContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            sectionLabel("显示")
+            sectionLabel(copy("settings.section.display"))
                 .padding(.top, 18)
                 .padding(.bottom, 6)
             displayControls
                 .padding(.bottom, 24)
 
-            sectionLabel("观测")
+            sectionLabel(copy("settings.section.observation"))
                 .padding(.bottom, 6)
             observationSummary
 
-            sectionLabel("帮助")
+            sectionLabel(copy("settings.section.help"))
                 .padding(.top, 24)
                 .padding(.bottom, 6)
             actionRow(
-                eyebrow: "STATUS & DATA",
-                title: "仪器状态与轨道数据"
+                eyebrow: copy("settings.status.eyebrow"),
+                title: copy("settings.status.title")
             ) {
                 push(.systemStatus)
             }
             actionRow(
-                eyebrow: "FIELD MANUAL",
-                title: "重新查看观测手册",
+                eyebrow: copy("settings.manual.eyebrow"),
+                title: copy("settings.manual.title"),
                 action: onOpenManual
             )
             actionRow(
-                eyebrow: "PRIVACY",
-                title: "隐私与设备内数据",
+                eyebrow: copy("settings.privacy.eyebrow"),
+                title: copy("settings.privacy.title"),
                 action: onOpenPrivacy
             )
             if observer.isDeniedOrRestricted {
@@ -212,20 +214,20 @@ struct InstrumentPanel: View {
     private var displayControls: some View {
         VStack(spacing: 0) {
             toggleRow(
-                title: "介质颗粒",
-                caption: "画面颗粒与扫描纹理。",
+                title: copy("settings.grain.title"),
+                caption: copy("settings.grain.caption"),
                 isOn: $grainEnabled
             )
             hairline
             toggleRow(
-                title: "抑制动效",
-                caption: "冻结漂移与呼吸，缩短转场。",
+                title: copy("settings.motion.title"),
+                caption: copy("settings.motion.caption"),
                 isOn: $reducedMotion
             )
             hairline
             toggleRow(
-                title: "确认捕获",
-                caption: "在主视野显示确认、切换与取消操作。",
+                title: copy("settings.capture.title"),
+                caption: copy("settings.capture.caption"),
                 isOn: $captureConfirmationEnabled
             )
         }
@@ -239,15 +241,15 @@ struct InstrumentPanel: View {
         } label: {
             HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("观测记录")
+                    Text(copy("navigation.observations"))
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                    Text("已识别 \(log.totalObjects) 个 · 共锁定 \(totalLockCount) 次")
+                    Text(L10n.format("observations.summary", language: language, log.totalObjects, totalLockCount))
                         .font(Typography.readingCompact)
                         .tracking(Typography.readingCompactTracking)
                         .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
-                    Text("最近：\(log.entries.first?.objectName ?? "尚无记录")")
+                    Text(L10n.format("observations.latest", language: language, log.entries.first?.objectName ?? copy("observations.none_short")))
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
                         .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
@@ -267,9 +269,9 @@ struct InstrumentPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "已识别 \(log.totalObjects) 个天体，最近观测 \(log.entries.first?.objectName ?? "尚无记录")"
+            L10n.format("observations.summary.accessibility", language: language, log.totalObjects, log.entries.first?.objectName ?? copy("observations.none_short"))
         )
-        .accessibilityHint("打开完整观测记录")
+        .accessibilityHint(copy("observations.open.hint"))
     }
 
     // MARK: - 仪器状态与数据
@@ -277,25 +279,25 @@ struct InstrumentPanel: View {
     private var systemStatus: some View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                sectionLabel("设备")
+                sectionLabel(copy("status.section.device"))
                     .padding(.top, 18)
                     .padding(.bottom, 8)
-                statusField("观察者", observerDescription)
-                statusField("定位权限", authorizationDescription)
-                statusField("指向", pointingDescription)
-                statusField("姿态服务", availabilityDescription)
+                statusField(copy("status.field.observer"), observerDescription)
+                statusField(copy("status.field.location_permission"), authorizationDescription)
+                statusField(copy("status.field.pointing"), pointingDescription)
+                statusField(copy("status.field.motion_service"), availabilityDescription)
 
                 if observer.isDeniedOrRestricted {
                     openSettingsButton
                 }
 
-                sectionLabel("轨道目录")
+                sectionLabel(copy("status.section.catalog"))
                     .padding(.top, 26)
                     .padding(.bottom, 8)
-                statusField("对象", "\(session.catalog.objects.count) OBJECTS")
-                statusField("快照", snapshotDescription)
-                statusField("龄期", catalogAgeDescription)
-                statusField("运行", "OFFLINE · ON DEVICE")
+                statusField(copy("status.field.objects"), L10n.format("status.objects", language: language, session.catalog.objects.count))
+                statusField(copy("status.field.snapshot"), snapshotDescription)
+                statusField(copy("status.field.age"), catalogAgeDescription)
+                statusField(copy("status.field.runtime"), copy("status.runtime.offline"))
 
                 Text("目录来自 CelesTrak GP/OMM 快照；SatelliteKit 在设备上执行 SGP4 传播。轨道数据不会在运行时联网刷新。")
                     .font(Typography.archivePoetic)
@@ -312,17 +314,17 @@ struct InstrumentPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
 
-                sectionLabel("支持与归属")
+                sectionLabel(copy("status.section.support"))
                     .padding(.top, 28)
                     .padding(.bottom, 6)
                 externalActionRow(
-                    eyebrow: "GITHUB ISSUES",
-                    title: "反馈问题与获取支持",
+                    eyebrow: copy("status.support.eyebrow"),
+                    title: copy("status.support.title"),
                     url: AppLinks.support
                 )
                 externalActionRow(
-                    eyebrow: "SOURCE & LICENSE",
-                    title: "项目源码与开源许可",
+                    eyebrow: copy("status.source.eyebrow"),
+                    title: copy("status.source.title"),
                     url: AppLinks.project
                 )
 
@@ -340,7 +342,7 @@ struct InstrumentPanel: View {
 
     private var observerDescription: String {
         let coordinates = observer.coordinates
-        if coordinates.assumed { return "BEIJING · ASSUMED" }
+        if coordinates.assumed { return copy("status.observer.assumed") }
         let latitude = String(
             format: "%.2f°%@",
             abs(coordinates.latitude),
@@ -356,41 +358,44 @@ struct InstrumentPanel: View {
 
     private var authorizationDescription: String {
         switch observer.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse: "ALLOWED"
-        case .denied: "DENIED · USING ASSUMED"
-        case .restricted: "RESTRICTED · USING ASSUMED"
-        case .notDetermined: "NOT REQUESTED"
-        @unknown default: "UNKNOWN"
+        case .authorizedAlways, .authorizedWhenInUse: copy("status.permission.allowed")
+        case .denied: copy("status.permission.denied")
+        case .restricted: copy("status.permission.restricted")
+        case .notDetermined: copy("status.permission.not_requested")
+        @unknown default: copy("status.value.unknown")
         }
     }
 
     private var pointingDescription: String {
         switch session.confidence {
-        case .trueNorth: "TRUE NORTH"
-        case .uncalibrated: "UNCALIBRATED · 请缓慢转动设备"
-        case .manual: "MANUAL · SIMULATION"
+        case .trueNorth: copy("status.pointing.true_north")
+        case .uncalibrated: copy("status.pointing.uncalibrated")
+        case .manual: copy("status.pointing.manual")
         }
     }
 
     private var availabilityDescription: String {
         switch session.pointingAvailability {
-        case .idle: "IDLE"
-        case .starting: "STARTING"
-        case .tracking: "TRACKING"
-        case .manual: "MANUAL"
-        case .unavailable: "UNAVAILABLE"
+        case .idle: copy("status.service.idle")
+        case .starting: copy("status.service.starting")
+        case .tracking: copy("status.service.tracking")
+        case .manual: copy("status.service.manual")
+        case .unavailable: copy("status.service.unavailable")
         }
     }
 
     private var snapshotDescription: String {
-        guard session.catalog.snapshotEpoch != .distantPast else { return "UNAVAILABLE" }
+        guard session.catalog.snapshotEpoch != .distantPast else { return copy("status.service.unavailable") }
         return Self.snapshotDateFormatter.string(from: session.catalog.snapshotEpoch)
     }
 
     private var catalogAgeDescription: String {
         let age = session.tleAgeDays
-        if age <= 14 { return "\(age)D · CURRENT" }
-        return "\(age)D · UPDATE APP"
+        return L10n.format(
+            age <= 14 ? "status.catalog.current" : "status.catalog.update",
+            language: language,
+            age
+        )
     }
 
     private static let snapshotDateFormatter: DateFormatter = {
@@ -481,11 +486,11 @@ struct InstrumentPanel: View {
         let calendar = Calendar.current
         let label: String
         if calendar.isDateInToday(day) {
-            label = "今天"
+            label = copy("date.today")
         } else if calendar.isDateInYesterday(day) {
-            label = "昨天"
+            label = copy("date.yesterday")
         } else {
-            label = Self.historyDayFormatter.string(from: day)
+            label = historyDayFormatter.string(from: day)
         }
         return Text(label)
             .font(Typography.statusTag)
@@ -499,8 +504,8 @@ struct InstrumentPanel: View {
 
     private var historyMetrics: some View {
         HStack(spacing: 28) {
-            metric("已识别", "\(log.totalObjects) / \(session.catalog.objects.count)")
-            metric("锁定次数", "\(totalLockCount)")
+            metric(copy("observations.metric.identified"), "\(log.totalObjects) / \(session.catalog.objects.count)")
+            metric(copy("observations.metric.locks"), "\(totalLockCount)")
             Spacer(minLength: 0)
         }
         .padding(.vertical, 12)
@@ -571,24 +576,30 @@ struct InstrumentPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            "\(entry.objectName)，最近观测 \(Self.historyDateFormatter.string(from: entry.lastSeen))，共 \(entry.count) 次"
+            L10n.format(
+                "observations.row.accessibility",
+                language: language,
+                entry.objectName,
+                Self.historyDateFormatter.string(from: entry.lastSeen),
+                entry.count
+            )
         )
-        .accessibilityHint("查看该天体的观测详情")
+        .accessibilityHint(copy("observations.detail.hint"))
     }
 
     private func historyCategory(for entry: ObservationLog.Entry) -> String? {
         (
             session.catalog.objectsByID[entry.objectId]?.category ?? entry.category
-        )?.title
+        )?.title(language: language)
     }
 
     private var emptyHistory: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("尚无观测记录")
+            Text(copy("observations.empty.title"))
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-            Text("将准星对准人造天体可即时阅读档案；开启“确认捕获”并确认目标后，观测会保存在这台设备上。")
+            Text(copy("observations.empty.body"))
                 .font(Typography.statusTag)
                 .tracking(0.45)
                 .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
@@ -618,6 +629,13 @@ struct InstrumentPanel: View {
         return formatter
     }()
 
+    private var historyDayFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.locale = language.locale
+        formatter.setLocalizedDateFormatFromTemplate("MMMd")
+        return formatter
+    }
+
     // MARK: - 单条观测详情
 
     @ViewBuilder
@@ -644,7 +662,15 @@ struct InstrumentPanel: View {
                         .foregroundStyle(Palette.signal.opacity(0.72))
                         .padding(.top, 16)
 
-                    Text(object.poetic)
+                    Text(
+                        object.deepArchivePresentation(language: language)?.story.lead
+                            ?? L10n.format(
+                                "observations.object.fallback",
+                                language: language,
+                                object.cosparId,
+                                object.orbitClass
+                            )
+                    )
                         .font(Typography.archivePoetic)
                         .tracking(Typography.archivePoeticTracking)
                         .lineSpacing(Typography.archivePoeticLineSpacing)
@@ -653,27 +679,27 @@ struct InstrumentPanel: View {
                         .padding(.top, 10)
                         .padding(.bottom, 24)
 
-                    sectionLabel("观测")
+                    sectionLabel(copy("settings.section.observation"))
                         .padding(.bottom, 8)
-                    detailField("最近锁定", Self.historyDateFormatter.string(from: entry.lastSeen))
-                    detailField("首次锁定", Self.historyDateFormatter.string(from: entry.firstSeen))
-                    detailField("累计次数", "\(entry.count)")
+                    detailField(copy("observations.field.latest_lock"), Self.historyDateFormatter.string(from: entry.lastSeen))
+                    detailField(copy("observations.field.first_lock"), Self.historyDateFormatter.string(from: entry.firstSeen))
+                    detailField(copy("observations.field.total"), "\(entry.count)")
                     if let observedAt = entry.observedAt {
-                        detailField("观测时刻", Self.historyDateFormatter.string(from: observedAt))
+                        detailField(copy("observations.field.time"), Self.historyDateFormatter.string(from: observedAt))
                     }
 
-                    sectionLabel("当时的轨道读数")
+                    sectionLabel(copy("observations.section.orbit_snapshot"))
                         .padding(.top, 24)
                         .padding(.bottom, 8)
                     orbitalSnapshot(entry: entry, object: object)
 
-                    sectionLabel("任务")
+                    sectionLabel(copy("observations.section.mission"))
                         .padding(.top, 24)
                         .padding(.bottom, 8)
-                    detailField("类别", object.category.title)
-                    detailField("轨道", object.orbitClass)
-                    detailField("发射", object.launched)
-                    detailField("状态", statusText(for: object.status))
+                    detailField(copy("observations.field.category"), object.category.title(language: language))
+                    detailField(copy("observations.field.orbit"), object.orbitClass)
+                    detailField(copy("observations.field.launch"), object.launched)
+                    detailField(copy("observations.field.status"), statusText(for: object.status))
                 }
                 .padding(.horizontal, 30)
                 .padding(.top, 18)
@@ -691,8 +717,7 @@ struct InstrumentPanel: View {
               let orbitClass = entry.orbitClass,
               let launched = entry.launched,
               let status = entry.status,
-              let kind = entry.kind,
-              let poetic = entry.poetic else { return nil }
+              let kind = entry.kind else { return nil }
         return CatalogObject(
             id: entry.objectId,
             name: entry.objectName,
@@ -702,7 +727,6 @@ struct InstrumentPanel: View {
             launched: launched,
             status: status,
             kind: kind,
-            poetic: poetic,
             category: category,
             family: entry.family,
             elementEpoch: entry.observedAt ?? entry.lastSeen,
@@ -734,19 +758,19 @@ struct InstrumentPanel: View {
         let velocity = entry.velocityKmS ?? fallback?.velocityKmS
 
         if let azimuth {
-            detailField("方位", String(format: "%.1f°", azimuth * 180 / .pi))
+            detailField(copy("observations.field.azimuth"), String(format: "%.1f°", azimuth * 180 / .pi))
         }
         if let elevation {
-            detailField("仰角", String(format: "%+.1f°", elevation * 180 / .pi))
+            detailField(copy("observations.field.elevation"), String(format: "%+.1f°", elevation * 180 / .pi))
         }
         if let altitude {
-            detailField("高度", String(format: "%.0f KM", altitude))
+            detailField(copy("observations.field.altitude"), String(format: "%.0f KM", altitude))
         }
         if let range {
-            detailField("距离", String(format: "%.0f KM", range))
+            detailField(copy("observations.field.range"), String(format: "%.0f KM", range))
         }
         if let velocity {
-            detailField("速度", String(format: "%.2f KM/S", velocity))
+            detailField(copy("observations.field.speed"), String(format: "%.2f KM/S", velocity))
         }
     }
 
@@ -769,27 +793,27 @@ struct InstrumentPanel: View {
 
     private func roleTitle(for object: CatalogObject) -> String {
         if let family = object.family {
-            return "\(family.title) CONSTELLATION · 星座节点"
+            return L10n.format("role.constellation", language: language, family.title)
         }
         return switch object.kind {
-        case "station": "ORBITAL HABITAT · 载人设施"
-        case "telescope": "SPACE OBSERVATORY · 空间望远镜"
-        case "weather": "WEATHER WATCH · 气象观测"
-        case "nav": "NAVIGATION CLOCK · 导航授时"
-        case "comms": "SIGNAL RELAY · 通信中继"
-        case "science": "SCIENCE MISSION · 科学任务"
-        case "debris": "ORBITAL DEBRIS · 在轨碎片"
-        case "rocket_body": "SPENT STAGE · 火箭末级"
-        default: "ORBITAL OBJECT · 在轨物体"
+        case "station": copy("role.station")
+        case "telescope": copy("role.telescope")
+        case "weather": copy("role.weather")
+        case "nav": copy("role.navigation")
+        case "comms": copy("role.communications")
+        case "science": copy("role.science")
+        case "debris": copy("role.debris")
+        case "rocket_body": copy("role.rocket_body")
+        default: copy("role.object")
         }
     }
 
     private func statusText(for status: CatalogObject.Status) -> String {
         switch status {
-        case .active: "ACTIVE"
-        case .silent: "SILENT"
-        case .derelict: "DERELICT"
-        case .debris: "DEBRIS"
+        case .active: copy("object.status.cataloged")
+        case .silent: copy("object.status.silent")
+        case .derelict: copy("object.status.derelict")
+        case .debris: copy("object.status.debris")
         }
     }
 
@@ -819,10 +843,12 @@ struct InstrumentPanel: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(0)
 
                 switchIndicator(isOn: isOn.wrappedValue)
                     .padding(.top, 1)
-                    .fixedSize()
+                    .frame(width: 44, alignment: .trailing)
+                    .layoutPriority(2)
             }
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -831,8 +857,8 @@ struct InstrumentPanel: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isOn.wrappedValue ? "开启" : "关闭")
-        .accessibilityHint("轻触切换")
+        .accessibilityValue(copy(isOn.wrappedValue ? "accessibility.on" : "accessibility.off"))
+        .accessibilityHint(copy("accessibility.toggle"))
     }
 
     private func switchIndicator(isOn: Bool) -> some View {
@@ -888,8 +914,8 @@ struct InstrumentPanel: View {
     private var openSettingsButton: some View {
         #if canImport(UIKit) && !targetEnvironment(simulator)
         actionRow(
-            eyebrow: "LOCATION",
-            title: "恢复真实位置权限",
+            eyebrow: copy("settings.location.eyebrow"),
+            title: copy("settings.location.title"),
             icon: "arrow.up.right"
         ) {
             if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -919,38 +945,38 @@ struct InstrumentPanel: View {
         switch page {
         case .settings:
             ArchiveTopBar(
-                backTitle: "天空",
-                title: "设置",
+                backTitle: copy("navigation.sky"),
+                title: copy("navigation.settings"),
                 onBack: dismiss
             )
         case .systemStatus:
             ArchiveTopBar(
-                backTitle: "设置",
-                title: "仪器状态",
+                backTitle: copy("navigation.settings"),
+                title: copy("navigation.instrument_status"),
                 onBack: returnToSettings
             )
         case .observations:
             if !log.entries.isEmpty {
                 ArchiveTopBar(
-                    backTitle: "设置",
-                    title: "观测记录",
-                    trailingTitle: "更多",
+                    backTitle: copy("navigation.settings"),
+                    title: copy("navigation.observations"),
+                    trailingTitle: copy("action.more"),
                     trailingIcon: "ellipsis",
                     onBack: returnToSettings,
-                    destructiveMenuTitle: "清除全部",
+                    destructiveMenuTitle: copy("observations.clear_all"),
                     onDestructiveMenuAction: { confirmClearLog = true }
                 )
             } else {
                 ArchiveTopBar(
-                    backTitle: "设置",
-                    title: "观测记录",
+                    backTitle: copy("navigation.settings"),
+                    title: copy("navigation.observations"),
                     onBack: returnToSettings
                 )
             }
         case .observationDetail(_):
             ArchiveTopBar(
-                backTitle: "观测记录",
-                title: "记录详情",
+                backTitle: copy("navigation.observations"),
+                title: copy("navigation.observation_detail"),
                 onBack: returnToObservations
             )
         }
@@ -1045,7 +1071,7 @@ private struct ObservationSwipeRow<Content: View>: View {
         }
         .clipped()
         .simultaneousGesture(swipeGesture)
-        .accessibilityAction(named: "删除") { delete() }
+        .accessibilityAction(named: Text(L10n.text("action.delete"))) { delete() }
     }
 
     private var swipeGesture: some Gesture {

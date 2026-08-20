@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import plistlib
+import re
 import struct
 import sys
 from datetime import datetime, timezone
@@ -91,11 +92,51 @@ def check_privacy_manifest() -> None:
     require("CA92.1" in defaults.get("NSPrivacyAccessedAPITypeReasons", []), "UserDefaults 理由必须包含 CA92.1")
 
 
+def check_localizations() -> None:
+    placeholder_pattern = re.compile(r"%(?:\d+\$)?(?:@|lld|ld|d|(?:\.\d+)?f)")
+
+    def placeholders(value: str) -> list[str]:
+        return sorted(re.sub(r"%\d+\$", "%", match.group(0)) for match in placeholder_pattern.finditer(value))
+
+    for name in ("Localizable.xcstrings", "SatelliteText.xcstrings"):
+        document = load_json(ROOT / "StarCatch/Localization" / name)
+        require(document.get("sourceLanguage") == "en", f"{name} 的源语言必须为英文")
+        strings = document.get("strings")
+        require(isinstance(strings, dict) and strings, f"{name} 不能为空")
+        for key, entry in strings.items():
+            localizations = entry.get("localizations", {})
+            values: dict[str, str] = {}
+            for language in ("en", "zh-Hans"):
+                unit = localizations.get(language, {}).get("stringUnit", {})
+                value = unit.get("value")
+                require(unit.get("state") == "translated", f"{name}: {key} 缺少 {language} 已翻译状态")
+                require(isinstance(value, str) and value.strip(), f"{name}: {key} 缺少 {language} 文本")
+                values[language] = value
+            require(
+                placeholders(values["en"]) == placeholders(values["zh-Hans"]),
+                f"{name}: {key} 的中英文插值参数不一致",
+            )
+
+    required_info_keys = {
+        "CFBundleDisplayName",
+        "NSLocationWhenInUseUsageDescription",
+        "NSMotionUsageDescription",
+    }
+    for language in ("en", "zh-Hans"):
+        text = (ROOT / "StarCatch/Localization" / f"{language}.lproj/InfoPlist.strings").read_text(encoding="utf-8")
+        present = set(re.findall(r'^"([^"]+)"\s*=', text, flags=re.MULTILINE))
+        require(required_info_keys <= present, f"{language} InfoPlist.strings 缺少权限说明")
+
+
 def check_catalog(now: datetime) -> tuple[int, float]:
     catalog = load_json(ROOT / "StarCatch/Resources/catalog.json")
     profiles = load_json(ROOT / "StarCatch/Resources/satellite_profiles.json")
     require(catalog.get("schemaVersion") == 2, "catalog.json schemaVersion 必须为 2")
-    require(profiles.get("schemaVersion") == 3, "satellite_profiles.json schemaVersion 必须为 3")
+    require(profiles.get("schemaVersion") == 4, "satellite_profiles.json schemaVersion 必须为 4")
+    require(
+        profiles.get("presentationMode") == "structured-localized",
+        "卫星档案必须声明结构化本地化展示模式",
+    )
     objects = catalog.get("objects")
     require(isinstance(objects, list), "catalog.json objects 必须是数组")
     require(len(objects) >= MIN_CATALOG_OBJECTS, f"轨道目录少于 {MIN_CATALOG_OBJECTS:,} 个对象")
@@ -110,11 +151,9 @@ def check_catalog(now: datetime) -> tuple[int, float]:
     require(age_days <= MAX_CATALOG_AGE_DAYS, f"轨道快照已过期：{age_days:.1f} 天（上限 {MAX_CATALOG_AGE_DAYS:.0f} 天）")
     require(len(profiles.get("stories", [])) > 0, "逐星档案为空")
     require(len(profiles.get("familyStories", [])) > 0, "星座家族档案为空")
-    summaries = [str(item.get("STARCATCH_POETIC", item.get("poetic", ""))).strip() for item in objects]
-    require(all(summaries), "轨道目录存在空的首层摘要")
     require(
-        len(set(summaries)) == len(summaries),
-        f"首层摘要存在重复：{len(summaries) - len(set(summaries))} 条未区分对象",
+        all("STARCATCH_POETIC" not in item and "poetic" not in item for item in objects),
+        "语言中立轨道目录不应包含旧的本地化摘要字段",
     )
     stories = profiles.get("stories", [])
     all_stories = stories + [item.get("story", {}) for item in profiles.get("familyStories", [])]
@@ -146,7 +185,7 @@ def check_catalog(now: datetime) -> tuple[int, float]:
         f"逐星档案摘要存在重复：{len(leads) - len(set(leads))} 条",
     )
     serialized_copy = json.dumps(
-        {"summaries": summaries, "stories": stories},
+        {"stories": stories},
         ensure_ascii=False,
         separators=(",", ":"),
     )
@@ -193,6 +232,7 @@ def main() -> int:
     try:
         check_info_plist()
         check_privacy_manifest()
+        check_localizations()
         objects, age_days = check_catalog(now)
         check_icon()
         check_dependency_lock()

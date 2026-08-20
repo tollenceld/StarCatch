@@ -1,0 +1,3 @@
+"CFBundleDisplayName" = "StarCatch";
+"NSLocationWhenInUseUsageDescription" = "StarCatch uses your location to align orbital targets with true north and your observing position. Your location stays on this device.";
+"NSMotionUsageDescription" = "StarCatch uses device motion to align the reticle with the part of the sky your iPhone is pointing toward. Motion data stays on this device.";

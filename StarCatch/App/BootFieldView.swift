@@ -10,6 +10,15 @@ struct BootVisualTimeline: Equatable {
         case catalogSync = "CATALOG SYNC"
         case calibrating = "CALIBRATING"
         case ready = "READY"
+
+        var localizedLabel: String {
+            switch self {
+            case .initializing: L10n.text("boot.phase.initializing")
+            case .catalogSync: L10n.text("boot.phase.catalog_sync")
+            case .calibrating: L10n.text("boot.phase.calibrating")
+            case .ready: L10n.text("boot.phase.ready")
+            }
+        }
     }
 
     static let minimumPresentationDuration: TimeInterval = 3.2
@@ -287,7 +296,7 @@ private struct BootStatusText: View {
             Text("OBSERVATION SYSTEM ·")
                 .frame(width: 154, alignment: .trailing)
 
-            Text(displayedPhase.rawValue)
+            Text(displayedPhase.localizedLabel)
                 .frame(width: 92, alignment: .leading)
                 .opacity(phaseVisible ? 1 : 0)
                 .offset(y: phaseVisible ? 0 : 1)
@@ -315,6 +324,8 @@ private struct BootStatusText: View {
                 }
             }
         }
-        .accessibilityLabel("观测系统，\(phase.rawValue)")
+        .accessibilityLabel(
+            L10n.format("boot.system.accessibility", phase.localizedLabel)
+        )
     }
 }

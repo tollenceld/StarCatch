@@ -25,9 +25,9 @@
 	<key>NSLocationDefaultAccuracyReduced</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。</string>
+	<string>StarCatch uses your location to align orbital targets with true north and your observing position.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。</string>
+	<string>StarCatch uses device motion to align the reticle with the part of the sky your iPhone is pointing toward.</string>
 	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>

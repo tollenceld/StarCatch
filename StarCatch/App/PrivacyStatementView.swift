@@ -6,6 +6,8 @@ struct PrivacyStatementView: View {
 
     @Environment(\.openURL) private var openURL
 
+    private func copy(_ key: String) -> String { L10n.text(key) }
+
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
@@ -18,31 +20,31 @@ struct PrivacyStatementView: View {
                     PrivacySummary()
 
                     PrivacySection(
-                        title: "位置与姿态",
-                        text: "定位默认请求完整精度，只用于在设备上计算观察者坐标与真北方向；低轨目标会因近似位置产生明显视差。陀螺仪只用于确定设备指向，位置和姿态不会上传或持久化。你仍可在系统中选择近似位置；精度不足时应用会明确提示。拒绝定位后，应用使用北京作为明确标注的假定坐标。"
+                        title: copy("privacy.location.title"),
+                        text: copy("privacy.location.body")
                     )
                     PrivacySection(
-                        title: "本地记录",
-                        text: "观测记录、手册阅读状态和显示偏好仅保存在本机，用于恢复你的仪器状态。你可以在设置中清除观测记录。"
+                        title: copy("privacy.records.title"),
+                        text: copy("privacy.records.body")
                     )
                     PrivacySection(
-                        title: "网络与第三方",
-                        text: "当前版本不创建账户，不包含广告、分析或跟踪代码，也不会向开发者或第三方传输个人数据。SatelliteKit 仅在本机执行轨道计算。"
+                        title: copy("privacy.network.title"),
+                        text: copy("privacy.network.body")
                     )
                     PrivacySection(
-                        title: "你的选择",
-                        text: "你可以在系统设置中撤销定位权限，也可以随时删除应用以移除全部本地数据。"
+                        title: copy("privacy.choice.title"),
+                        text: copy("privacy.choice.body")
                     )
 
                     VStack(spacing: 0) {
                         DocumentLinkRow(
-                            title: "查看公开隐私政策",
-                            label: "PUBLIC POLICY",
-                            action: { openURL(AppLinks.privacyPolicy) }
+                            title: copy("privacy.public.title"),
+                            label: copy("privacy.public.label"),
+                            action: { openURL(AppLinks.privacyPolicy(for: .current)) }
                         )
                         DocumentLinkRow(
-                            title: "反馈隐私或支持问题",
-                            label: "SUPPORT",
+                            title: copy("privacy.support.title"),
+                            label: copy("privacy.support.label"),
                             action: { openURL(AppLinks.support) }
                         )
                     }
@@ -60,8 +62,8 @@ struct PrivacyStatementView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             ArchiveTopBar(
-                backTitle: "设置",
-                title: "隐私",
+                backTitle: copy("navigation.settings"),
+                title: copy("navigation.privacy"),
                 onBack: onFinished
             )
         }
@@ -70,21 +72,21 @@ struct PrivacyStatementView: View {
 }
 
 private struct PrivacySummary: View {
-    private let conclusions = [
-        "不创建账户",
-        "不上传位置",
-        "不进行追踪",
-        "所有计算均在设备上完成",
+    private let conclusionKeys = [
+        "privacy.summary.no_account",
+        "privacy.summary.no_location_upload",
+        "privacy.summary.no_tracking",
+        "privacy.summary.on_device",
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(conclusions, id: \.self) { conclusion in
+            ForEach(conclusionKeys, id: \.self) { key in
                 HStack(spacing: 10) {
                     Circle()
                         .fill(Palette.signal.opacity(0.62))
                         .frame(width: 3.5, height: 3.5)
-                    Text(conclusion)
+                    Text(L10n.text(key))
                         .font(Typography.readingCompact)
                         .tracking(Typography.readingCompactTracking)
                         .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
@@ -148,7 +150,7 @@ private struct DocumentLinkRow: View {
             .overlay(alignment: .bottom) { ContentHairline() }
         }
         .buttonStyle(.plain)
-        .accessibilityHint("在浏览器中打开")
+        .accessibilityHint(L10n.text("accessibility.open_browser"))
     }
 }
 

@@ -9,23 +9,35 @@ enum CatalogCategory: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .exploration: "探索"
-        case .observation: "观测"
-        case .network: "网络"
-        case .legacy: "遗迹"
+    func title(language: SupportedLanguage = .current) -> String {
+        switch (self, language) {
+        case (.exploration, .english): "Exploration"
+        case (.observation, .english): "Observation"
+        case (.network, .english): "Network"
+        case (.legacy, .english): "Legacy"
+        case (.exploration, .simplifiedChinese): "探索"
+        case (.observation, .simplifiedChinese): "观测"
+        case (.network, .simplifiedChinese): "网络"
+        case (.legacy, .simplifiedChinese): "遗迹"
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .exploration: "人类驻留、科学与实验任务"
-        case .observation: "持续阅读地球与大气"
-        case .network: "通信、导航与星座 · 大型星座自动收束"
-        case .legacy: "失效航天器、火箭体与轨道残留"
+    var title: String { title() }
+
+    func subtitle(language: SupportedLanguage = .current) -> String {
+        switch (self, language) {
+        case (.exploration, .english): "Human presence, science, and experimental missions"
+        case (.observation, .english): "Continuous observation of Earth and atmosphere"
+        case (.network, .english): "Communication, navigation, and constellations"
+        case (.legacy, .english): "Inactive spacecraft, rocket bodies, and orbital remnants"
+        case (.exploration, .simplifiedChinese): "人类驻留、科学与实验任务"
+        case (.observation, .simplifiedChinese): "持续阅读地球与大气"
+        case (.network, .simplifiedChinese): "通信、导航与星座 · 大型星座自动收束"
+        case (.legacy, .simplifiedChinese): "失效航天器、火箭体与轨道残留"
         }
     }
+
+    var subtitle: String { subtitle() }
 
     var symbolName: String {
         switch self {
@@ -47,20 +59,28 @@ enum CatalogFilterGroup: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var title: String {
-        switch self {
-        case .overview: "常用镜片"
-        case .mission: "看它们在做什么"
-        case .authority: "看谁在运行"
-        case .constellation: "看一片轨道网络"
+        switch (self, SupportedLanguage.current) {
+        case (.overview, .english): "Common Lenses"
+        case (.mission, .english): "Mission Type"
+        case (.authority, .english): "Confirmed Operator"
+        case (.constellation, .english): "Orbital Network"
+        case (.overview, .simplifiedChinese): "常用镜片"
+        case (.mission, .simplifiedChinese): "看它们在做什么"
+        case (.authority, .simplifiedChinese): "看谁在运行"
+        case (.constellation, .simplifiedChinese): "看一片轨道网络"
         }
     }
 
     var subtitle: String {
-        switch self {
-        case .overview: "从完整天空或少量精选目标开始"
-        case .mission: "科学、地球、导航、通信与轨道历史"
-        case .authority: "只看可由公开资料确认的运营者"
-        case .constellation: "让某一个大型网络单独浮现"
+        switch (self, SupportedLanguage.current) {
+        case (.overview, .english): "Start with the full sky or selected objects"
+        case (.mission, .english): "Science, Earth, navigation, communication, and history"
+        case (.authority, .english): "Operators confirmed by public sources"
+        case (.constellation, .english): "Isolate one large orbital network"
+        case (.overview, .simplifiedChinese): "从完整天空或少量精选目标开始"
+        case (.mission, .simplifiedChinese): "科学、地球、导航、通信与轨道历史"
+        case (.authority, .simplifiedChinese): "只看可由公开资料确认的运营者"
+        case (.constellation, .simplifiedChinese): "让某一个大型网络单独浮现"
         }
     }
 
@@ -95,10 +115,13 @@ enum CatalogScope: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var title: String {
-        switch self {
-        case .all: "全部轨道"
-        case .lowEarth: "近地轨道"
-        case .mediumAndHigh: "中高轨道"
+        switch (self, SupportedLanguage.current) {
+        case (.all, .english): "All Orbits"
+        case (.lowEarth, .english): "Low Earth Orbit"
+        case (.mediumAndHigh, .english): "Medium and High Orbits"
+        case (.all, .simplifiedChinese): "全部轨道"
+        case (.lowEarth, .simplifiedChinese): "近地轨道"
+        case (.mediumAndHigh, .simplifiedChinese): "中高轨道"
         }
     }
 
@@ -154,51 +177,105 @@ enum CatalogFilter: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var title: String {
-        switch self {
-        case .all: "全部轨道"
-        case .featured: "可读档案"
-        case .humanScience: "载人与科学"
-        case .earthObservation: "地球观察"
-        case .navigation: "导航与授时"
-        case .communications: "通信基础设施"
-        case .orbitalHeritage: "历史与遗产"
-        case .unitedStates: "美国公共任务"
-        case .europe: "ESA / Copernicus"
-        case .china: "中国公共任务"
-        case .otherPublic: "其他公共任务"
-        case .starlink: "Starlink"
-        case .oneweb: "OneWeb"
-        case .chinaConstellations: "中国低轨网络"
-        case .kuiper: "Project Kuiper"
-        case .mobileConstellations: "移动通信网络"
+        switch (self, SupportedLanguage.current) {
+        case (.all, .english): "All Orbits"
+        case (.featured, .english): "Readable Archives"
+        case (.humanScience, .english): "Human and Science"
+        case (.earthObservation, .english): "Earth Observation"
+        case (.navigation, .english): "Navigation and Timing"
+        case (.communications, .english): "Communication Infrastructure"
+        case (.orbitalHeritage, .english): "History and Heritage"
+        case (.unitedStates, .english): "U.S. Public Missions"
+        case (.europe, .english): "ESA / Copernicus"
+        case (.china, .english): "Chinese Public Missions"
+        case (.otherPublic, .english): "Other Public Missions"
+        case (.starlink, _): "Starlink"
+        case (.oneweb, _): "OneWeb"
+        case (.chinaConstellations, .english): "Chinese LEO Networks"
+        case (.kuiper, _): "Project Kuiper"
+        case (.mobileConstellations, .english): "Mobile Networks"
+        case (.all, .simplifiedChinese): "全部轨道"
+        case (.featured, .simplifiedChinese): "可读档案"
+        case (.humanScience, .simplifiedChinese): "载人与科学"
+        case (.earthObservation, .simplifiedChinese): "地球观察"
+        case (.navigation, .simplifiedChinese): "导航与授时"
+        case (.communications, .simplifiedChinese): "通信基础设施"
+        case (.orbitalHeritage, .simplifiedChinese): "历史与遗产"
+        case (.unitedStates, .simplifiedChinese): "美国公共任务"
+        case (.europe, .simplifiedChinese): "ESA / Copernicus"
+        case (.china, .simplifiedChinese): "中国公共任务"
+        case (.otherPublic, .simplifiedChinese): "其他公共任务"
+        case (.chinaConstellations, .simplifiedChinese): "中国低轨网络"
+        case (.mobileConstellations, .simplifiedChinese): "移动通信网络"
         }
     }
 
     /// 收起后的镜片入口只保留一个能够被迅速读懂的短名称。完整名称仍用于
     /// 展开面板和辅助功能，避免顶部工具区被机构全称挤占。
     var compactTitle: String {
-        switch self {
-        case .all: "观察镜片"
-        case .featured: "档案"
-        case .humanScience: "科学"
-        case .earthObservation: "地球"
-        case .navigation: "导航"
-        case .communications: "通信"
-        case .orbitalHeritage: "轨道历史"
-        case .unitedStates: "美国公共"
-        case .europe: "欧洲公共"
-        case .china: "中国公共"
-        case .otherPublic: "其他公共"
-        case .starlink: "Starlink"
-        case .oneweb: "OneWeb"
-        case .chinaConstellations: "中国低轨"
-        case .kuiper: "Kuiper"
-        case .mobileConstellations: "移动网络"
+        if SupportedLanguage.current == .english {
+            switch self {
+            case .all: "Lenses"
+            case .featured: "Archives"
+            case .humanScience: "Science"
+            case .earthObservation: "Earth"
+            case .navigation: "Navigation"
+            case .communications: "Communication"
+            case .orbitalHeritage: "Heritage"
+            case .unitedStates: "U.S. Public"
+            case .europe: "European Public"
+            case .china: "Chinese Public"
+            case .otherPublic: "Other Public"
+            case .starlink: "Starlink"
+            case .oneweb: "OneWeb"
+            case .chinaConstellations: "Chinese LEO"
+            case .kuiper: "Kuiper"
+            case .mobileConstellations: "Mobile"
+            }
+        } else {
+            switch self {
+            case .all: "观察镜片"
+            case .featured: "档案"
+            case .humanScience: "科学"
+            case .earthObservation: "地球"
+            case .navigation: "导航"
+            case .communications: "通信"
+            case .orbitalHeritage: "轨道历史"
+            case .unitedStates: "美国公共"
+            case .europe: "欧洲公共"
+            case .china: "中国公共"
+            case .otherPublic: "其他公共"
+            case .starlink: "Starlink"
+            case .oneweb: "OneWeb"
+            case .chinaConstellations: "中国低轨"
+            case .kuiper: "Kuiper"
+            case .mobileConstellations: "移动网络"
+            }
         }
     }
 
     var subtitle: String {
-        switch self {
+        if SupportedLanguage.current == .english {
+            switch self {
+            case .all: "Complete offline catalog · large constellations are condensed"
+            case .featured: "Objects with reliable mission notes or deeper archives"
+            case .humanScience: "Stations, telescopes, and major science missions"
+            case .earthObservation: "Weather, land, ocean, and climate records"
+            case .navigation: "GPS, Galileo, BeiDou, and other timing systems"
+            case .communications: "Relay, geosynchronous links, and early communications"
+            case .orbitalHeritage: "Historic missions and silent objects still in orbit"
+            case .unitedStates: "NASA, NOAA, USGS, GPS, and related public programs"
+            case .europe: "ESA, EUMETSAT, and EU Copernicus"
+            case .china: "Space stations, BeiDou, Fengyun, and Earth observation"
+            case .otherPublic: "JAXA, ISRO, and other public mission systems"
+            case .starlink: "SpaceX low-Earth-orbit broadband network"
+            case .oneweb: "Eutelsat OneWeb near-polar communications network"
+            case .chinaConstellations: "Qianfan and Guowang low-Earth-orbit nodes"
+            case .kuiper: "Amazon low-Earth-orbit broadband system"
+            case .mobileConstellations: "Iridium, Globalstar, and Orbcomm"
+            }
+        } else {
+            switch self {
         case .all: "完整离线目录 · 大型星座自动收束"
         case .featured: "具有可靠任务说明或深入资料的目标"
         case .humanScience: "空间站、望远镜与重要科学任务"
@@ -215,6 +292,7 @@ enum CatalogFilter: String, CaseIterable, Identifiable, Sendable {
         case .chinaConstellations: "千帆与国网低轨通信节点"
         case .kuiper: "Amazon 近地轨道宽带系统"
         case .mobileConstellations: "Iridium、Globalstar 与 Orbcomm"
+            }
         }
     }
 
@@ -305,18 +383,22 @@ enum CatalogFamily: String, Codable, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    var title: String {
-        switch self {
-        case .starlink: "STARLINK"
-        case .oneweb: "ONEWEB"
-        case .qianfan: "千帆"
-        case .hulianwang: "国网"
-        case .kuiper: "KUIPER"
-        case .iridium: "IRIDIUM"
-        case .globalstar: "GLOBALSTAR"
-        case .orbcomm: "ORBCOMM"
+    func title(language: SupportedLanguage = .current) -> String {
+        switch (self, language) {
+        case (.starlink, _): "STARLINK"
+        case (.oneweb, _): "ONEWEB"
+        case (.qianfan, .english): "QIANFAN"
+        case (.qianfan, .simplifiedChinese): "千帆"
+        case (.hulianwang, .english): "GUOWANG"
+        case (.hulianwang, .simplifiedChinese): "国网"
+        case (.kuiper, _): "KUIPER"
+        case (.iridium, _): "IRIDIUM"
+        case (.globalstar, _): "GLOBALSTAR"
+        case (.orbcomm, _): "ORBCOMM"
         }
     }
+
+    var title: String { title() }
 
     static func infer(from name: String) -> CatalogFamily? {
         let upper = name.uppercased()
@@ -386,7 +468,6 @@ struct CatalogObject: Identifiable, Sendable {
     let launched: String
     let status: Status
     let kind: String
-    let poetic: String
     let category: CatalogCategory
     let family: CatalogFamily?
     let elementEpoch: Date

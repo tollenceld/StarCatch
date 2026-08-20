@@ -10,6 +10,7 @@ struct SatelliteStoryLibrary: Sendable {
 
     private struct Document: Decodable {
         let schemaVersion: Int
+        let presentationMode: String
         let stories: [SatelliteStory]
         let familyStories: [FamilyStory]
     }
@@ -32,7 +33,8 @@ struct SatelliteStoryLibrary: Sendable {
                 Document.self,
                 from: Data(contentsOf: url, options: .mappedIfSafe)
             )
-            guard document.schemaVersion == 3 else {
+            guard document.schemaVersion == 4,
+                  document.presentationMode == "structured-localized" else {
                 return .init(
                     storiesByNORAD: [:],
                     storiesByFamily: [:],

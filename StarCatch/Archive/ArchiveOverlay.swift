@@ -35,7 +35,14 @@ struct TargetMicroLabel: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
-            "\(object.name)，距离 \(ephemeris.map { String(format: "%.0f 公里", $0.rangeKm) } ?? "未知")，\(object.orbitClass) 轨道"
+            L10n.format(
+                "accessibility.micro_label",
+                table: "SatelliteText",
+                object.name,
+                ephemeris.map { String(format: "%.0f KM", $0.rangeKm) }
+                    ?? L10n.text("value.unknown", table: "SatelliteText"),
+                object.orbitClass
+            )
         )
     }
 
@@ -63,13 +70,18 @@ struct ArchiveOverlay: View {
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
     private var clampedReleaseProgress: Double { min(1, max(0, releaseProgress)) }
+    private var language: SupportedLanguage { .current }
+
+    private func copy(_ key: String) -> String {
+        L10n.text(key, table: "SatelliteText", language: language)
+    }
 
     private var statusText: String {
         switch object.status {
-        case .active: "轨道在列"
-        case .silent: "静默记录"
-        case .derelict: "失效记录"
-        case .debris: "轨道残留"
+        case .active: copy("status.cataloged")
+        case .silent: copy("status.silent")
+        case .derelict: copy("status.derelict")
+        case .debris: copy("status.debris")
         }
     }
 
@@ -80,13 +92,17 @@ struct ArchiveOverlay: View {
     private var fallbackInsight: String {
         let fingerprint = object.orbitFingerprint
         if fingerprint.eccentricity >= 0.08 {
-            return String(
-                format: "椭圆轨道 · 近远地点相差 %.0f KM",
+            return L10n.format(
+                "insight.orbit.elliptical",
+                table: "SatelliteText",
+                language: language,
                 fingerprint.apogeeKm - fingerprint.perigeeKm
             )
         }
-        return String(
-            format: "%.1f 分钟一周 · 倾角 %.1f°",
+        return L10n.format(
+            "insight.orbit.summary",
+            table: "SatelliteText",
+            language: language,
             fingerprint.periodMinutes,
             fingerprint.inclinationDegrees
         )
@@ -105,7 +121,10 @@ struct ArchiveOverlay: View {
                     .padding(.top, 7)
 
                 Text(
-                    insight?.headline(relativeTo: insight?.observationTime ?? Date())
+                    insight?.headline(
+                        relativeTo: insight?.observationTime ?? Date(),
+                        language: language
+                    )
                         ?? fallbackInsight
                 )
                     .font(.system(size: 11.5, weight: .regular))
@@ -144,8 +163,8 @@ struct ArchiveOverlay: View {
         )
         .simultaneousGesture(dismissGesture)
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: "保持目标详情", onInteraction)
-        .accessibilityAction(named: "收起目标详情", onDismiss)
+        .accessibilityAction(named: Text(copy("accessibility.retain_detail")), onInteraction)
+        .accessibilityAction(named: Text(copy("accessibility.collapse_detail")), onDismiss)
         .task(id: object.id) {
             presentationVisible = false
             await Task.yield()
@@ -207,7 +226,7 @@ struct ArchiveOverlay: View {
                 .fill(Palette.inkFaint.opacity(0.34))
                 .frame(width: 0.5, height: 9)
 
-            Text(object.category.title)
+            Text(object.category.title(language: language))
                 .foregroundStyle(Palette.inkMid.opacity(0.83))
 
             Rectangle()
@@ -256,12 +275,12 @@ struct ArchiveOverlay: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
-                retainedByInteraction ? "取消固定目标详情" : "固定目标详情"
+                copy(retainedByInteraction ? "accessibility.unpin_detail" : "accessibility.pin_detail")
             )
             .accessibilityHint(
                 retainedByInteraction
-                    ? "准星移开后，详情将按正常宽限时间收起"
-                    : "准星移开或转向其他目标时，详情仍保持显示"
+                    ? copy("accessibility.unpin_detail.hint")
+                    : copy("accessibility.pin_detail.hint")
             )
 
             collapseControl
@@ -275,7 +294,7 @@ struct ArchiveOverlay: View {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 10, weight: .bold))
-                Text("收起")
+                Text(copy("action.collapse"))
                     .font(.system(size: 9.5, weight: .medium))
             }
             .foregroundStyle(Palette.inkHigh.opacity(0.88))
@@ -292,27 +311,28 @@ struct ArchiveOverlay: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("收起目标详情")
-        .accessibilityHint("目标仍保持锁定，可再次展开")
+        .accessibilityLabel(copy("accessibility.collapse_detail"))
+        .accessibilityHint(copy("accessibility.collapse_detail.hint"))
     }
 
     private var telemetry: some View {
         HStack(spacing: 0) {
             telemetryCell(
-                title: "距离",
+                title: copy("archive.field.range"),
                 value: ephemeris.map { String(format: "%.0f KM", $0.rangeKm) } ?? "—"
             )
             telemetryDivider
             telemetryCell(
-                title: "高度",
+                title: copy("archive.field.altitude"),
                 value: ephemeris.map { String(format: "%.0f KM", $0.altitudeKm) } ?? "—"
             )
             telemetryDivider
             telemetryCell(
-                title: "速度",
+                title: copy("archive.field.speed"),
                 value: ephemeris.map { String(format: "%.2f KM/S", $0.velocityKmS) } ?? "—"
             )
         }
+        .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
         .background(
             Palette.voidBlack.opacity(0.18),
@@ -356,10 +376,10 @@ struct ArchiveOverlay: View {
                         .font(.system(size: 10.5, weight: .medium))
                         .foregroundStyle(object.identityTint.opacity(0.9))
                 }
-                Text("查看档案")
+                Text(copy("action.view_archive"))
                     .font(.system(size: 11.5, weight: .medium))
                 Spacer(minLength: 8)
-                Text("任务、轨道与来源")
+                Text(copy("action.view_archive.subtitle"))
                     .font(.system(size: 9.5, weight: .regular))
                     .foregroundStyle(Palette.inkMid.opacity(0.72))
                 Image(systemName: "chevron.right")
@@ -380,7 +400,7 @@ struct ArchiveOverlay: View {
             .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityHint("打开目标的完整任务与轨道资料")
+        .accessibilityHint(copy("action.view_archive.hint"))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(Palette.inkFaint.opacity(0.22))

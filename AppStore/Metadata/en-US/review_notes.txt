@@ -1,0 +1,12 @@
+StarCatch has no login, subscription, in-app purchase, advertising, analytics, or backend account. Its core catalog ships in the app, so review does not depend on network access.
+
+Suggested review path:
+1. Read or skip the first-run field manual and enter the sky.
+2. Allow location and motion access, then move the device. In Simulator, drag the sky to simulate azimuth and elevation.
+3. Bring the central reticle near a bright orbital object to observe sensing, focusing, locking, and the bottom summary. The summary has a reading grace period and can be pinned.
+4. Pinch out from the main sky past the resistance threshold to enter the 3D global view. The globe supports drag rotation, two-finger zoom/rotation, and double-tap reset.
+5. Open Settings from the lower-right control to inspect observations, snapshot age, permissions, privacy, and the manual.
+
+When location is denied, StarCatch remains usable with a clearly labeled assumed position. Simulator and degraded pointing modes still demonstrate the complete capture flow.
+
+The app is for education and observation only, not navigation, collision avoidance, or safety decisions.

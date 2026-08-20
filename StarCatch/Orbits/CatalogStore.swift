@@ -26,7 +26,6 @@ private struct CatalogRecord: Decodable {
         case generatedStatus = "STARCATCH_STATUS"
         case generatedOrbitClass = "STARCATCH_ORBIT_CLASS"
         case generatedLaunched = "STARCATCH_LAUNCHED"
-        case generatedPoetic = "STARCATCH_POETIC"
         case generatedFamily = "STARCATCH_FAMILY"
         case generatedCurated = "STARCATCH_CURATED"
 
@@ -41,7 +40,6 @@ private struct CatalogRecord: Decodable {
         case authoredLaunched = "launched"
         case authoredStatus = "status"
         case authoredKind = "kind"
-        case authoredPoetic = "poetic"
         case authoredCategory = "category"
     }
 
@@ -104,10 +102,6 @@ private struct CatalogRecord: Decodable {
             ) ?? "—",
             status: status,
             kind: kind,
-            poetic: try container.decodeIfPresent(
-                String.self,
-                forKey: isAuthoredTLE ? .authoredPoetic : .generatedPoetic
-            ) ?? "它仍在轨道上，以自己的速度穿过观察者此刻的天空。",
             category: category,
             family: try container.decodeIfPresent(
                 CatalogFamily.self,

@@ -56,9 +56,9 @@ struct TimeDial: View {
         // 时间轴位于天空拖拽层之上，优先接收横向手势，避免被“移动准星”吞掉。
         .highPriorityGesture(dragGesture)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("时间坐标")
+        .accessibilityLabel(L10n.text("time.accessibility.label"))
         .accessibilityValue(accessibilityValue)
-        .accessibilityHint("左右拖动时间，或上下轻扫调整三十分钟")
+        .accessibilityHint(L10n.text("time.accessibility.hint"))
         .accessibilityAdjustableAction { direction in
             markInteracted()
             switch direction {
@@ -70,7 +70,7 @@ struct TimeDial: View {
                 break
             }
         }
-        .accessibilityAction(named: "返回此刻") {
+        .accessibilityAction(named: L10n.text("time.return_now")) {
             returnToLive()
         }
         .animation(.easeOut(duration: 0.8), value: clock.isLive)
@@ -108,7 +108,7 @@ struct TimeDial: View {
                 .fill(Palette.signal.opacity(clock.isLive ? 0.76 : 0.46))
                 .frame(width: 4, height: 4)
 
-            Text(clock.isLive ? "此刻" : clock.relativeOffsetLabel)
+            Text(clock.isLive ? L10n.text("time.live") : clock.relativeOffsetLabel)
                 .font(Typography.statusTag)
                 .tracking(clock.isLive ? Typography.statusTagTracking : 0.7)
                 .foregroundStyle(
@@ -121,7 +121,13 @@ struct TimeDial: View {
     }
 
     private var accessibilityValue: String {
-        clock.isLive ? "实时，\(clock.utcLabel())" : "\(clock.offsetLabel)，\(clock.utcLabel())"
+        clock.isLive
+            ? L10n.format("time.accessibility.live_value", clock.utcLabel())
+            : L10n.format(
+                "time.accessibility.offset_value",
+                clock.offsetLabel,
+                clock.utcLabel()
+            )
     }
 
     // MARK: - 刻度
@@ -219,7 +225,7 @@ struct TimeDial: View {
         }
         .overlay(alignment: .topLeading) {
             if !hasInteracted {
-                Label("左右拖动时间", systemImage: "arrow.left.and.right")
+                Label(L10n.text("time.drag_hint"), systemImage: "arrow.left.and.right")
                     .font(.system(size: 8.5, weight: .medium))
                     .foregroundStyle(Palette.inkMid.opacity(0.84))
                     .padding(.horizontal, 7)

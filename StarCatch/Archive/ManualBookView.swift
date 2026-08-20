@@ -19,8 +19,11 @@ struct ManualBookView: View {
     @State private var pageRevealed = false
     @State private var fadingOut = false
 
-    private let pages: [ManualPage] = ManualPage.all
+    private var language: SupportedLanguage { .current }
+    private var pages: [ManualPage] { ManualPage.all(language: language) }
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+
+    private func copy(_ key: String) -> String { L10n.text(key, language: language) }
 
     // MARK: - body
 
@@ -43,8 +46,8 @@ struct ManualBookView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if revisiting {
                 ArchiveTopBar(
-                    backTitle: "设置",
-                    title: "观测手册",
+                    backTitle: copy("navigation.settings"),
+                    title: copy("navigation.manual"),
                     onBack: { finish(interrupted: true) }
                 )
             }
@@ -95,7 +98,7 @@ struct ManualBookView: View {
                     .tracking(Typography.statusTagTracking)
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
                 if !revisiting {
-                    Button("跳过") { finish(interrupted: true) }
+                    Button(copy("manual.skip")) { finish(interrupted: true) }
                         .font(Typography.statusTag)
                         .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
                         .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
@@ -103,17 +106,10 @@ struct ManualBookView: View {
             }
             .modifier(LineReveal(index: 0, revealed: pageRevealed))
 
-            // 标题：中英各一行
-            VStack(alignment: .leading, spacing: 6) {
-                Text(page.titleEN)
-                    .font(Typography.objectName)
-                    .tracking(Typography.objectNameTracking + 0.5)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
-                Text(page.titleCN)
-                    .font(Typography.guide)
-                    .tracking(Typography.guideTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-            }
+            Text(page.title)
+                .font(Typography.objectName)
+                .tracking(language == .english ? Typography.objectNameTracking + 0.5 : 0.15)
+                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
             .modifier(LineReveal(index: 1, revealed: pageRevealed))
 
             ManualChapterVisual(pageIndex: pageIndex, revealed: pageRevealed)
@@ -166,7 +162,9 @@ struct ManualBookView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("第 \(index + 1) 页")
+                .accessibilityLabel(
+                    L10n.format("manual.page", language: language, index + 1)
+                )
             }
         }
     }
@@ -176,7 +174,11 @@ struct ManualBookView: View {
         let isLast = pageIndex == pages.count - 1
         return Button(action: advance) {
             HStack(spacing: 12) {
-                Text(isLast ? (revisiting ? "完成阅读" : "开始观测") : "继续")
+                Text(
+                    isLast
+                        ? copy(revisiting ? "manual.finish_reading" : "manual.begin")
+                        : copy("manual.continue")
+                )
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking + 0.4)
                     .foregroundStyle(
@@ -196,7 +198,9 @@ struct ManualBookView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(
-            isLast ? (revisiting ? "完成阅读" : "开始观测") : "继续到下一页"
+            isLast
+                ? copy(revisiting ? "manual.finish_reading" : "manual.begin")
+                : copy("manual.continue.hint")
         )
         .opacity(pageRevealed ? 1 : 0.72)
         .animation(.easeOut(duration: suppressMotion ? 0.12 : 0.28), value: pageRevealed)
@@ -307,8 +311,10 @@ struct ManualBookView: View {
     private func resolve(_ value: ManualPage.FieldValue) -> String {
         switch value {
         case .literal(let s): return s
-        case .catalogCount: return "\(session.catalog.objects.count) OBJECTS"
-        case .epochAge: return "\(session.tleAgeDays)D"
+        case .catalogCount:
+            return L10n.format("manual.catalog_count", language: language, session.catalog.objects.count)
+        case .epochAge:
+            return L10n.format("manual.epoch_age", language: language, session.tleAgeDays)
         case .snapshotDate:
             if session.catalog.snapshotEpoch == .distantPast { return "—" }
             return Self.snapshotDateFormatter.string(
@@ -493,71 +499,37 @@ struct ManualPage: Equatable {
         let value: FieldValue
     }
 
-    let chapterMark: String  // 例如 "CHAPTER 01"
-    let titleEN: String      // 例如 "THE INSTRUMENT"
-    let titleCN: String      // 例如 "这台仪器"
+    let chapterMark: String
+    let title: String
     let paragraphs: [String]
     let fields: [Field]
 
-    static let all: [ManualPage] = [
-        ManualPage(
-            chapterMark: "CHAPTER 01",
-            titleEN: "THE INSTRUMENT",
-            titleCN: "这台仪器",
-            paragraphs: [
-                "此刻，空间站、望远镜、导航星座与旧火箭正在越过你头顶。",
-                "它们不发光，肉眼不可见。这台仪器把它们放回你的感知范围。",
-            ],
-            fields: []
-        ),
-        ManualPage(
-            chapterMark: "CHAPTER 02",
-            titleEN: "HOW TO OBSERVE",
-            titleCN: "如何观察",
-            paragraphs: [
-                "举起设备，屏幕即视野，中心十字丝即指向。",
-                "缓慢移动。视野中的光点是真实在轨物；空域之外的目标会由屏幕边缘提示方向。",
-                "让十字丝靠近它，档案会随视线浮现。移开后仍保留短暂阅读时间；触碰面板可将它固定。若在设置中开启“确认捕获”，主视野才会出现确认、切换与取消捕获按钮。",
-                "完整信息出现后，画面下方会浮现“深入档案”。单体卫星读取自己的资料；大型星座的任意节点进入同一份项目档案，避免用重复文字伪装成不同故事。",
-            ],
-            fields: []
-        ),
-        ManualPage(
-            chapterMark: "CHAPTER 03",
-            titleEN: "TIME COORDINATE",
-            titleCN: "时间坐标",
-            paragraphs: [
-                "点按左上角进入全局星图，屏幕下缘才会出现观测时钟。左右拨动刻度，即可抵达过去或未来。",
-                "点按“返回此刻”即可回到 LIVE；退出全局星图时，时间也会先归还到此刻。",
-            ],
-            fields: []
-        ),
-        ManualPage(
-            chapterMark: "CHAPTER 04",
-            titleEN: "DATA & FRAME",
-            titleCN: "数据与坐标",
-            paragraphs: [
-                "轨道来自 NORAD 两行根数，并由 SGP4 在设备上推算；数据龄期会被如实标注。",
-                "位置与姿态只用于建立观察者坐标和设备指向，不离开设备。拒绝定位后，仪器会明确使用假定坐标。",
-                "这些结果用于教育与观测，不用于导航、碰撞规避或任何安全决策。",
-            ],
-            fields: [
-                Field(label: "MODEL", value: .literal("SGP4 / WGS-72")),
-                Field(label: "SOURCE", value: .literal("CELESTRAK · NORAD GP")),
-                Field(label: "EPOCH AGE", value: .epochAge),
-            ]
-        ),
-        ManualPage(
-            chapterMark: "FINAL",
-            titleEN: "READY FOR OBSERVATION",
-            titleCN: "观测就绪",
-            paragraphs: [
-                "右上角的设置入口可以重新打开手册、显示控制与隐私说明。",
-                "天空一直在那里。它只负责在你抬头的时候，替你看见。",
-            ],
-            fields: []
-        ),
-    ]
+    static func all(language: SupportedLanguage = .current) -> [ManualPage] {
+        func text(_ key: String) -> String { L10n.text(key, language: language) }
+        func page(_ number: Int, paragraphCount: Int, fields: [Field] = []) -> ManualPage {
+            ManualPage(
+                chapterMark: text(number == 5 ? "manual.chapter.final" : "manual.chapter.\(number)"),
+                title: text("manual.\(number).title"),
+                paragraphs: (1 ... paragraphCount).map { text("manual.\(number).paragraph.\($0)") },
+                fields: fields
+            )
+        }
+        return [
+            page(1, paragraphCount: 2),
+            page(2, paragraphCount: 4),
+            page(3, paragraphCount: 2),
+            page(
+                4,
+                paragraphCount: 3,
+                fields: [
+                    Field(label: text("manual.field.model"), value: .literal("SGP4 / WGS-72")),
+                    Field(label: text("manual.field.source"), value: .literal("CELESTRAK · NORAD GP")),
+                    Field(label: text("manual.field.epoch_age"), value: .epochAge),
+                ]
+            ),
+            page(5, paragraphCount: 2),
+        ]
+    }
 }
 
 // MARK: - 行浮现

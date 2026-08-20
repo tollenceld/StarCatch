@@ -396,7 +396,7 @@ struct SkyOverviewView: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("交互式三维地球轨道星图，显示观察者位置、卫星与实时轨迹")
+        .accessibilityLabel(L10n.text("overview.accessibility"))
         .accessibilityHint(interactive ? "单指上下左右旋转，双指缩放或旋转倾角，双击复位" : "拖动时间轴查看轨道变化")
         .accessibilityAction(named: "复位星图") { resetView() }
     }
@@ -1957,7 +1957,7 @@ struct SkyOverviewView: View {
     ) {
         guard presence > 0.01 else { return }
         context.draw(
-            Text("DISPLAY  \(displayed)  /  CATALOG  \(total)")
+            Text(L10n.format("overview.counts", displayed, total))
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
                 .foregroundStyle(
@@ -1971,7 +1971,7 @@ struct SkyOverviewView: View {
         )
         if showGestureHint {
             context.draw(
-                Text("DRAG  ↕↔  ·  PINCH / ROTATE  ·  DOUBLE TAP  RESET")
+                Text(L10n.text("overview.gesture_hint"))
                     .font(Typography.statusTag)
                     .tracking(0.7)
                     .foregroundStyle(Palette.inkLow.opacity(0.68 * presence)),

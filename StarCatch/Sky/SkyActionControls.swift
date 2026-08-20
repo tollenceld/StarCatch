@@ -11,11 +11,11 @@ enum FocusActionMode: Equatable {
 
     var title: String {
         switch self {
-        case .seeking: "将准星移向卫星"
-        case .confirm: "捕获卫星"
-        case .replace: "切换捕获"
-        case .captured: "捕获保持中"
-        case .releasing: "正在取消"
+        case .seeking: L10n.text("capture.seeking")
+        case .confirm: L10n.text("capture.confirm")
+        case .replace: L10n.text("capture.replace")
+        case .captured: L10n.text("capture.held")
+        case .releasing: L10n.text("capture.releasing")
         }
     }
 
@@ -138,15 +138,15 @@ struct FocusActionControl: View {
     private var accessibilityHint: String {
         switch mode {
         case .seeking:
-            "移动设备，让卫星进入准星的捕获范围"
+            L10n.text("capture.seeking.hint")
         case .confirm:
-            "确认准星当前感应到的卫星"
+            L10n.text("capture.confirm.hint")
         case .replace:
-            "结束当前目标并锁定准星感应到的新卫星"
+            L10n.text("capture.replace.hint")
         case .captured:
-            "当前目标保持捕获；可对准另一目标切换，或使用旁边按钮取消"
+            L10n.text("capture.held.hint")
         case .releasing:
-            "正在关闭当前卫星档案"
+            L10n.text("capture.releasing.hint")
         }
     }
 
@@ -163,8 +163,8 @@ enum CaptureSecondaryMode: Equatable {
 
     var title: String {
         switch self {
-        case .cancelCapture: "取消捕获"
-        case .cancelling: "取消中"
+        case .cancelCapture: L10n.text("capture.cancel")
+        case .cancelling: L10n.text("capture.cancelling")
         }
     }
 
@@ -198,7 +198,7 @@ struct CaptureSecondaryControl: View {
             }
         }
         .accessibilityLabel(mode.title)
-        .accessibilityHint("结束当前持续捕获，不影响设置中的确认捕获开关")
+        .accessibilityHint(L10n.text("capture.cancel.hint"))
     }
 
     private var button: some View {
@@ -251,8 +251,8 @@ struct ReturnToLiveControl: View {
                     }
             }
         }
-        .accessibilityLabel(returning ? "正在返回实时天空" : "返回此刻")
-        .accessibilityHint("让卫星沿时间轨迹回到当前状态")
+        .accessibilityLabel(L10n.text(returning ? "time.returning.accessibility" : "time.return_now"))
+        .accessibilityHint(L10n.text("time.return_now.hint"))
     }
 
     private var actionButton: some View {
@@ -268,7 +268,7 @@ struct ReturnToLiveControl: View {
                         .rotationEffect(.degrees(returning ? -34 : 0))
                 }
 
-                Text(returning ? "正在返回" : "返回此刻")
+                Text(L10n.text(returning ? "time.returning" : "time.return_now"))
                     .font(.system(size: 12, weight: .medium, design: .default))
                     .tracking(1.4)
                     .foregroundStyle(Palette.inkHigh.opacity(0.94))
@@ -340,8 +340,8 @@ struct FieldOfViewResetControl: View {
                     }
             }
         }
-        .accessibilityLabel("复位视场")
-        .accessibilityHint("恢复当前视图的默认观察比例")
+        .accessibilityLabel(L10n.text("view.reset"))
+        .accessibilityHint(L10n.text("view.reset.hint"))
     }
 
     private var actionButton: some View {
@@ -350,7 +350,7 @@ struct FieldOfViewResetControl: View {
                 Image(systemName: "viewfinder")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(Palette.signal.opacity(0.78))
-                Text("复位视场")
+                Text(L10n.text("view.reset"))
                     .font(.system(size: 11, weight: .medium, design: .default))
                     .tracking(1.1)
                     .foregroundStyle(Palette.inkHigh.opacity(0.88))

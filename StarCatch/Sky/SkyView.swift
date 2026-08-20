@@ -728,8 +728,8 @@ struct SkyView: View {
     private var instrumentEntry: some View {
         utilityButton(symbol: "slider.horizontal.3", action: onOpenInstrument)
         .opacity(observationChromeOpacity)
-        .accessibilityLabel("打开仪器状态与设置")
-        .accessibilityHint("进入设置、观测记录与帮助")
+        .accessibilityLabel(L10n.text("settings.open.accessibility"))
+        .accessibilityHint(L10n.text("settings.open.hint"))
     }
 
     @ViewBuilder
@@ -1096,7 +1096,7 @@ struct SkyView: View {
                     islandDirectionWingWidth: islandMetrics.directionWingWidth,
                     wingHeight: islandMetrics.wingHeight,
                     wingCornerRadius: islandMetrics.wingCornerRadius,
-                    backTitle: overviewChromeVisible ? "天空" : nil,
+                    backTitle: overviewChromeVisible ? L10n.text("navigation.sky") : nil,
                     onBack: overviewChromeVisible ? exitOverviewToLocal : nil,
                     onStatusTap: {
                         handleStatusWingTap()
@@ -1160,10 +1160,14 @@ struct SkyView: View {
     /// 捕获中的事件状态优先于非阻断式环境提示，确保顶部与准星、卡片说同一种语言。
     private var statusMode: SkyStatusIndicator.Mode {
         if session.pointingAvailability == .unavailable {
-            return .degraded(reason: "姿态不可用 · 方向仅供参考")
+            return .degraded(reason: L10n.text("sky.degraded.pointing"))
         }
         if overviewChromeVisible {
-            return .field(timeLabel: clock.isLive ? "全局星图 · 此刻" : "全局星图 · \(clock.offsetLabel)")
+            return .field(
+                timeLabel: clock.isLive
+                    ? L10n.text("sky.global.now")
+                    : L10n.format("sky.global.offset", clock.offsetLabel)
+            )
         }
         if archivePresentationReady,
            let id = capture.engagedObjectId,
@@ -1225,10 +1229,18 @@ struct SkyView: View {
         let metrics = topPanelMetrics(for: panel)
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(panel == .observation ? "观测状态" : "方向与精度")
+                Text(
+                    panel == .observation
+                        ? L10n.text("sky.panel.observation")
+                        : L10n.text("sky.panel.direction")
+                )
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Palette.inkHigh.opacity(0.94))
-                Text(panel == .observation ? "SYSTEM" : "ATTITUDE")
+                Text(
+                    panel == .observation
+                        ? L10n.text("sky.panel.tag.system")
+                        : L10n.text("sky.panel.tag.attitude")
+                )
                     .font(.system(size: 7.5, weight: .medium, design: .monospaced))
                     .tracking(0.7)
                     .foregroundStyle(Palette.inkLow.opacity(0.68))
@@ -1254,7 +1266,11 @@ struct SkyView: View {
 
             Button(action: openFullInstrumentStatus) {
                 HStack(spacing: 5) {
-                    Text(panel == .observation ? "完整状态" : "查看校准")
+                    Text(
+                        panel == .observation
+                            ? L10n.text("sky.panel.status")
+                            : L10n.text("sky.panel.calibration")
+                    )
                         .font(.system(size: 8.5, weight: .medium))
                     Spacer(minLength: 2)
                     Image(systemName: "arrow.right")
@@ -1292,17 +1308,25 @@ struct SkyView: View {
         switch panel {
         case .observation:
             [
-                ("姿态", pointingAvailabilityText),
-                ("方位参考", headingConfidenceText),
-                ("定位", session.observer.coordinates.assumed ? "估算" : "实时"),
-                ("轨道龄期", "\(session.tleAgeDays) 天"),
+                (L10n.text("sky.metric.attitude"), pointingAvailabilityText),
+                (L10n.text("sky.metric.heading_reference"), headingConfidenceText),
+                (
+                    L10n.text("sky.metric.location"),
+                    session.observer.coordinates.assumed
+                        ? L10n.text("sky.value.assumed")
+                        : L10n.text("sky.value.live")
+                ),
+                (
+                    L10n.text("sky.metric.orbit_age"),
+                    L10n.format("sky.value.days", session.tleAgeDays)
+                ),
             ]
         case .direction:
             [
-                ("方位", statusAzimuth.replacingOccurrences(of: "AZ ", with: "")),
-                ("仰角", statusElevation.replacingOccurrences(of: "EL ", with: "")),
-                ("视场", String(format: "%.1f×", Double(fieldMagnification))),
-                ("精度", headingConfidenceText),
+                (L10n.text("sky.metric.azimuth"), statusAzimuth.replacingOccurrences(of: "AZ ", with: "")),
+                (L10n.text("sky.metric.altitude"), statusElevation.replacingOccurrences(of: "EL ", with: "")),
+                (L10n.text("sky.metric.field"), String(format: "%.1f×", Double(fieldMagnification))),
+                (L10n.text("sky.metric.accuracy"), headingConfidenceText),
             ]
         }
     }
@@ -1330,24 +1354,26 @@ struct SkyView: View {
 
     private var pointingAvailabilityText: String {
         switch session.pointingAvailability {
-        case .idle: "空闲"
-        case .starting: "启动中"
-        case .tracking: "追踪中"
-        case .manual: "手动"
-        case .unavailable: "不可用"
+        case .idle: L10n.text("sky.value.idle")
+        case .starting: L10n.text("sky.value.starting")
+        case .tracking: L10n.text("sky.value.tracking")
+        case .manual: L10n.text("sky.value.manual")
+        case .unavailable: L10n.text("sky.value.unavailable")
         }
     }
 
     private var headingConfidenceText: String {
         switch session.confidence {
-        case .trueNorth: "真北"
-        case .uncalibrated: "待校准"
-        case .manual: "模拟"
+        case .trueNorth: L10n.text("sky.value.true_north")
+        case .uncalibrated: L10n.text("sky.value.uncalibrated")
+        case .manual: L10n.text("sky.value.simulated")
         }
     }
 
     private var directionGuidance: String {
-        session.confidence == .uncalibrated ? "画 8 字校准并查看详情" : "查看完整姿态信息"
+        session.confidence == .uncalibrated
+            ? L10n.text("sky.panel.direction.uncalibrated")
+            : L10n.text("sky.panel.direction.guidance")
     }
 
     /// 只有会影响“这些点是否真的在你所指天空中”的降级才常驻提示；正常真北、
@@ -1357,22 +1383,22 @@ struct SkyView: View {
         // 并只保留最重要的一条：同时罗列多项会让顶部重新变成一串噪声。
         switch session.pointingAvailability {
         case .unavailable:
-            return "姿态不可用 · 方向仅供参考"
+            return L10n.text("sky.degraded.pointing")
         case .manual:
             return nil
         case .idle, .starting, .tracking:
             if session.confidence == .uncalibrated {
-                return "指向未校准 · 画 8 字校准"
+                return L10n.text("sky.degraded.uncalibrated")
             }
         }
         if session.observer.coordinates.assumed {
-            return "位置为估算值"
+            return L10n.text("sky.degraded.location_assumed")
         }
         if session.observer.coordinates.horizontalAccuracyMeters > 2_000 {
-            return "位置精度较低 · 方向仅供参考"
+            return L10n.text("sky.degraded.location_accuracy")
         }
         if session.tleAgeDays > 14 {
-            return "轨道数据已 \(session.tleAgeDays) 天"
+            return L10n.format("sky.degraded.orbit_age", session.tleAgeDays)
         }
         return nil
     }
@@ -1964,10 +1990,10 @@ struct SkyView: View {
     private var satelliteStoryLayer: some View {
         if let id = presentedStoryObjectID,
            let object = session.catalog.objectsByID[id],
-           let story = object.deepArchiveStory {
+           let presentation = object.deepArchivePresentation() {
            SatelliteStoryView(
                 object: object,
-                story: story,
+                story: presentation.story,
                 ephemeris: engagedDisplayEphemeris(for: id),
                 insight: engagedInsight?.objectID == id ? engagedInsight : nil,
                 onDismiss: {
@@ -2144,8 +2170,8 @@ struct SkyView: View {
                 Spacer()
                 Text(
                     captureConfirmationEnabled
-                        ? "对准目标，再确认持续捕获。"
-                        : "将准星移向目标，档案会随视线出现。"
+                        ? L10n.text("guide.capture.confirm")
+                        : L10n.text("guide.capture.direct")
                 )
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking)
@@ -2163,7 +2189,7 @@ struct SkyView: View {
             // 释放提示：锁定驻留 6s 后浮现，教一次观测语言。最多出现三次。
             VStack {
                 Spacer()
-                Text("对准另一目标切换，或取消当前捕获。")
+                Text(L10n.text("guide.capture.switch"))
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking)
                     .foregroundStyle(Palette.inkLow.opacity(releaseHintVisible ? Palette.Level.faint : 0))

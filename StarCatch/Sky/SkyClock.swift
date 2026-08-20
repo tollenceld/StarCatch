@@ -192,8 +192,10 @@ final class SkyClock: ObservableObject {
 
     /// 面向时间轴的自然读法，明确方向与单位，不要求用户理解 T+/T− 记号。
     var relativeOffsetLabel: String {
-        guard !isLive else { return "此刻 · LIVE" }
-        let direction = offset >= 0 ? "未来" : "过去"
+        guard !isLive else { return "\(L10n.text("time.live")) · LIVE" }
+        let direction = offset >= 0
+            ? L10n.text("time.relative.future")
+            : L10n.text("time.relative.past")
         let total = Int(abs(offset).rounded())
         let days = total / 86_400
         let hours = (total % 86_400) / 3_600
@@ -202,18 +204,18 @@ final class SkyClock: ObservableObject {
 
         if days > 0 {
             return hours > 0
-                ? "\(direction) \(days)天 \(hours)小时"
-                : "\(direction) \(days)天"
+                ? L10n.format("time.relative.day_hour", direction, days, hours)
+                : L10n.format("time.relative.day", direction, days)
         }
         if hours > 0 {
             return minutes > 0
-                ? "\(direction) \(hours)小时 \(minutes)分"
-                : "\(direction) \(hours)小时"
+                ? L10n.format("time.relative.hour_minute", direction, hours, minutes)
+                : L10n.format("time.relative.hour", direction, hours)
         }
         if minutes > 0 {
-            return "\(direction) \(minutes)分"
+            return L10n.format("time.relative.minute", direction, minutes)
         }
-        return "\(direction) \(max(1, seconds))秒"
+        return L10n.format("time.relative.second", direction, max(1, seconds))
     }
 
     /// 观测时刻的 UTC 读数："07-10 14:23:05Z"。

@@ -1,0 +1,20 @@
+StarCatch is a quiet, precise instrument for observing artificial objects in the real sky.
+
+Raise your iPhone and point it overhead. StarCatch combines device attitude, observer location, and a bundled orbital catalog to calculate which satellites, stations, rocket bodies, and other cataloged objects are actually in that direction. Bring the reticle close to an object to sense, focus, lock, and inspect it.
+
+CORE EXPERIENCE
+
+• Live sky — explore orbital objects using the direction of your phone
+• Continuous scale — move naturally from the local sky to a 3D Earth and the wider orbital field
+• Object archives — inspect identity, current observation, orbital character, and source scope
+• Global view — rotate Earth, zoom through orbital space, and inspect past or future positions
+• Observation history — keep confirmed observations locally on your device
+• Offline calculation — orbital propagation, filtering, archives, and history work without an account
+
+PRIVACY AND PERMISSIONS
+
+StarCatch has no account, advertising, analytics, or cross-app tracking. Precise location is used only on device to establish the observer position and true-north reference; device motion aligns the sky with the direction of the iPhone. If location access is denied, the app continues with a clearly labeled assumed position.
+
+Orbital elements come from a CelesTrak GP/OMM snapshot bundled with the release and are propagated on device with SatelliteKit. The app does not refresh orbital data at runtime, and its age is shown in Instrument Status.
+
+StarCatch is for education and observation only. It must not be used for navigation, collision avoidance, or safety decisions.

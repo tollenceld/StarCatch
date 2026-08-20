@@ -8,22 +8,106 @@ enum InformationProvenance: String, Codable, Sendable {
     case verifiedFamily
     case classification
 
-    var title: String {
+    func title(language: SupportedLanguage = .current) -> String {
         switch self {
-        case .catalog: "目录事实"
-        case .computed: "本机推算"
-        case .verifiedObject: "本星官方资料"
-        case .verifiedFamily: "系列官方资料"
-        case .classification: "StarCatch 分类"
+        case .catalog: L10n.text("provenance.catalog", table: "SatelliteText", language: language)
+        case .computed: L10n.text("provenance.computed", table: "SatelliteText", language: language)
+        case .verifiedObject: L10n.text("provenance.verified_object", table: "SatelliteText", language: language)
+        case .verifiedFamily: L10n.text("provenance.verified_family", table: "SatelliteText", language: language)
+        case .classification: L10n.text("provenance.classification", table: "SatelliteText", language: language)
         }
     }
+
+    var title: String { title() }
 }
 
 enum InformationScope: String, Codable, Sendable {
     case object
     case family
 
-    var title: String { self == .object ? "当前目标" : "系列背景" }
+    func title(language: SupportedLanguage = .current) -> String {
+        L10n.text(
+            self == .object ? "scope.object" : "scope.family",
+            table: "SatelliteText",
+            language: language
+        )
+    }
+
+    var title: String { title() }
+}
+
+enum OrbitMotionPresentation: String, Equatable, Sendable {
+    case pass
+    case lowOrbit
+    case mediumOrbit
+    case highElliptical
+    case geostationary
+}
+
+/// A low-frequency, immutable signature derived when the insight snapshot is
+/// built. SwiftUI may interpolate it at 30 fps without propagating an orbit,
+/// touching the catalog, or reading a resource file.
+struct SatelliteMotionSignature: Equatable, Sendable {
+    let referenceDate: Date
+    let phaseRadians: Double
+    let angularDirection: Double
+    let periodSeconds: Double
+    let inclinationDegrees: Double
+    let eccentricity: Double
+    let rangeRateKmS: Double?
+    let presentation: OrbitMotionPresentation
+}
+
+enum OrbitMotionModel {
+    static func phase(
+        for signature: SatelliteMotionSignature,
+        at date: Date
+    ) -> Double {
+        guard signature.presentation != .geostationary else {
+            return normalized(signature.phaseRadians)
+        }
+        let elapsed = date.timeIntervalSince(signature.referenceDate)
+        let mean = normalized(
+            signature.phaseRadians
+                + signature.angularDirection * 2 * .pi * elapsed / max(60, signature.periodSeconds)
+        )
+        guard signature.presentation == .highElliptical,
+              signature.eccentricity > 0.01
+        else { return mean }
+
+        // Solve Kepler's equation with a fixed iteration count. This is only a
+        // geometric playback mapping; the factual position came from SGP4 when
+        // the signature was created.
+        let eccentricity = min(0.92, max(0, signature.eccentricity))
+        var eccentricAnomaly = mean
+        for _ in 0 ..< 5 {
+            eccentricAnomaly -= (eccentricAnomaly - eccentricity * sin(eccentricAnomaly) - mean)
+                / max(0.08, 1 - eccentricity * cos(eccentricAnomaly))
+        }
+        let numerator = sqrt(1 + eccentricity) * sin(eccentricAnomaly / 2)
+        let denominator = sqrt(1 - eccentricity) * cos(eccentricAnomaly / 2)
+        return normalized(2 * atan2(numerator, denominator))
+    }
+
+    static func scanProgress(
+        for signature: SatelliteMotionSignature,
+        at date: Date
+    ) -> Double {
+        let duration = max(2.4, min(8.0, signature.periodSeconds / 180))
+        return positiveRemainder(
+            date.timeIntervalSince(signature.referenceDate) / duration,
+            divisor: 1
+        )
+    }
+
+    private static func normalized(_ value: Double) -> Double {
+        positiveRemainder(value, divisor: 2 * .pi)
+    }
+
+    private static func positiveRemainder(_ value: Double, divisor: Double) -> Double {
+        let remainder = value.truncatingRemainder(dividingBy: divisor)
+        return remainder >= 0 ? remainder : remainder + divisor
+    }
 }
 
 struct OrbitFingerprint: Codable, Equatable, Sendable {
@@ -85,54 +169,112 @@ struct SatelliteInsightSnapshot: Equatable, Sendable {
     let subpoint: GroundPoint?
     let familyComparison: FamilyComparison?
     let launchCohort: LaunchCohort?
+    let motion: SatelliteMotionSignature
 
-    var movementLabel: String? {
-        guard let rangeRateKmS else { return nil }
-        if abs(rangeRateKmS) < 0.02 { return "与观测者距离基本稳定" }
-        return rangeRateKmS < 0
-            ? String(format: "正在接近 · %.2f KM/S", abs(rangeRateKmS))
-            : String(format: "正在远离 · %.2f KM/S", rangeRateKmS)
+    func movementLabel(language: SupportedLanguage = .current) -> String? {
+        SatelliteInsightCopy.movement(snapshot: self, language: language)
     }
 
-    func headline(relativeTo now: Date) -> String {
-        if let pass {
+    var movementLabel: String? { movementLabel() }
+
+    func headline(
+        relativeTo now: Date,
+        language: SupportedLanguage = .current
+    ) -> String {
+        SatelliteInsightCopy.headline(snapshot: self, relativeTo: now, language: language)
+    }
+}
+
+enum SatelliteInsightCopy {
+    static func movement(
+        snapshot: SatelliteInsightSnapshot,
+        language: SupportedLanguage = .current
+    ) -> String? {
+        guard let rate = snapshot.rangeRateKmS else { return nil }
+        if abs(rate) < 0.02 {
+            return L10n.text("insight.range.stable", table: "SatelliteText", language: language)
+        }
+        return L10n.format(
+            rate < 0 ? "insight.range.approaching" : "insight.range.receding",
+            table: "SatelliteText",
+            language: language,
+            abs(rate)
+        )
+    }
+
+    static func headline(
+        snapshot: SatelliteInsightSnapshot,
+        relativeTo now: Date,
+        language: SupportedLanguage = .current
+    ) -> String {
+        if let pass = snapshot.pass {
             switch pass.phase {
             case .visible:
                 if let set = pass.set {
-                    return "仍将在地平线上停留 \(Self.countdown(to: set, from: now))"
+                    return L10n.format(
+                        "insight.pass.visible",
+                        table: "SatelliteText",
+                        language: language,
+                        countdown(to: set, from: now)
+                    )
                 }
             case .approaching:
                 if let rise = pass.rise {
-                    return "下一次进入地平线 \(Self.countdown(to: rise, from: now))"
+                    return L10n.format(
+                        "insight.pass.next_rise",
+                        table: "SatelliteText",
+                        language: language,
+                        countdown(to: rise, from: now)
+                    )
                 }
             case .stationary:
-                return "相对地面方向在短时间内保持稳定"
+                return L10n.text("insight.pass.stationary", table: "SatelliteText", language: language)
             }
         }
-        if let familyComparison {
-            let direction = familyComparison.altitudeDeltaKm >= 0 ? "高" : "低"
-            return String(
-                format: "比 %@ 系列中位轨道约%@ %.0f KM",
-                familyComparison.family.title,
-                direction,
-                abs(familyComparison.altitudeDeltaKm)
+        if let comparison = snapshot.familyComparison {
+            return L10n.format(
+                comparison.altitudeDeltaKm >= 0
+                    ? "insight.family.higher"
+                    : "insight.family.lower",
+                table: "SatelliteText",
+                language: language,
+                comparison.family.title(language: language),
+                abs(comparison.altitudeDeltaKm)
             )
         }
-        if let launchCohort, launchCohort.memberCount > 1 {
-            return "同次发射的第 \(launchCohort.ordinal) / \(launchCohort.memberCount) 个在列对象"
+        if let cohort = snapshot.launchCohort, cohort.memberCount > 1 {
+            return L10n.format(
+                "insight.launch.cohort",
+                table: "SatelliteText",
+                language: language,
+                cohort.ordinal,
+                cohort.memberCount
+            )
         }
-        if fingerprint.eccentricity >= 0.08 {
-            return String(format: "椭圆轨道 · 近远地点相差 %.0f KM", fingerprint.apogeeKm - fingerprint.perigeeKm)
+        if snapshot.fingerprint.eccentricity >= 0.08 {
+            return L10n.format(
+                "insight.orbit.elliptical",
+                table: "SatelliteText",
+                language: language,
+                snapshot.fingerprint.apogeeKm - snapshot.fingerprint.perigeeKm
+            )
         }
-        if let movementLabel { return movementLabel }
-        if let subpoint {
-            return String(
-                format: "星下点 · %.1f°%@  %.1f°%@",
+        if let movement = movement(snapshot: snapshot, language: language) { return movement }
+        if let subpoint = snapshot.subpoint {
+            return L10n.format(
+                "insight.subpoint",
+                table: "SatelliteText",
+                language: language,
                 abs(subpoint.latitude), subpoint.latitude >= 0 ? "N" : "S",
                 abs(subpoint.longitude), subpoint.longitude >= 0 ? "E" : "W"
             )
         }
-        return String(format: "%.1f 分钟完成一周轨道", fingerprint.periodMinutes)
+        return L10n.format(
+            "insight.orbit.period",
+            table: "SatelliteText",
+            language: language,
+            snapshot.fingerprint.periodMinutes
+        )
     }
 
     private static func countdown(to date: Date, from now: Date) -> String {
@@ -310,15 +452,53 @@ final class SatelliteInsightEngine {
             )
         }
         let pass = computePassWindow(satellite: satellite, observer: location, start: date)
+        guard let currentPosition = try? satellite.position(julianDays: date.julianDate) else {
+            return nil
+        }
+        let futurePosition = try? satellite.position(
+            julianDays: date.addingTimeInterval(60).julianDate
+        )
+        let currentAngle = atan2(currentPosition.y, currentPosition.x)
+        let futureAngle = futurePosition.map { atan2($0.y, $0.x) }
+        let delta = futureAngle.map { angle -> Double in
+            var value = angle - currentAngle
+            if value > .pi { value -= 2 * .pi }
+            if value < -.pi { value += 2 * .pi }
+            return value
+        } ?? 1
+        let fingerprint = object.orbitFingerprint
+        let presentation: OrbitMotionPresentation
+        if pass?.phase == .stationary || fingerprint.periodMinutes > 1_250 {
+            presentation = .geostationary
+        } else if pass?.phase == .visible || pass?.phase == .approaching {
+            presentation = .pass
+        } else if fingerprint.eccentricity >= 0.08 {
+            presentation = .highElliptical
+        } else if fingerprint.periodMinutes < 225 {
+            presentation = .lowOrbit
+        } else {
+            presentation = .mediumOrbit
+        }
+        let motion = SatelliteMotionSignature(
+            referenceDate: date,
+            phaseRadians: currentAngle,
+            angularDirection: delta < 0 ? -1 : 1,
+            periodSeconds: max(60, fingerprint.periodMinutes * 60),
+            inclinationDegrees: fingerprint.inclinationDegrees,
+            eccentricity: fingerprint.eccentricity,
+            rangeRateKmS: rangeRate,
+            presentation: presentation
+        )
         return SatelliteInsightSnapshot(
             objectID: object.id,
             observationTime: date,
-            fingerprint: object.orbitFingerprint,
+            fingerprint: fingerprint,
             pass: pass,
             rangeRateKmS: rangeRate,
             subpoint: subpoint,
             familyComparison: familyComparison,
-            launchCohort: launchCohort
+            launchCohort: launchCohort,
+            motion: motion
         )
     }
 

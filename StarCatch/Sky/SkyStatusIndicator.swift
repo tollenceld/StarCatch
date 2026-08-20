@@ -140,19 +140,19 @@ struct SkyStatusIndicator: View {
 
         func label(at date: Date) -> String {
             switch self {
-            case .observing: "正在观测"
-            case .sensing: "正在感应"
-            case .focusing: "正在对焦"
+            case .observing: L10n.text("sky.status.observing")
+            case .sensing: L10n.text("sky.status.sensing")
+            case .focusing: L10n.text("sky.status.focusing")
             case .locked(let identifier, let confirmedAt):
                 if let confirmedAt,
                    date.timeIntervalSince(confirmedAt) < Motion.lockStatusHoldDuration {
-                    "已锁定"
+                    L10n.text("sky.status.locked")
                 } else {
                     identifier
                 }
-            case .releasing: "正在释放"
-            case .field: "全局星图"
-            case .degraded: "状态受限"
+            case .releasing: L10n.text("sky.status.releasing")
+            case .field: L10n.text("sky.status.global")
+            case .degraded: L10n.text("sky.status.degraded")
             }
         }
 
@@ -160,7 +160,7 @@ struct SkyStatusIndicator: View {
             switch self {
             case .field(let timeLabel): timeLabel
             case .degraded(let reason): reason
-            case .releasing(let identifier): "释放 \(identifier)"
+            case .releasing(let identifier): L10n.format("sky.status.release_object", identifier)
             default: label(at: Date())
             }
         }
@@ -328,7 +328,7 @@ struct SkyStatusIndicator: View {
             HStack(spacing: 6) {
                 indicator(breath: breath)
 
-                if mode.isLocked, label != "已锁定" {
+                if mode.isLocked, label != L10n.text("sky.status.locked") {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 7, weight: .semibold))
                         .foregroundStyle(Palette.signal.opacity(0.88))
@@ -347,8 +347,8 @@ struct SkyStatusIndicator: View {
             .contentShape(RoundedRectangle(cornerRadius: wingCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("观测状态，\(mode.fullLabel)")
-        .accessibilityHint("展开观测与传感器状态")
+        .accessibilityLabel(L10n.format("sky.status.accessibility", mode.fullLabel))
+        .accessibilityHint(L10n.text("sky.status.accessibility.hint"))
         core
             .modifier(
                 SkyWingSurfaceModifier(
@@ -382,8 +382,8 @@ struct SkyStatusIndicator: View {
             .contentShape(RoundedRectangle(cornerRadius: wingCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("姿态数据，\(azimuth)，\(elevation)")
-        .accessibilityHint("展开方向精度和校准信息")
+        .accessibilityLabel(L10n.format("sky.direction.accessibility", azimuth, elevation))
+        .accessibilityHint(L10n.text("sky.direction.accessibility.hint"))
 
         core
             .modifier(

@@ -17,6 +17,11 @@ struct SatelliteStoryView: View {
     @State private var sourcesExpanded = false
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var language: SupportedLanguage { .current }
+
+    private func copy(_ key: String) -> String {
+        L10n.text(key, table: "SatelliteText", language: language)
+    }
 
     var body: some View {
         ZStack {
@@ -41,7 +46,7 @@ struct SatelliteStoryView: View {
                     currentTargetModule
                         .padding(.bottom, 22)
 
-                    sectionLabel(story.scope == .family ? "SERIES BACKGROUND" : "MISSION IN VIEW")
+                    sectionLabel(copy(story.scope == .family ? "archive.section.family" : "archive.section.mission"))
                     Text(story.lead)
                         .font(Typography.readingBody)
                         .tracking(Typography.readingBodyTracking)
@@ -57,7 +62,7 @@ struct SatelliteStoryView: View {
                             .padding(.bottom, 20)
                     }
 
-                    sectionLabel("MISSION & CATALOG FACTS")
+                    sectionLabel(copy("archive.section.facts"))
                     VStack(spacing: 0) {
                         ForEach(preferredFacts) { fact in
                             storyField(fact.label, fact.value)
@@ -67,7 +72,7 @@ struct SatelliteStoryView: View {
                     .padding(.bottom, 24)
 
                     if !story.chapters.isEmpty {
-                        sectionLabel("MISSION NOTES")
+                        sectionLabel(copy("archive.section.notes"))
                         VStack(spacing: 0) {
                             ForEach(story.chapters) { chapter in
                                 chapterDisclosure(chapter)
@@ -79,8 +84,8 @@ struct SatelliteStoryView: View {
 
                     if !story.milestones.isEmpty {
                         compactDisclosure(
-                            title: "任务历程",
-                            detail: "\(story.milestones.count) 个关键节点",
+                            title: copy("archive.history.title"),
+                            detail: L10n.format("archive.history.count", table: "SatelliteText", language: language, story.milestones.count),
                             isExpanded: $missionHistoryExpanded
                         ) {
                             milestoneRail
@@ -90,8 +95,8 @@ struct SatelliteStoryView: View {
                     }
 
                     compactDisclosure(
-                        title: "资料与计算说明",
-                        detail: "\(story.sources.count) 个离线来源",
+                        title: copy("archive.sources.title"),
+                        detail: L10n.format("archive.sources.count", table: "SatelliteText", language: language, story.sources.count),
                         isExpanded: $sourcesExpanded
                     ) {
                         sourceNote
@@ -106,8 +111,8 @@ struct SatelliteStoryView: View {
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             ArchiveTopBar(
-                backTitle: "天空",
-                title: "目标档案",
+                backTitle: copy("navigation.sky"),
+                title: copy("navigation.object_archive"),
                 onBack: onDismiss
             )
         }
@@ -191,15 +196,16 @@ struct SatelliteStoryView: View {
             }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("打开\(reference.title)官方任务页面")
-        .accessibilityHint("将在浏览器中打开外部网站")
+        .accessibilityLabel(
+            L10n.format("accessibility.open_official", table: "SatelliteText", language: language, reference.title)
+        )
+        .accessibilityHint(copy("accessibility.external_browser"))
     }
 
     private var preferredFacts: [SatelliteStory.Fact] {
-        let priority = [
-            "任务", "类型", "周期", "倾角", "估算近 / 远地点",
-            "形态", "主镜", "观测", "档案范围",
-        ]
+        let priority = language == .english
+            ? ["Mission", "Type", "Period", "Inclination", "Perigee / apogee", "Orbit"]
+            : ["任务", "类型", "周期", "倾角", "估算近 / 远地点", "形态", "主镜", "观测", "档案范围"]
         let indexed = Dictionary(uniqueKeysWithValues: priority.enumerated().map {
             ($0.element, $0.offset)
         })
@@ -233,23 +239,23 @@ struct SatelliteStoryView: View {
                 )
                 observationDivider
                 observationCell(
-                    label: "RANGE",
+                    label: copy("archive.field.range"),
                     value: String(format: "%.0f KM", ephemeris.rangeKm)
                 )
             }
 
             HStack(spacing: 0) {
                 observationCell(
-                    label: "ALT",
+                    label: copy("archive.field.altitude"),
                     value: String(format: "%.0f KM", ephemeris.altitudeKm)
                 )
                 observationDivider
                 observationCell(
-                    label: "SPEED",
+                    label: copy("archive.field.speed"),
                     value: String(format: "%.2f KM/S", ephemeris.velocityKmS)
                 )
                 observationDivider
-                observationCell(label: "ORBIT", value: object.orbitClass)
+                observationCell(label: copy("archive.field.orbit"), value: object.orbitClass)
             }
 
             Text(observationSentence(ephemeris))
@@ -258,7 +264,7 @@ struct SatelliteStoryView: View {
                 .foregroundStyle(Palette.inkMid.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
 
-            if let movement = insight?.movementLabel {
+            if let movement = insight?.movementLabel(language: language) {
                 Text(movement)
                     .font(Typography.statusTag)
                     .tracking(0.55)
@@ -281,26 +287,26 @@ struct SatelliteStoryView: View {
 
     private var orbitFingerprintModule: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel("ORBIT FINGERPRINT")
+            sectionLabel(copy("archive.section.orbit_fingerprint"))
             OrbitFingerprintView(
                 fingerprint: object.orbitFingerprint,
                 tint: object.identityTint
             )
             VStack(spacing: 0) {
                 storyField(
-                    "周期",
+                    copy("archive.field.period"),
                     String(format: "%.1f MIN", object.orbitFingerprint.periodMinutes)
                 )
                 storyField(
-                    "倾角",
+                    copy("archive.field.inclination"),
                     String(format: "%.2f°", object.orbitFingerprint.inclinationDegrees)
                 )
                 storyField(
-                    "离心率",
+                    copy("archive.field.eccentricity"),
                     String(format: "%.6f", object.orbitFingerprint.eccentricity)
                 )
                 storyField(
-                    "近 / 远地点",
+                    copy("archive.field.apsides"),
                     String(
                         format: "%.0f / %.0f KM",
                         object.orbitFingerprint.perigeeKm,
@@ -313,23 +319,25 @@ struct SatelliteStoryView: View {
 
     private var currentTargetModule: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel("CURRENT OBJECT")
+            sectionLabel(copy("archive.section.current_object"))
             VStack(spacing: 0) {
                 storyField("NORAD", "N\(object.noradId)")
                 storyField("COSPAR", object.cosparId)
-                storyField("发射", object.launched)
-                storyField("轨道", object.orbitClass)
+                storyField(copy("archive.field.launch"), object.launched)
+                storyField(copy("archive.field.orbit"), object.orbitClass)
                 if let cohort = insight?.launchCohort {
                     storyField(
-                        "同次发射",
+                        copy("archive.field.launch_cohort"),
                         "\(cohort.ordinal) / \(cohort.memberCount) · \(cohort.launchKey)"
                     )
                 }
                 if let comparison = insight?.familyComparison {
                     storyField(
-                        "系列位置",
-                        String(
-                            format: "%@ · 高度中位差 %+.0f KM",
+                        copy("archive.field.family_position"),
+                        L10n.format(
+                            "archive.value.family_position",
+                            table: "SatelliteText",
+                            language: language,
                             comparison.family.title,
                             comparison.altitudeDeltaKm
                         )
@@ -337,7 +345,7 @@ struct SatelliteStoryView: View {
                 }
                 if let point = insight?.subpoint {
                     storyField(
-                        "星下点",
+                        copy("archive.field.subpoint"),
                         String(
                             format: "%.1f°%@  %.1f°%@",
                             abs(point.latitude), point.latitude >= 0 ? "N" : "S",
@@ -379,12 +387,19 @@ struct SatelliteStoryView: View {
 
     private func observationSentence(_ ephemeris: Ephemeris) -> String {
         let azimuth = normalizedDegrees(ephemeris.azimuth)
-        let directions = ["正北", "东北", "正东", "东南", "正南", "西南", "正西", "西北"]
+        let directions = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
         let index = Int((azimuth + 22.5) / 45).quotientAndRemainder(dividingBy: 8).remainder
-        let visibility = ephemeris.elevation > 0
-            ? "位于地平线上方"
-            : "当前处于几何地平线下"
-        return "此刻目标在\(directions[index])方向，\(visibility)。肉眼可见性还取决于日照、相位、天气与目标姿态。"
+        let direction = copy("direction.\(directions[index])")
+        let visibility = copy(
+            ephemeris.elevation > 0 ? "visibility.above_horizon" : "visibility.below_horizon"
+        )
+        return L10n.format(
+            "archive.observation.sentence",
+            table: "SatelliteText",
+            language: language,
+            direction,
+            visibility
+        )
     }
 
     private func chapterDisclosure(_ chapter: SatelliteStory.Chapter) -> some View {
@@ -522,14 +537,14 @@ struct SatelliteStoryView: View {
 
     private var sourceNote: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("SOURCES · OFFLINE EDITION")
+            Text(copy("archive.sources.offline_edition"))
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
                 .foregroundStyle(Palette.inkLow.opacity(0.52))
             ForEach(story.sources) { source in
                 sourceRow(source)
             }
-            Text("历史叙述随版本校订；位置与速度由 App 内置 CelesTrak GP/OMM 元素在设备上推算。")
+            Text(copy("archive.sources.calculation_note"))
                 .font(Typography.archiveNarrative)
                 .tracking(0.45)
                 .foregroundStyle(Palette.inkLow.opacity(0.58))
@@ -602,8 +617,8 @@ struct SatelliteStoryEntryControl: View {
                     }
             }
         }
-        .accessibilityLabel("深入档案")
-        .accessibilityHint("打开当前卫星或所属星座的离线任务档案")
+        .accessibilityLabel(L10n.text("archive.open", table: "SatelliteText"))
+        .accessibilityHint(L10n.text("archive.open.hint", table: "SatelliteText"))
     }
 
     private var button: some View {
@@ -612,7 +627,7 @@ struct SatelliteStoryEntryControl: View {
                 Image(systemName: "book.closed")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(tint.opacity(0.88))
-                Text("深入档案")
+                Text(L10n.text("archive.open", table: "SatelliteText"))
                     .font(.system(size: 11.5, weight: .medium))
                     .tracking(1.1)
                 Rectangle()

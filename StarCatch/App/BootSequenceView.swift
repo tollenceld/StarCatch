@@ -55,15 +55,15 @@ struct BootSequenceView: View {
                     .padding(.vertical, 20)
 
                 Text("一台面向真实天空的轨道观测仪。")
-                    .font(.custom("PingFangSC-Light", size: 15, relativeTo: .body))
-                    .tracking(0.72)
+                    .font(.system(.body, design: .default, weight: .light))
+                    .tracking(SupportedLanguage.current == .english ? 0.2 : 0.1)
                     .foregroundStyle(Palette.inkMid.opacity(0.82))
                     .opacity(bodyVisible ? 1 : 0)
                     .offset(y: suppressMotion || bodyVisible ? 0 : 2)
 
                 Text("举起手机，辨认此刻经过你上空的人造天体，沿时间查看它们的轨迹。")
-                    .font(.custom("PingFangSC-Light", size: 13, relativeTo: .body))
-                    .tracking(0.58)
+                    .font(.system(.footnote, design: .default, weight: .regular))
+                    .tracking(SupportedLanguage.current == .english ? 0.1 : 0.05)
                     .lineSpacing(6)
                     .foregroundStyle(Palette.inkLow.opacity(0.62))
                     .fixedSize(horizontal: false, vertical: true)
@@ -76,8 +76,8 @@ struct BootSequenceView: View {
                 } label: {
                     HStack(spacing: 11) {
                         Text("进入观测")
-                            .font(.custom("PingFangSC-Medium", size: 13, relativeTo: .body))
-                            .tracking(1.2)
+                            .font(.system(.footnote, design: .default, weight: .medium))
+                            .tracking(SupportedLanguage.current == .english ? 0.25 : 0.5)
                         Rectangle()
                             .fill(Palette.signal.opacity(0.42))
                             .frame(width: 20, height: 0.5)
@@ -99,8 +99,12 @@ struct BootSequenceView: View {
                 .opacity(actionVisible ? 1 : 0)
                 .offset(y: suppressMotion || actionVisible ? 0 : 3)
                 .padding(.top, 28)
-                .accessibilityLabel("进入观测")
-                .accessibilityHint(isReady ? "进入主天空" : "数据准备完成后进入主天空")
+                .accessibilityLabel(L10n.text("boot.action.enter"))
+                .accessibilityHint(
+                    isReady
+                        ? L10n.text("boot.action.enter.hint")
+                        : L10n.text("boot.action.wait.hint")
+                )
             }
             .frame(maxWidth: 330, alignment: .leading)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -225,6 +229,6 @@ struct StartupLoadingView: View {
             onFinished()
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("正在准备本地星图")
+        .accessibilityLabel(L10n.text("boot.accessibility.preparing"))
     }
 }

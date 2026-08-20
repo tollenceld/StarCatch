@@ -290,12 +290,9 @@ def metadata_for_active(
             "STARCATCH_STATUS": curated_record.get("status", "active") if curated_record else "active",
             "STARCATCH_ORBIT_CLASS": orbit,
             "STARCATCH_LAUNCHED": curated_record.get("launched") if curated_record else str(record.get("OBJECT_ID") or "—")[:4],
-            "STARCATCH_POETIC": curated_record.get("poetic") if curated_record else "",
             "STARCATCH_CURATED": curated_record is not None,
         }
     )
-    if not curated_record:
-        output["STARCATCH_POETIC"] = unique_summary(output)
     if family := previous_record.get("STARCATCH_FAMILY") or family_for(name):
         output["STARCATCH_FAMILY"] = family
     return output
@@ -389,6 +386,7 @@ def main() -> None:
         if identifier in seen:
             continue
         preserved = dict(record)
+        preserved.pop("poetic", None)
         # If an authored favorite is no longer in CelesTrak's active catalog, keep
         # it only as historical context. Never present an old element set as live.
         preserved["category"] = "legacy"

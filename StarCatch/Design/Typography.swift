@@ -3,8 +3,8 @@ import SwiftUI
 /// StarCatch 字体系统。
 ///
 /// 数据字段：SF Mono 度量（只能经 `design: .monospaced` 取得，不能按名字加载）。
-/// 中文描述：苹方细体 —— 小字号深底下宋体横画会糊，细体苹方更接近"仪器铭牌"。
-/// 中英分行呈现，不同段混排，各守各的节奏。
+/// 连续正文使用系统字体，让 iOS 根据当前 App 语言选择合适的中文或拉丁字形；
+/// 等宽体仅留给编号、短标签和数据。
 enum Typography {
 
     /// 数据字段值：随 Dynamic Type 缩放的 callout 等宽体。
@@ -37,12 +37,12 @@ enum Typography {
     static let readingCompactTracking: CGFloat = 0.15
 
     /// 天体档案的诗意说明：刻意退到遥测数据之后，恢复较轻、较暗的旧版气质。
-    static let archivePoetic = Font.custom("PingFangSC-Light", size: 12.5, relativeTo: .footnote)
-    static let archivePoeticTracking: CGFloat = 0.9
+    static let archivePoetic = Font.system(.footnote, design: .default, weight: .regular)
+    static let archivePoeticTracking: CGFloat = 0.15
     static let archivePoeticLineSpacing: CGFloat = 6
 
-    static let archiveNarrative = Font.custom("PingFangSC-Light", size: 11.5, relativeTo: .caption)
-    static let archiveNarrativeTracking: CGFloat = 0.7
+    static let archiveNarrative = Font.system(.caption, design: .default, weight: .regular)
+    static let archiveNarrativeTracking: CGFloat = 0.1
     static let archiveNarrativeLineSpacing: CGFloat = 5
 
     /// 窄档案带使用的紧凑遥测字号；仍随 Dynamic Type 缩放。

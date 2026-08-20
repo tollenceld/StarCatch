@@ -27,7 +27,6 @@ final class ObservationLog: ObservableObject {
         var launched: String?
         var status: CatalogObject.Status?
         var kind: String?
-        var poetic: String?
         var family: CatalogFamily?
 
         var id: String { objectId }
@@ -70,7 +69,6 @@ final class ObservationLog: ObservableObject {
             entries[idx].launched = object.launched
             entries[idx].status = object.status
             entries[idx].kind = object.kind
-            entries[idx].poetic = object.poetic
             entries[idx].family = object.family
         } else {
             entries.append(Entry(
@@ -92,7 +90,6 @@ final class ObservationLog: ObservableObject {
                 launched: object.launched,
                 status: object.status,
                 kind: object.kind,
-                poetic: object.poetic,
                 family: object.family
             ))
         }

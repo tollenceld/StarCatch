@@ -26,19 +26,19 @@ struct CatalogFilterControl: View {
         Section(
             id: CatalogFilterGroup.mission.id,
             group: .mission,
-            label: "任务类型 · 可多选",
+            label: L10n.text("filter.section.mission"),
             filters: CatalogFilterGroup.mission.filters
         ),
         Section(
             id: CatalogFilterGroup.authority.id,
             group: .authority,
-            label: "运营方 · 可多选",
+            label: L10n.text("filter.section.operator"),
             filters: CatalogFilterGroup.authority.filters
         ),
         Section(
             id: CatalogFilterGroup.constellation.id,
             group: .constellation,
-            label: "轨道网络 · 可多选",
+            label: L10n.text("filter.section.network"),
             filters: CatalogFilterGroup.constellation.filters
         ),
     ]
@@ -56,9 +56,9 @@ struct CatalogFilterControl: View {
 
     private var resultSummary: String {
         if selections.isEmpty {
-            return "当前：\(scope.title) · 显示 \(resultCount.formatted()) 个目标"
+            return L10n.format("filter.result.current", scope.title, resultCount)
         }
-        return "\(selections.count) 个附加筛选 · 显示 \(resultCount.formatted()) 个目标"
+        return L10n.format("filter.result.additional", selections.count, resultCount)
     }
 
     private var hasSelection: Bool {
@@ -117,11 +117,11 @@ struct CatalogFilterControl: View {
                     .frame(width: 14)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(hasSelection ? "目标已筛选" : "全部目标")
+                    Text(L10n.text(hasSelection ? "filter.filtered" : "filter.all_objects"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(Palette.inkHigh.opacity(0.9))
                         .lineLimit(1)
-                    Text("\(resultCount.formatted()) 可见")
+                    Text(L10n.format("filter.visible", resultCount))
                         .font(.system(size: 8.5, weight: .regular, design: .monospaced))
                         .tracking(0.3)
                         .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
@@ -139,8 +139,8 @@ struct CatalogFilterControl: View {
             .contentShape(shellShape)
         }
         .buttonStyle(SkyCapsulePressStyle())
-        .accessibilityLabel("目标筛选，当前显示 \(resultCount) 个目标")
-        .accessibilityHint("展开目标筛选")
+        .accessibilityLabel(L10n.format("filter.accessibility", resultCount))
+        .accessibilityHint(L10n.text("filter.accessibility.hint"))
     }
 
     private var resultFooter: some View {
@@ -184,10 +184,10 @@ struct CatalogFilterControl: View {
     private var panelHeader: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("目标筛选")
+                Text(L10n.text("filter.title"))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Palette.inkHigh.opacity(0.92))
-                Text("选择会实时作用于当前天空")
+                Text(L10n.text("filter.live_note"))
                     .font(.system(size: 8.5, weight: .regular))
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
             }
@@ -196,14 +196,14 @@ struct CatalogFilterControl: View {
 
             if hasSelection {
                 Button(action: onReset) {
-                    Text("重置")
+                    Text(L10n.text("action.reset"))
                         .font(.system(size: 9, weight: .medium))
                         .foregroundStyle(Palette.signal.opacity(0.9))
                         .frame(width: 42, height: 30)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("恢复全部目标")
+                .accessibilityLabel(L10n.text("filter.reset.accessibility"))
                 .transition(.opacity.combined(with: .move(edge: .trailing)))
             }
 
@@ -215,7 +215,7 @@ struct CatalogFilterControl: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("关闭筛选列表")
+            .accessibilityLabel(L10n.text("filter.close.accessibility"))
         }
         .padding(.horizontal, 12)
         .frame(height: 52)
@@ -225,7 +225,7 @@ struct CatalogFilterControl: View {
 
     private var scopeSection: some View {
         VStack(alignment: .leading, spacing: 5) {
-            sectionHeader(symbol: "scope", label: "显示范围 · 单选", tint: Palette.signal)
+            sectionHeader(symbol: "scope", label: L10n.text("filter.section.scope"), tint: Palette.signal)
 
             VStack(spacing: 0) {
                 ForEach(CatalogScope.allCases) { item in
@@ -293,7 +293,9 @@ struct CatalogFilterControl: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(filter.title)，\(filter.subtitle)")
+        .accessibilityLabel(
+            L10n.format("filter.accessibility.item", filter.title, filter.subtitle)
+        )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 

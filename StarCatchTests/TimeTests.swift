@@ -40,7 +40,7 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(entry.observedAt, observedAt)
         XCTAssertEqual(entry.azimuth, snapshot.azimuth)
         XCTAssertEqual(entry.altitudeKm, snapshot.altitudeKm)
-        XCTAssertEqual(entry.poetic, object.poetic)
+        XCTAssertFalse(entry.objectName.isEmpty)
 
         restored.remove(objectId: object.id)
         XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
@@ -105,6 +105,90 @@ final class TimeTests: XCTestCase {
         )
         XCTAssertEqual(final.finalFrame, 1, accuracy: 0.0001)
         XCTAssertEqual(final.wordmarkOpacity, 0, accuracy: 0.0001)
+    }
+
+    func testSupportedLanguageUsesEnglishFallbackAndSimplifiedChinese() {
+        XCTAssertEqual(SupportedLanguage(locale: Locale(identifier: "en-US")), .english)
+        XCTAssertEqual(SupportedLanguage(locale: Locale(identifier: "fr-FR")), .english)
+        XCTAssertEqual(
+            SupportedLanguage(locale: Locale(identifier: "zh-Hans-CN")),
+            .simplifiedChinese
+        )
+        XCTAssertEqual(SupportedLanguage(locale: Locale(identifier: "zh-Hant-TW")), .english)
+    }
+
+    func testOrbitMotionIsDeterministicDirectionalAndGeostationaryStable() {
+        let reference = Date(timeIntervalSince1970: 1_750_000_000)
+        let prograde = SatelliteMotionSignature(
+            referenceDate: reference,
+            phaseRadians: 0.4,
+            angularDirection: 1,
+            periodSeconds: 5_400,
+            inclinationDegrees: 51.6,
+            eccentricity: 0.001,
+            rangeRateKmS: -1.2,
+            presentation: .lowOrbit
+        )
+        let later = reference.addingTimeInterval(120)
+        XCTAssertEqual(
+            OrbitMotionModel.phase(for: prograde, at: later),
+            OrbitMotionModel.phase(for: prograde, at: later),
+            accuracy: 0.000_001
+        )
+        XCTAssertGreaterThan(
+            OrbitMotionModel.phase(for: prograde, at: later),
+            OrbitMotionModel.phase(for: prograde, at: reference)
+        )
+
+        let retrograde = SatelliteMotionSignature(
+            referenceDate: reference,
+            phaseRadians: 2.4,
+            angularDirection: -1,
+            periodSeconds: 5_400,
+            inclinationDegrees: 101,
+            eccentricity: 0.001,
+            rangeRateKmS: 0.8,
+            presentation: .lowOrbit
+        )
+        XCTAssertLessThan(
+            OrbitMotionModel.phase(for: retrograde, at: later),
+            OrbitMotionModel.phase(for: retrograde, at: reference)
+        )
+
+        let geostationary = SatelliteMotionSignature(
+            referenceDate: reference,
+            phaseRadians: 1.2,
+            angularDirection: 1,
+            periodSeconds: 86_164,
+            inclinationDegrees: 0.1,
+            eccentricity: 0.0001,
+            rangeRateKmS: 0,
+            presentation: .geostationary
+        )
+        XCTAssertEqual(
+            OrbitMotionModel.phase(for: geostationary, at: reference),
+            OrbitMotionModel.phase(for: geostationary, at: reference.addingTimeInterval(21_600)),
+            accuracy: 0.000_001
+        )
+    }
+
+    func testHighlyEllipticalMotionUsesNonUniformPhaseMapping() {
+        let reference = Date(timeIntervalSince1970: 1_750_000_000)
+        let signature = SatelliteMotionSignature(
+            referenceDate: reference,
+            phaseRadians: 0,
+            angularDirection: 1,
+            periodSeconds: 43_200,
+            inclinationDegrees: 63.4,
+            eccentricity: 0.7,
+            rangeRateKmS: nil,
+            presentation: .highElliptical
+        )
+        let quarter = OrbitMotionModel.phase(
+            for: signature,
+            at: reference.addingTimeInterval(signature.periodSeconds / 4)
+        )
+        XCTAssertNotEqual(quarter, .pi / 2, accuracy: 0.05)
     }
 
     func testBootTimelineLoopsWithoutReturningToBlack() {

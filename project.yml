@@ -1,7 +1,7 @@
 name: StarCatch
 options:
   bundleIdPrefix: com.starcatch
-  developmentLanguage: zh-Hans
+  developmentLanguage: en
   deploymentTarget:
     iOS: "17.0"
   createIntermediateGroups: true
@@ -57,11 +57,11 @@ targets:
         ITSAppUsesNonExemptEncryption: false
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        NSLocationWhenInUseUsageDescription: 用于确定真北方向与观测者坐标，使天空标注与真实方位对齐。
+        NSLocationWhenInUseUsageDescription: StarCatch uses your location to align orbital targets with true north and your observing position.
         # 低轨目标会产生明显视差；默认申请完整精度，但用户仍可在系统中选择近似位置。
         # 坐标只在设备内参与 SGP4 拓扑转换，不上传也不持久化。
         NSLocationDefaultAccuracyReduced: false
-        NSMotionUsageDescription: 用于读取设备姿态，使准星与手机实际指向的天空区域保持对齐。
+        NSMotionUsageDescription: StarCatch uses device motion to align the reticle with the part of the sky your iPhone is pointing toward.
         UIRequiresFullScreen: true
         UIStatusBarHidden: true
         UIViewControllerBasedStatusBarAppearance: false

@@ -88,6 +88,16 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 3. SGP4 批量传播在后台任务执行，主线程只接收完整快照。
 4. 24 小时过境扫描和系列比较不得进入 SwiftUI `body`、Canvas 或点击回调；摘要卡先用
    已缓存星历与目录指纹出现，高级洞察完成后在固定版式内补齐。
+5. 档案连续动效只能读取低频生成的 `SatelliteMotionSignature` 并做几何插值；页面隐藏、
+   App 进入后台或减少动态效果启用时必须暂停 `TimelineView`。
+
+## 本地化与资料边界
+
+- `Localizable.xcstrings` 管理 App 界面，`SatelliteText.xcstrings` 管理卫星状态、洞察和自动档案。
+- `SupportedLanguage` 只把系统 Locale 映射为 `en` 或 `zh-Hans`，不得保存第二份用户选择。
+- `catalog.json` 是语言中立轨道事实源，不得重新写入本地化摘要或观测故事。
+- `SatelliteInsightSnapshot` 只保存数值事实；所有句子由展示格式器按当前语言生成。
+- 观测日志只持久化身份与轨道快照。旧 JSON 的额外文本字段由 Codable 忽略，不得继续展示。
 
 ## Swift 并发约束
 

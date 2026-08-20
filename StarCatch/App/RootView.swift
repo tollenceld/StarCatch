@@ -375,6 +375,7 @@ private struct CatalogUnavailableView: View {
                 .font(Typography.poetic)
                 .lineSpacing(Typography.poeticLineSpacing)
                 .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+            #if DEBUG
             if let reason {
                 Text(reason)
                     .font(Typography.statusTag)
@@ -382,6 +383,7 @@ private struct CatalogUnavailableView: View {
                     .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
                     .fixedSize(horizontal: false, vertical: true)
             }
+            #endif
             Button {
                 openURL(AppLinks.support)
             } label: {
@@ -391,7 +393,7 @@ private struct CatalogUnavailableView: View {
                     .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
-            .accessibilityHint("打开 StarCatch 支持页面")
+            .accessibilityHint(L10n.text("support.open.hint"))
         }
         .frame(maxWidth: 300, alignment: .leading)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

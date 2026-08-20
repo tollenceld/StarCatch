@@ -219,14 +219,13 @@ def catalog_document() -> dict:
 
 
 def refresh_catalog_summaries(document: dict) -> int:
-    """Refresh generated first-layer copy without fetching or aging the snapshot."""
+    """Remove legacy localized prose from the language-neutral orbit catalog."""
     changed = 0
     for record in document["objects"]:
-        if "STARCATCH_POETIC" not in record or record.get("STARCATCH_CURATED") is True:
-            continue
-        summary = unique_summary(record)
-        if record.get("STARCATCH_POETIC") != summary:
-            record["STARCATCH_POETIC"] = summary
+        for key in ("STARCATCH_POETIC", "poetic"):
+            if key not in record:
+                continue
+            del record[key]
             changed += 1
     if changed:
         temporary = CATALOG.with_suffix(CATALOG.suffix + ".tmp")
@@ -852,28 +851,10 @@ def validate_profiles(require_complete_coverage: bool = True) -> tuple[list[dict
 
 def validate_catalog_copy() -> list[str]:
     errors: list[str] = []
-    seen: dict[str, int] = {}
-    generated_count = 0
     for record in catalog_objects():
-        if "STARCATCH_POETIC" not in record or record.get("STARCATCH_CURATED") is True:
-            continue
-        generated_count += 1
-        norad, _ = identity(record)
-        summary = str(record.get("STARCATCH_POETIC") or "").strip()
-        if not summary:
-            errors.append(f"catalog.json: N{norad} 缺少首层摘要")
-            continue
-        for phrase in FORBIDDEN_GENERATED_COPY:
-            if phrase in summary:
-                errors.append(f"catalog.json: N{norad} 仍含占位文案“{phrase}”")
-        if prior := seen.get(summary):
-            errors.append(f"catalog.json: N{norad} 与 N{prior} 的首层摘要完全重复")
-        else:
-            seen[summary] = norad
-    if len(seen) != generated_count:
-        errors.append(
-            f"catalog.json: {generated_count} 条自动摘要中只有 {len(seen)} 条唯一内容"
-        )
+        if "STARCATCH_POETIC" in record or "poetic" in record:
+            norad, _ = identity(record)
+            errors.append(f"catalog.json: N{norad} 仍包含语言相关的旧摘要字段")
     return errors
 
 
@@ -932,7 +913,8 @@ def compile_profiles(output: Path) -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
     document = {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
+        "presentationMode": "structured-localized",
         # 使用轨道目录快照时间，保证相同 Markdown 输入得到字节稳定的产物。
         "generatedAt": catalog_document().get("generatedAt"),
         "source": "SatelliteKnowledge/Profiles + Families Markdown",
