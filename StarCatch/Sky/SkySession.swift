@@ -15,6 +15,7 @@ final class SkySession: ObservableObject {
     let ephemeris: EphemerisEngine
     let tracks: TrackSampler
     let passes: PassPredictor
+    let insights: SatelliteInsightEngine
     let log = ObservationLog()
 
     @Published private(set) var pointing: Pointing = .initial
@@ -42,6 +43,7 @@ final class SkySession: ObservableObject {
         ephemeris = EphemerisEngine(store: catalog, observer: ObserverLocation.fallback)
         tracks = TrackSampler(store: catalog)
         passes = PassPredictor(store: catalog)
+        insights = SatelliteInsightEngine(store: catalog)
         let initialOverviewObjects = Self.makeDisplaySample(
             from: catalog.objects,
             starlinkDivisor: 14
@@ -165,7 +167,12 @@ final class SkySession: ObservableObject {
             observer: observer.coordinates,
             at: date
         )
-        _ = await (precise, track)
+        async let insight: Void = insights.prewarm(
+            objectID: objectID,
+            observer: observer.coordinates,
+            at: date
+        )
+        _ = await (precise, track, insight)
     }
 
     private nonisolated static func locationAllowsTrueNorth(

@@ -1115,6 +1115,33 @@ final class TimeTests: XCTestCase {
         XCTAssert(label?.value.hasPrefix("T−1H") == true, "1h+ 应显示小时，得 \(label?.value ?? "nil")")
     }
 
+    func testInsightSnapshotComputesPassTrendAndSubpointOffTheRenderPath() async throws {
+        let store = Self.store
+        let engine = SatelliteInsightEngine(store: store)
+        let observation = store.generatedAt ?? Date()
+        let generated = await engine.insight(
+            for: "iss",
+            observer: ObserverLocation.fallback,
+            at: observation
+        )
+        let first = try XCTUnwrap(generated)
+        XCTAssertEqual(first.objectID, "iss")
+        XCTAssertNotNil(first.pass, "ISS 应在 24 小时内形成完整过境窗口")
+        XCTAssertNotNil(first.rangeRateKmS)
+        let subpoint = try XCTUnwrap(first.subpoint)
+        XCTAssertTrue((-90 ... 90).contains(subpoint.latitude))
+        XCTAssertTrue((-180 ... 180).contains(subpoint.longitude))
+        XCTAssertGreaterThan(first.fingerprint.periodMinutes, 80)
+        XCTAssertLessThan(first.fingerprint.periodMinutes, 110)
+
+        let cached = await engine.insight(
+            for: "iss",
+            observer: ObserverLocation.fallback,
+            at: observation
+        )
+        XCTAssertEqual(first, cached, "相同目标、位置和时间桶应复用完全一致的洞察")
+    }
+
     func testTargetDetailWaitsThreeSecondsAfterFocusLeaves() {
         let focusLeftAt = Date(timeIntervalSince1970: 1_750_000_000)
         let deadline = TargetDetailRetentionPolicy.deadline(after: focusLeftAt)

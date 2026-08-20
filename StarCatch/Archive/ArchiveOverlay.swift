@@ -47,6 +47,7 @@ struct TargetMicroLabel: View {
 struct ArchiveOverlay: View {
     let object: CatalogObject
     let ephemeris: Ephemeris?
+    let insight: SatelliteInsightSnapshot?
     let revealed: Bool
     var retainedByInteraction: Bool = false
     var releaseProgress: Double = 0
@@ -65,15 +66,30 @@ struct ArchiveOverlay: View {
 
     private var statusText: String {
         switch object.status {
-        case .active: "ACTIVE"
-        case .silent: "SILENT"
-        case .derelict: "DERELICT"
-        case .debris: "DEBRIS"
+        case .active: "轨道在列"
+        case .silent: "静默记录"
+        case .derelict: "失效记录"
+        case .debris: "轨道残留"
         }
     }
 
     private var statusColor: Color {
         object.status.isActive ? Palette.activeTint : Palette.derelictTint
+    }
+
+    private var fallbackInsight: String {
+        let fingerprint = object.orbitFingerprint
+        if fingerprint.eccentricity >= 0.08 {
+            return String(
+                format: "椭圆轨道 · 近远地点相差 %.0f KM",
+                fingerprint.apogeeKm - fingerprint.perigeeKm
+            )
+        }
+        return String(
+            format: "%.1f 分钟一周 · 倾角 %.1f°",
+            fingerprint.periodMinutes,
+            fingerprint.inclinationDegrees
+        )
     }
 
     var body: some View {
@@ -88,16 +104,22 @@ struct ArchiveOverlay: View {
                     .minimumScaleFactor(0.78)
                     .padding(.top, 7)
 
-                Text(object.archiveNarrative)
+                Text(
+                    insight?.headline(relativeTo: insight?.observationTime ?? Date())
+                        ?? fallbackInsight
+                )
                     .font(.system(size: 11.5, weight: .regular))
-                    .foregroundStyle(Palette.inkMid.opacity(0.9))
+                    .foregroundStyle(Palette.inkMid.opacity(0.92))
                     .lineSpacing(1.5)
-                    .lineLimit(2)
+                    .lineLimit(1)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
 
+                insightGraphic
+                    .padding(.top, 8)
+
                 telemetry
-                    .padding(.top, 10)
+                    .padding(.top, 8)
             }
             .contentShape(Rectangle())
             .onTapGesture(perform: onInteraction)
@@ -140,6 +162,35 @@ struct ArchiveOverlay: View {
             withAnimation(.easeOut(duration: suppressMotion ? 0.1 : 0.2)) {
                 presentationVisible = visible
             }
+        }
+    }
+
+    @ViewBuilder
+    private var insightGraphic: some View {
+        Group {
+            if let insight {
+                SatelliteInsightGraphic(
+                    insight: insight,
+                    tint: object.identityTint,
+                    compact: true
+                )
+            } else {
+                OrbitFingerprintView(
+                    fingerprint: object.orbitFingerprint,
+                    tint: object.identityTint,
+                    compact: true
+                )
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            Palette.voidBlack.opacity(0.16),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Palette.inkFaint.opacity(0.2), lineWidth: 0.5)
         }
     }
 

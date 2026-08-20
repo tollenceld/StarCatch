@@ -195,7 +195,12 @@ final class OrbitTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(hubble.chapters.count, 2)
         XCTAssertGreaterThanOrEqual(hubble.milestones.count, 3)
         XCTAssertGreaterThanOrEqual(hubble.facts.count, 3)
-        XCTAssertTrue(hubble.sources.contains("NASA Hubble Mission"))
+        XCTAssertTrue(hubble.sources.contains { source in
+            source.title == "NASA Hubble Mission"
+                && source.provenance == .verifiedObject
+                && source.scope == .object
+        })
+        XCTAssertFalse(hubble.leadSourceIDs.isEmpty)
 
         let generated = try XCTUnwrap(SatelliteStoryCatalog.story(forNORAD: 43_226))
         XCTAssertEqual(generated.program, "GOES 17")
@@ -206,8 +211,10 @@ final class OrbitTests: XCTestCase {
         let starlinkArchive = try XCTUnwrap(starlink.deepArchiveStory)
         XCTAssertEqual(starlink.deepArchiveTitle, starlink.name)
         XCTAssertTrue(starlinkArchive.program.contains(starlink.name))
-        XCTAssertEqual(starlinkArchive.lead, starlink.poetic)
-        XCTAssertTrue(starlinkArchive.lead.contains("N\(starlink.noradId)"))
+        XCTAssertEqual(starlinkArchive.scope, .family)
+        XCTAssertTrue(starlinkArchive.lead.contains("系列"))
+        XCTAssertTrue(starlinkArchive.chapters.first?.body.contains("N\(starlink.noradId)") == true)
+        XCTAssertTrue(starlinkArchive.chapters.first?.body.contains(starlink.cosparId) == true)
         XCTAssertGreaterThanOrEqual(starlinkArchive.chapters.count, 3)
         XCTAssertEqual(
             starlinkArchive.officialReference?.url.absoluteString,
@@ -233,12 +240,69 @@ final class OrbitTests: XCTestCase {
         )
         let otherArchive = try XCTUnwrap(otherStarlink.deepArchiveStory)
         XCTAssertNotEqual(starlink.archiveNarrative, otherStarlink.archiveNarrative)
-        XCTAssertNotEqual(starlinkArchive.lead, otherArchive.lead)
+        XCTAssertEqual(starlinkArchive.lead, otherArchive.lead)
         XCTAssertNotEqual(starlinkArchive.program, otherArchive.program)
         XCTAssertNotEqual(starlinkArchive.chapters.first?.body, otherArchive.chapters.first?.body)
 
         let qianfan = try XCTUnwrap(store.objects.first(where: { $0.family == .qianfan }))
         XCTAssertTrue(qianfan.deepArchiveStory?.program.hasPrefix("千帆星座 · ") == true)
+    }
+
+    func testCompiledKnowledgeClaimsHaveValidStructuredSources() throws {
+        let store = Self.store
+        for object in store.objects {
+            let story = try XCTUnwrap(object.deepArchiveStory, "\(object.name) 缺少档案")
+            XCTAssertFalse(story.sources.isEmpty, "\(object.name) 缺少来源")
+
+            let sourceIDs = Set(story.sources.map(\.id))
+            let claimSourceIDs = story.leadSourceIDs
+                + story.chapters.flatMap(\.sourceIDs)
+                + story.milestones.flatMap(\.sourceIDs)
+                + story.facts.flatMap(\.sourceIDs)
+            XCTAssertFalse(claimSourceIDs.isEmpty, "\(object.name) 没有关联任何来源")
+            XCTAssertTrue(
+                claimSourceIDs.allSatisfy(sourceIDs.contains),
+                "\(object.name) 引用了不存在的来源"
+            )
+
+            if object.family != nil {
+                XCTAssertEqual(story.scope, .family)
+            } else {
+                XCTAssertEqual(story.scope, .object)
+            }
+            XCTAssertTrue(story.sources.contains { $0.provenance == .catalog })
+        }
+    }
+
+    func testOrbitFingerprintsAndRelativeInsightsAreDeterministic() {
+        let store = Self.store
+        XCTAssertTrue(store.objects.allSatisfy { object in
+            let fingerprint = object.orbitFingerprint
+            return fingerprint.periodMinutes > 0
+                && (0 ... 180).contains(fingerprint.inclinationDegrees)
+                && (0 ..< 1).contains(fingerprint.eccentricity)
+                && fingerprint.apogeeKm >= fingerprint.perigeeKm
+        })
+
+        let first = CatalogInsightIndex(objects: store.objects)
+        let second = CatalogInsightIndex(objects: store.objects)
+        for object in store.objects.prefix(500) {
+            XCTAssertEqual(
+                first.familyComparison(for: object.id),
+                second.familyComparison(for: object.id)
+            )
+            XCTAssertEqual(
+                first.launchCohort(for: object.id),
+                second.launchCohort(for: object.id)
+            )
+        }
+
+        let familyObject = store.objects.first { $0.family != nil }
+        XCTAssertNotNil(familyObject.flatMap { first.familyComparison(for: $0.id) })
+        let sharedLaunch = store.objects.first { object in
+            (first.launchCohort(for: object.id)?.memberCount ?? 0) > 1
+        }
+        XCTAssertNotNil(sharedLaunch)
     }
 
     func testEveryCatalogObjectHasUniqueFirstLayerCopy() {

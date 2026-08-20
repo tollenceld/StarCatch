@@ -44,9 +44,11 @@ RootView
   建立索引与 SatelliteKit 对象。主体为 OMM；active GP 分组之外的少量历史目标由
   同一 schema 中显式的策展 TLE 载荷保留，不再兼容旧版整份目录文档。
 - `SatelliteStories.swift`：以 NORAD ID 连接逐星 Markdown，并让大型星座节点连接
-  项目共享 Markdown；不参与轨道传播。
+  项目共享 Markdown；schema v3 为每条内容保留来源 ID、`object/family` 范围与可信类型。
 - `EphemerisEngine.swift`：负责传播调度、缓存、LIVE 插值与冻结时刻快照。
 - `TrackSampler.swift` / `PassPredictor.swift`：基于星历的低频派生能力。
+- `SatelliteInsights.swift`：只为当前感应目标在 utility 任务中计算星下点、距离趋势、
+  完整过境窗口、轨道指纹、发射批次和系列中位数差异；由 `SkySession` 会话级持有。
 - `Scripts/update_catalog.py`：仅发布期联网；APP 运行时保持完全离线。
 
 不要把轨道元素解码字段泄漏到 UI，也不要让页面直接创建 `Satellite`。
@@ -84,6 +86,8 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 1. 不在 Canvas 循环中做文件 IO、JSON 解码或网络调用。
 2. 大目录使用批量绘制；只有捕获目标和精选对象保留独立细节。
 3. SGP4 批量传播在后台任务执行，主线程只接收完整快照。
+4. 24 小时过境扫描和系列比较不得进入 SwiftUI `body`、Canvas 或点击回调；摘要卡先用
+   已缓存星历与目录指纹出现，高级洞察完成后在固定版式内补齐。
 
 ## Swift 并发约束
 

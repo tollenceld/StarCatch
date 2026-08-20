@@ -399,8 +399,8 @@ def mission_summary(record: dict[str, Any]) -> str:
     if rule := mission_rule(record):
         return rule.summary
     return (
-        f"公开 GP/OMM 条目把它记录为{category_title(record)}；"
-        "条目本身不包含足以确认载荷和运营方的任务说明，因此这里不作推测。"
+        f"StarCatch 根据公开目录分组与名称，将它保守归入{category_title(record)}；"
+        "这是一项浏览分类，不是 GP/OMM 原始字段。公开条目不足以确认载荷和运营方，因此这里不作推测。"
     )
 
 

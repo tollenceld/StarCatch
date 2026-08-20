@@ -706,7 +706,14 @@ struct InstrumentPanel: View {
             category: category,
             family: entry.family,
             elementEpoch: entry.observedAt ?? entry.lastSeen,
-            isCurated: false
+            isCurated: false,
+            orbitFingerprint: OrbitFingerprint(
+                periodMinutes: 0,
+                inclinationDegrees: 0,
+                eccentricity: 0,
+                perigeeKm: 0,
+                apogeeKm: 0
+            )
         )
     }
 

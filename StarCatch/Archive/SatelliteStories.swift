@@ -1,5 +1,15 @@
 import Foundation
 
+struct StorySource: Codable, Identifiable, Sendable {
+    let id: String
+    let title: String
+    let url: URL?
+    let provenance: InformationProvenance
+    let scope: InformationScope
+    let retrievedAt: String?
+    let verifiedAt: String?
+}
+
 /// 所有可观测目标的深度档案内容。单体卫星使用逐星资料，大型星座节点
 /// 共享项目资料，避免把同一段文字复制成上万份。
 ///
@@ -17,18 +27,21 @@ struct SatelliteStory: Codable, Sendable {
         let id: String
         let title: String
         let body: String
+        let sourceIDs: [String]
     }
 
     struct Milestone: Codable, Identifiable, Sendable {
         let id: String
         let time: String
         let event: String
+        let sourceIDs: [String]
     }
 
     struct Fact: Codable, Identifiable, Sendable {
         let id: String
         let label: String
         let value: String
+        let sourceIDs: [String]
     }
 
     let noradID: Int
@@ -36,25 +49,24 @@ struct SatelliteStory: Codable, Sendable {
     let organization: String
     let program: String
     let lead: String
+    let leadSourceIDs: [String]
+    let scope: InformationScope
+    let reviewStatus: String
     let chapters: [Chapter]
     let milestones: [Milestone]
     let facts: [Fact]
-    let sources: [String]
+    let sources: [StorySource]
 
     /// 资料源仍以可审阅的纯文本保存在离线档案中；界面只把其中第一个非
     /// CelesTrak 的 HTTPS 官方页面提升为明确操作，避免把轨道数据源误称为官网。
     var officialReference: OfficialReference? {
         for source in sources {
-            guard let range = source.range(of: "https://"),
-                  let url = URL(string: String(source[range.lowerBound...])),
-                  url.scheme == "https",
+            guard let url = source.url,
+                  source.provenance == .verifiedObject
+                    || source.provenance == .verifiedFamily,
                   url.host?.localizedCaseInsensitiveContains("celestrak") != true
             else { continue }
-            var title = String(source[..<range.lowerBound])
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            title = title.trimmingCharacters(in: CharacterSet(charactersIn: "·—- "))
-            if title.isEmpty { title = url.host ?? "官方网站" }
-            return OfficialReference(title: title, url: url)
+            return OfficialReference(title: source.title, url: url)
         }
         return nil
     }
@@ -68,19 +80,24 @@ struct SatelliteStory: Codable, Sendable {
         let identityChapter = Chapter(
             id: "current-node-\(object.noradId)",
             title: "当前节点 · N\(object.noradId)",
-            body: "\(object.poetic) 它以国际编号 \(object.cosparId) 登记；这使当前节点与同一星座、甚至同次发射中的其他对象保持明确区分。"
+            body: "它以国际编号 \(object.cosparId) 和 NORAD N\(object.noradId) 进入公开轨道目录；这些身份字段只描述当前节点，不代表整个系列。",
+            sourceIDs: sources.filter { $0.provenance == .catalog }.map(\.id)
         )
         let launchMarker = Milestone(
             id: "node-launch-\(object.noradId)",
             time: object.launched,
-            event: "\(object.name) 以 \(object.cosparId) 进入公开轨道目录"
+            event: "\(object.name) 以 \(object.cosparId) 进入公开轨道目录",
+            sourceIDs: sources.filter { $0.provenance == .catalog }.map(\.id)
         )
         return SatelliteStory(
             noradID: object.noradId,
             eyebrow: eyebrow,
             organization: organization,
             program: "\(program) · \(object.name)",
-            lead: object.poetic,
+            lead: "当前节点的身份与轨道由本地 GP/OMM 快照计算；以下任务说明属于 \(program) 系列。",
+            leadSourceIDs: sources.map(\.id),
+            scope: .family,
+            reviewStatus: reviewStatus,
             chapters: [identityChapter] + chapters,
             milestones: [launchMarker] + milestones,
             facts: facts,

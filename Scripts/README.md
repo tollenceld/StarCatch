@@ -8,7 +8,7 @@ uses CelesTrak group membership plus conservative name rules for StarCatch's
 task semantics, identifies major constellation families for independent sampling,
 overlays the hand-authored metadata in
 `catalog-curated.json`, rejects active element sets older than 14 days (or more
-than 4 days ahead of packaging), and
+than 4 days ahead of packaging) as an absolute development limit, and
 writes the bundled `StarCatch/Resources/catalog.json` snapshot.
 
 From the repository root:
@@ -31,8 +31,8 @@ python3 Scripts/update_catalog.py \
 ```
 
 Before release, verify the printed total/category counts, run `OrbitTests`, and
-confirm `snapshotEpoch`, `generatedAt`, unique NORAD IDs, and the 14-day age
-limit. Authored objects absent from the active source are retained only in the
+confirm `snapshotEpoch`, `generatedAt`, unique NORAD IDs, and the release gate's
+72-hour age limit. Authored objects absent from the active source are retained only in the
 legacy category and marked silent. TLE/OMM propagation is most reliable near
 its epoch; refreshing the
 bundled snapshot is therefore part of every App Store release.

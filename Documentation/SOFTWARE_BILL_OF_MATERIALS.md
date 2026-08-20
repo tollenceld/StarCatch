@@ -27,4 +27,4 @@ SwiftUI、CoreLocation、CoreMotion、Combine 与 Foundation 均来自 iOS SDK�
 
 - 每次升级 Swift Package 后，复核许可、隐私清单与 Required Reason API。
 - 每次 Archive 前运行 `python3 Scripts/release_check.py`；脚本也会由 Archive 构建阶段自动执行。
-- 轨道快照超过 14 天时禁止归档，应先运行 `python3 Scripts/update_catalog.py`。
+- 轨道快照超过 72 小时时禁止归档，应先运行 `python3 Scripts/update_catalog.py --refresh-active`；14 天仅是开发生成器拒绝陈旧输入的绝对上限。

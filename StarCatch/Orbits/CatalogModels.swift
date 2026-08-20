@@ -391,9 +391,29 @@ struct CatalogObject: Identifiable, Sendable {
     let family: CatalogFamily?
     let elementEpoch: Date
     let isCurated: Bool
+    let orbitFingerprint: OrbitFingerprint
 
     var isStarlink: Bool { family == .starlink }
     var authority: CatalogAuthority { CatalogAuthority.infer(from: name) }
+
+    /// COSPAR 的年份与发射序号共同标识一次发射；末尾分件只标识当前对象。
+    var launchKey: String? {
+        let parts = cosparId.split(separator: "-", maxSplits: 1)
+        guard parts.count == 2,
+              parts[0].count == 4,
+              parts[0].allSatisfy(\.isNumber)
+        else { return nil }
+        let tail = String(parts[1])
+        let digits = tail.prefix(while: \.isNumber)
+        guard digits.count >= 3 else { return nil }
+        return "\(parts[0])-\(digits)"
+    }
+
+    var launchPiece: String? {
+        guard let launchKey, cosparId.hasPrefix(launchKey) else { return nil }
+        let suffix = cosparId.dropFirst(launchKey.count)
+        return suffix.isEmpty ? nil : String(suffix)
+    }
 
     private var normalizedName: String { " \(name.uppercased()) " }
 

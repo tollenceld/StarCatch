@@ -6,6 +6,7 @@ struct SatelliteStoryView: View {
     let object: CatalogObject
     let story: SatelliteStory
     let ephemeris: Ephemeris?
+    let insight: SatelliteInsightSnapshot?
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -34,12 +35,13 @@ struct SatelliteStoryView: View {
                             .padding(.bottom, 20)
                     }
 
-                    if let reference = story.officialReference {
-                        officialReferenceLink(reference)
-                            .padding(.bottom, 22)
-                    }
+                    orbitFingerprintModule
+                        .padding(.bottom, 22)
 
-                    sectionLabel("MISSION IN VIEW")
+                    currentTargetModule
+                        .padding(.bottom, 22)
+
+                    sectionLabel(story.scope == .family ? "SERIES BACKGROUND" : "MISSION IN VIEW")
                     Text(story.lead)
                         .font(Typography.readingBody)
                         .tracking(Typography.readingBodyTracking)
@@ -48,17 +50,18 @@ struct SatelliteStoryView: View {
                         .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, 10)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, story.officialReference == nil ? 20 : 12)
 
-                    sectionLabel("ORBIT & IDENTITY")
+                    if let reference = story.officialReference {
+                        officialReferenceLink(reference)
+                            .padding(.bottom, 20)
+                    }
+
+                    sectionLabel("MISSION & CATALOG FACTS")
                     VStack(spacing: 0) {
                         ForEach(preferredFacts) { fact in
                             storyField(fact.label, fact.value)
                         }
-                        storyField("NORAD", "N\(object.noradId)")
-                        storyField("COSPAR", object.cosparId)
-                        storyField("发射", object.launched)
-                        storyField("轨道", object.orbitClass)
                     }
                     .padding(.top, 8)
                     .padding(.bottom, 24)
@@ -211,6 +214,13 @@ struct SatelliteStoryView: View {
 
     private func observationSnapshot(_ ephemeris: Ephemeris) -> some View {
         VStack(alignment: .leading, spacing: 11) {
+            if let insight {
+                SatelliteInsightGraphic(
+                    insight: insight,
+                    tint: object.identityTint
+                )
+            }
+
             HStack(spacing: 0) {
                 observationCell(
                     label: "AZ",
@@ -247,6 +257,13 @@ struct SatelliteStoryView: View {
                 .tracking(0.25)
                 .foregroundStyle(Palette.inkMid.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
+
+            if let movement = insight?.movementLabel {
+                Text(movement)
+                    .font(Typography.statusTag)
+                    .tracking(0.55)
+                    .foregroundStyle(object.identityTint.opacity(0.78))
+            }
         }
         .padding(.horizontal, 13)
         .padding(.vertical, 12)
@@ -260,6 +277,76 @@ struct SatelliteStoryView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(observationSentence(ephemeris))
+    }
+
+    private var orbitFingerprintModule: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionLabel("ORBIT FINGERPRINT")
+            OrbitFingerprintView(
+                fingerprint: object.orbitFingerprint,
+                tint: object.identityTint
+            )
+            VStack(spacing: 0) {
+                storyField(
+                    "周期",
+                    String(format: "%.1f MIN", object.orbitFingerprint.periodMinutes)
+                )
+                storyField(
+                    "倾角",
+                    String(format: "%.2f°", object.orbitFingerprint.inclinationDegrees)
+                )
+                storyField(
+                    "离心率",
+                    String(format: "%.6f", object.orbitFingerprint.eccentricity)
+                )
+                storyField(
+                    "近 / 远地点",
+                    String(
+                        format: "%.0f / %.0f KM",
+                        object.orbitFingerprint.perigeeKm,
+                        object.orbitFingerprint.apogeeKm
+                    )
+                )
+            }
+        }
+    }
+
+    private var currentTargetModule: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionLabel("CURRENT OBJECT")
+            VStack(spacing: 0) {
+                storyField("NORAD", "N\(object.noradId)")
+                storyField("COSPAR", object.cosparId)
+                storyField("发射", object.launched)
+                storyField("轨道", object.orbitClass)
+                if let cohort = insight?.launchCohort {
+                    storyField(
+                        "同次发射",
+                        "\(cohort.ordinal) / \(cohort.memberCount) · \(cohort.launchKey)"
+                    )
+                }
+                if let comparison = insight?.familyComparison {
+                    storyField(
+                        "系列位置",
+                        String(
+                            format: "%@ · 高度中位差 %+.0f KM",
+                            comparison.family.title,
+                            comparison.altitudeDeltaKm
+                        )
+                    )
+                }
+                if let point = insight?.subpoint {
+                    storyField(
+                        "星下点",
+                        String(
+                            format: "%.1f°%@  %.1f°%@",
+                            abs(point.latitude), point.latitude >= 0 ? "N" : "S",
+                            abs(point.longitude), point.longitude >= 0 ? "E" : "W"
+                        )
+                    )
+                }
+            }
+        }
     }
 
     private func observationCell(label: String, value: String) -> some View {
@@ -434,21 +521,60 @@ struct SatelliteStoryView: View {
     }
 
     private var sourceNote: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("SOURCES · OFFLINE EDITION")
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
                 .foregroundStyle(Palette.inkLow.opacity(0.52))
-            Text(story.sources.joined(separator: "  ·  "))
-                .font(Typography.statusTag)
-                .tracking(0.45)
-                .foregroundStyle(Palette.inkLow.opacity(0.44))
-                .fixedSize(horizontal: false, vertical: true)
+            ForEach(story.sources) { source in
+                sourceRow(source)
+            }
             Text("历史叙述随版本校订；位置与速度由 App 内置 CelesTrak GP/OMM 元素在设备上推算。")
                 .font(Typography.archiveNarrative)
                 .tracking(0.45)
-                .foregroundStyle(Palette.inkLow.opacity(0.46))
+                .foregroundStyle(Palette.inkLow.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder
+    private func sourceRow(_ source: StorySource) -> some View {
+        let content = HStack(alignment: .firstTextBaseline, spacing: 9) {
+            Text(source.provenance.title)
+                .font(Typography.statusTag)
+                .tracking(0.45)
+                .foregroundStyle(object.identityTint.opacity(0.76))
+                .padding(.horizontal, 7)
+                .frame(minHeight: 22)
+                .background(
+                    object.identityTint.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(source.title)
+                    .font(Typography.archiveNarrative)
+                    .foregroundStyle(Palette.inkMid.opacity(0.8))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(source.scope.title)
+                    .font(Typography.statusTag)
+                    .tracking(0.35)
+                    .foregroundStyle(Palette.inkLow.opacity(0.58))
+            }
+            Spacer(minLength: 4)
+            if source.url != nil {
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .foregroundStyle(Palette.inkLow.opacity(0.62))
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
+        .contentShape(Rectangle())
+
+        if let url = source.url {
+            Link(destination: url) { content }
+                .buttonStyle(.plain)
+        } else {
+            content
         }
     }
 }

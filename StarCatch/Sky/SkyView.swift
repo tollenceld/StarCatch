@@ -71,6 +71,7 @@ struct SkyView: View {
     @State private var overviewResetRequest = 0
     @State private var presentedStoryObjectID: String?
     @State private var engagedPreciseEphemeris: Ephemeris?
+    @State private var engagedInsight: SatelliteInsightSnapshot?
 
     private enum TopPanel: Equatable {
         case observation
@@ -604,6 +605,7 @@ struct SkyView: View {
         ArchiveOverlay(
             object: object,
             ephemeris: engagedDisplayEphemeris(for: objectID),
+            insight: engagedInsight?.objectID == objectID ? engagedInsight : nil,
             revealed: lockedDetailPresented,
             retainedByInteraction: detailPinnedByInteraction,
             releaseProgress: releasePresentationProgress(at: Date()),
@@ -1967,6 +1969,7 @@ struct SkyView: View {
                 object: object,
                 story: story,
                 ephemeris: engagedDisplayEphemeris(for: id),
+                insight: engagedInsight?.objectID == id ? engagedInsight : nil,
                 onDismiss: {
                     withAnimation(
                         suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.22)
@@ -2067,6 +2070,7 @@ struct SkyView: View {
     /// 用户移开准星后旧结果不会写回新目标。
     private func prepareEngagedTargetData(for objectID: String?) async {
         engagedPreciseEphemeris = nil
+        engagedInsight = nil
         guard let objectID else { return }
         let observation = clock.observationTime()
         let live = clock.isLive
@@ -2075,15 +2079,22 @@ struct SkyView: View {
             observer: session.observer.coordinates,
             at: observation
         )
-        let precise = await session.ephemeris.preparePreciseEphemeris(
+        async let preciseTask = session.ephemeris.preparePreciseEphemeris(
             objectID,
             at: observation,
             live: live
         )
+        async let insightTask = session.insights.insight(
+            for: objectID,
+            observer: session.observer.coordinates,
+            at: observation
+        )
+        let (precise, insight) = await (preciseTask, insightTask)
         guard !Task.isCancelled,
               capture.engagedObjectId == objectID
         else { return }
         engagedPreciseEphemeris = precise
+        engagedInsight = insight
     }
 
     /// 方位、距离和高度跟随批量 LIVE 帧平滑更新；精确速度使用感应阶段的后台

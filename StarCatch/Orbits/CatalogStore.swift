@@ -74,6 +74,16 @@ private struct CatalogRecord: Decodable {
         let name = try container.decodeIfPresent(String.self, forKey: .authoredName)
             ?? elements.commonName
         let identifier = Int(elements.noradIndex)
+        let earthRadiusKm = 6_378.137
+        let semimajorAxisKm = elements.a₀ * earthRadiusKm
+        let eccentricity = elements.e₀
+        let fingerprint = OrbitFingerprint(
+            periodMinutes: 2 * .pi / elements.n₀,
+            inclinationDegrees: elements.i₀ * 180 / .pi,
+            eccentricity: eccentricity,
+            perigeeKm: semimajorAxisKm * (1 - eccentricity) - earthRadiusKm,
+            apogeeKm: semimajorAxisKm * (1 + eccentricity) - earthRadiusKm
+        )
         object = CatalogObject(
             id: try container.decodeIfPresent(
                 String.self,
@@ -106,7 +116,8 @@ private struct CatalogRecord: Decodable {
             elementEpoch: try container.decodeIfPresent(Date.self, forKey: .epoch)
                 ?? .distantPast,
             isCurated: try container.decodeIfPresent(Bool.self, forKey: .generatedCurated)
-                ?? isAuthoredTLE
+                ?? isAuthoredTLE,
+            orbitFingerprint: fingerprint
         )
     }
 
@@ -139,6 +150,7 @@ final class CatalogStore: @unchecked Sendable {
     let familyCounts: [CatalogFamily: Int]
     let filterCounts: [CatalogFilter: Int]
     let filterReadableCounts: [CatalogFilter: Int]
+    let insightIndex: CatalogInsightIndex
 
     init() {
         let catalog: CatalogDocument
@@ -158,6 +170,7 @@ final class CatalogStore: @unchecked Sendable {
             familyCounts = [:]
             filterCounts = [:]
             filterReadableCounts = [:]
+            insightIndex = CatalogInsightIndex(objects: [])
             assertionFailure("catalog.json 加载失败：\(Self.describe(error))")
             return
         }
@@ -197,6 +210,7 @@ final class CatalogStore: @unchecked Sendable {
                 )
             }
         )
+        insightIndex = CatalogInsightIndex(objects: valid)
     }
 
     private enum LoadError: LocalizedError {

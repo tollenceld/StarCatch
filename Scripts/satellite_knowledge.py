@@ -208,8 +208,14 @@ FAMILY_ARCHIVES = {
     },
 }
 
+_catalog_document_cache: dict | None = None
+
+
 def catalog_document() -> dict:
-    return json.loads(CATALOG.read_text(encoding="utf-8"))
+    global _catalog_document_cache
+    if _catalog_document_cache is None:
+        _catalog_document_cache = json.loads(CATALOG.read_text(encoding="utf-8"))
+    return _catalog_document_cache
 
 
 def refresh_catalog_summaries(document: dict) -> int:
@@ -340,11 +346,94 @@ def chapters(lines: list[str]) -> list[dict[str, str]]:
     return result
 
 
+def structured_sources(
+    values: list[str],
+    *,
+    scope: str,
+    review_status: str,
+    verified_at: str | None,
+) -> list[dict]:
+    records: list[dict] = []
+    catalog_date = str(catalog_document().get("generatedAt") or "")[:10] or None
+    for index, value_text in enumerate(values):
+        match = re.search(r"https://\S+", value_text)
+        url = match.group(0).rstrip(".,;，。；") if match else None
+        title = value_text[: match.start()].strip(" ·—-\t") if match else value_text.strip()
+        lower = value_text.casefold()
+        if "celestrak" in lower:
+            provenance = "catalog"
+            source_scope = "object"
+            retrieved_at = catalog_date
+        elif "nasa earth observatory" in lower and "轨道" in value_text:
+            provenance = "computed"
+            source_scope = "object"
+            retrieved_at = catalog_date
+        elif url:
+            provenance = "verifiedFamily" if scope == "family" else "verifiedObject"
+            source_scope = scope
+            retrieved_at = None
+        else:
+            # A citation without a URL remains visible, but is not promoted as an
+            # official action. Migrated hand-authored profiles keep their review
+            # history without pretending the compiler re-verified them today.
+            provenance = "verifiedFamily" if scope == "family" else "verifiedObject"
+            source_scope = scope
+            retrieved_at = None
+        records.append(
+            {
+                "id": f"source-{index}-{slug(title)[:24].lower()}",
+                "title": title or "资料来源",
+                "url": url,
+                "provenance": provenance,
+                "scope": source_scope,
+                "retrievedAt": retrieved_at,
+                "verifiedAt": verified_at if review_status != "generated" else None,
+            }
+        )
+    if review_status == "generated" and scope == "object":
+        records.append(
+            {
+                "id": "source-starcatch-classification",
+                "title": "StarCatch 名称与公开分组分类规则",
+                "url": None,
+                "provenance": "classification",
+                "scope": "object",
+                "retrievedAt": catalog_date,
+                "verifiedAt": None,
+            }
+        )
+    return records
+
+
+def source_ids_for(text: str, sources: list[dict]) -> list[str]:
+    catalog = [item["id"] for item in sources if item["provenance"] == "catalog"]
+    computed = [item["id"] for item in sources if item["provenance"] == "computed"]
+    official = [
+        item["id"]
+        for item in sources
+        if item["provenance"] in ("verifiedObject", "verifiedFamily")
+    ]
+    classification = [
+        item["id"] for item in sources if item["provenance"] == "classification"
+    ]
+    ids: list[str] = []
+    orbital_tokens = ("轨道", "周期", "倾角", "离心率", "近地点", "远地点", "NORAD", "COSPAR", "发射", "目录")
+    mission_tokens = ("任务", "载荷", "观测", "通信", "导航", "实验", "运营", "计划", "系统")
+    if any(token in text for token in orbital_tokens):
+        ids += catalog + computed
+    if any(token in text for token in mission_tokens):
+        ids += official + classification
+    if not ids:
+        ids = catalog + official + classification
+    return list(dict.fromkeys(ids or [item["id"] for item in sources]))
+
+
 def parsed_story(
     metadata: dict[str, str],
     body: list[str],
     *,
     norad: int,
+    scope: str,
 ) -> tuple[dict | None, list[str]]:
     errors: list[str] = []
     sections = section_map(body)
@@ -372,22 +461,48 @@ def parsed_story(
     if errors:
         return None, errors
 
+    review_status = metadata.get("review_status", "generated")
+    source_records = structured_sources(
+        source_values,
+        scope=scope,
+        review_status=review_status,
+        verified_at=metadata.get("verified_at"),
+    )
+    lead_source_ids = source_ids_for(lead, source_records)
+    for chapter in chapter_values:
+        chapter["sourceIDs"] = source_ids_for(
+            f"{chapter['title']} {chapter['body']}", source_records
+        )
+
     story = {
         "noradID": norad,
         "eyebrow": metadata["eyebrow"],
         "organization": metadata["organization"],
         "program": metadata["program"],
         "lead": lead,
+        "leadSourceIDs": lead_source_ids,
+        "scope": scope,
+        "reviewStatus": review_status,
         "chapters": chapter_values,
         "milestones": [
-            {"id": f"milestone-{index}", "time": time, "event": event}
+            {
+                "id": f"milestone-{index}",
+                "time": time,
+                "event": event,
+                "sourceIDs": source_ids_for(f"{time} {event}", source_records),
+            }
             for index, (time, event) in enumerate(milestone_values)
         ],
         "facts": [
-            {"id": f"fact-{index}", "label": label, "value": item_value}
+            {
+                "id": f"fact-{index}",
+                "label": label,
+                "value": item_value,
+                "sourceIDs": source_ids_for(f"{label} {item_value}", source_records),
+            }
             for index, (label, item_value) in enumerate(fact_values)
         ],
-        "sources": source_values,
+        "sources": source_records,
     }
     return story, []
 
@@ -404,7 +519,7 @@ def parse_profile(path: Path) -> tuple[dict | None, list[str]]:
         norad = int(metadata.get("norad", "").replace("_", ""))
     except ValueError:
         return None, ["NORAD 编号无效"]
-    return parsed_story(metadata, body, norad=norad)
+    return parsed_story(metadata, body, norad=norad, scope="object")
 
 
 def parse_family_profile(path: Path) -> tuple[dict | None, list[str]]:
@@ -419,7 +534,7 @@ def parse_family_profile(path: Path) -> tuple[dict | None, list[str]]:
     family = metadata["family"]
     if family not in FAMILY_ARCHIVES:
         return None, [f"未知星座 family: {family}"]
-    story, errors = parsed_story(metadata, body, norad=0)
+    story, errors = parsed_story(metadata, body, norad=0, scope="family")
     if errors or story is None:
         return None, errors
     return {"family": family, "story": story}, []
@@ -442,6 +557,12 @@ def render_generated_profile(record: dict, context: CatalogContext) -> str:
     orbit = str(value(record, "STARCATCH_ORBIT_CLASS", "orbitClass") or "—")
     category = str(value(record, "STARCATCH_CATEGORY", "category") or "exploration")
     status = str(value(record, "STARCATCH_STATUS", "status") or "active")
+    status_title = {
+        "active": "轨道在列",
+        "silent": "静默记录",
+        "derelict": "失效记录",
+        "debris": "轨道残留",
+    }.get(status, "目录记录")
     launched = str(value(record, "STARCATCH_LAUNCHED", "launched") or cospar[:4] or "—")
     eyebrow = {
         "observation": "EARTH OBSERVATION ARCHIVE",
@@ -496,7 +617,7 @@ review_status: generated
 - 分类 | {category_title(record)}
 - 类型 | {kind_title(record)}
 - 轨道 | {orbit}
-- 状态 | {status.upper()}
+- 目录状态 | {status_title}
 {orbital_facts}
 
 ## 来源
@@ -811,7 +932,7 @@ def compile_profiles(output: Path) -> int:
             print(f"- {error}", file=sys.stderr)
         return 1
     document = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         # 使用轨道目录快照时间，保证相同 Markdown 输入得到字节稳定的产物。
         "generatedAt": catalog_document().get("generatedAt"),
         "source": "SatelliteKnowledge/Profiles + Families Markdown",

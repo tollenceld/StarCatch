@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MAX_CATALOG_AGE_DAYS = 14.0
+MAX_CATALOG_AGE_DAYS = 3.0
 MIN_CATALOG_OBJECTS = 10_000
 FORBIDDEN_CONTENT_MARKERS = (
     "OPERATOR TO BE VERIFIED",
@@ -95,7 +95,7 @@ def check_catalog(now: datetime) -> tuple[int, float]:
     catalog = load_json(ROOT / "StarCatch/Resources/catalog.json")
     profiles = load_json(ROOT / "StarCatch/Resources/satellite_profiles.json")
     require(catalog.get("schemaVersion") == 2, "catalog.json schemaVersion 必须为 2")
-    require(profiles.get("schemaVersion") == 2, "satellite_profiles.json schemaVersion 必须为 2")
+    require(profiles.get("schemaVersion") == 3, "satellite_profiles.json schemaVersion 必须为 3")
     objects = catalog.get("objects")
     require(isinstance(objects, list), "catalog.json objects 必须是数组")
     require(len(objects) >= MIN_CATALOG_OBJECTS, f"轨道目录少于 {MIN_CATALOG_OBJECTS:,} 个对象")
@@ -117,6 +117,28 @@ def check_catalog(now: datetime) -> tuple[int, float]:
         f"首层摘要存在重复：{len(summaries) - len(set(summaries))} 条未区分对象",
     )
     stories = profiles.get("stories", [])
+    all_stories = stories + [item.get("story", {}) for item in profiles.get("familyStories", [])]
+    allowed_provenance = {
+        "catalog", "computed", "verifiedObject", "verifiedFamily", "classification"
+    }
+    for story in all_stories:
+        require(story.get("scope") in {"object", "family"}, "档案缺少 object/family 资料范围")
+        sources = story.get("sources", [])
+        require(isinstance(sources, list) and sources, "档案缺少结构化来源")
+        source_ids = {item.get("id") for item in sources if isinstance(item, dict)}
+        require(None not in source_ids and len(source_ids) == len(sources), "档案来源 ID 缺失或重复")
+        require(
+            all(item.get("provenance") in allowed_provenance for item in sources),
+            "档案来源含未知可信度类型",
+        )
+        claims = [story]
+        claims += story.get("chapters", [])
+        claims += story.get("milestones", [])
+        claims += story.get("facts", [])
+        for index, claim in enumerate(claims):
+            ids = claim.get("leadSourceIDs") if index == 0 else claim.get("sourceIDs")
+            require(isinstance(ids, list) and ids, "档案存在没有来源关联的内容")
+            require(set(ids).issubset(source_ids), "档案内容关联了不存在的来源")
     leads = [str(item.get("lead", "")).strip() for item in stories]
     require(all(leads), "逐星档案存在空摘要")
     require(
@@ -130,6 +152,10 @@ def check_catalog(now: datetime) -> tuple[int, float]:
     )
     for marker in FORBIDDEN_CONTENT_MARKERS:
         require(marker not in serialized_copy, f"卫星资料仍含占位内容：{marker}")
+    require(
+        "公开 GP/OMM 条目把它记录为" not in serialized_copy,
+        "资料仍把 StarCatch 分类误称为 GP/OMM 原始字段",
+    )
     return len(objects), age_days
 
 

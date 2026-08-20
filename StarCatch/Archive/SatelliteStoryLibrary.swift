@@ -32,7 +32,7 @@ struct SatelliteStoryLibrary: Sendable {
                 Document.self,
                 from: Data(contentsOf: url, options: .mappedIfSafe)
             )
-            guard document.schemaVersion == 2 else {
+            guard document.schemaVersion == 3 else {
                 return .init(
                     storiesByNORAD: [:],
                     storiesByFamily: [:],
