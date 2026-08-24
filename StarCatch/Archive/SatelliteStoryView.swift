@@ -3,6 +3,30 @@ import SwiftUI
 /// 单体卫星或大型星座的离线深度档案。策展事实与当前节点的实时轨道读数
 /// 明确分区，避免把故事和瞬时位置混成同一种“参数表”。
 struct SatelliteStoryView: View {
+    private enum ArchiveSection: String, CaseIterable, Identifiable {
+        case observation
+        case mission
+        case data
+
+        var id: String { rawValue }
+
+        var titleKey: String {
+            switch self {
+            case .observation: "archive.tab.observation"
+            case .mission: "archive.tab.mission"
+            case .data: "archive.tab.data"
+            }
+        }
+
+        var symbolName: String {
+            switch self {
+            case .observation: "scope"
+            case .mission: "sparkles"
+            case .data: "waveform.path.ecg"
+            }
+        }
+    }
+
     let object: CatalogObject
     let story: SatelliteStory
     let ephemeris: Ephemeris?
@@ -15,6 +39,8 @@ struct SatelliteStoryView: View {
     @State private var expandedChapterID: String?
     @State private var missionHistoryExpanded = false
     @State private var sourcesExpanded = false
+    @State private var selectedSection: ArchiveSection = .observation
+    @Namespace private var sectionSelection
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
     private var language: SupportedLanguage { .current }
@@ -32,77 +58,19 @@ struct SatelliteStoryView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
-                    identityHeader
-                        .padding(.bottom, ephemeris == nil ? 20 : 14)
-
-                    if let ephemeris {
-                        observationSnapshot(ephemeris)
-                            .padding(.bottom, 20)
-                    }
-
-                    orbitFingerprintModule
+                    identityHero
                         .padding(.bottom, 22)
 
-                    currentTargetModule
+                    archiveSectionPicker
                         .padding(.bottom, 22)
 
-                    sectionLabel(copy(story.scope == .family ? "archive.section.family" : "archive.section.mission"))
-                    Text(story.lead)
-                        .font(Typography.readingBody)
-                        .tracking(Typography.readingBodyTracking)
-                        .lineSpacing(4)
-                        .foregroundStyle(Palette.inkMid.opacity(0.88))
-                        .lineLimit(4)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 10)
-                        .padding(.bottom, story.officialReference == nil ? 20 : 12)
-
-                    if let reference = story.officialReference {
-                        officialReferenceLink(reference)
-                            .padding(.bottom, 20)
-                    }
-
-                    sectionLabel(copy("archive.section.facts"))
-                    VStack(spacing: 0) {
-                        ForEach(preferredFacts) { fact in
-                            storyField(fact.label, fact.value)
-                        }
-                    }
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-
-                    if !story.chapters.isEmpty {
-                        sectionLabel(copy("archive.section.notes"))
-                        VStack(spacing: 0) {
-                            ForEach(story.chapters) { chapter in
-                                chapterDisclosure(chapter)
-                            }
-                        }
-                        .padding(.top, 7)
-                        .padding(.bottom, 20)
-                    }
-
-                    if !story.milestones.isEmpty {
-                        compactDisclosure(
-                            title: copy("archive.history.title"),
-                            detail: L10n.format("archive.history.count", table: "SatelliteText", language: language, story.milestones.count),
-                            isExpanded: $missionHistoryExpanded
-                        ) {
-                            milestoneRail
-                                .padding(.top, 12)
-                                .padding(.bottom, 8)
-                        }
-                    }
-
-                    compactDisclosure(
-                        title: copy("archive.sources.title"),
-                        detail: L10n.format("archive.sources.count", table: "SatelliteText", language: language, story.sources.count),
-                        isExpanded: $sourcesExpanded
-                    ) {
-                        sourceNote
-                            .padding(.top, 12)
-                            .padding(.bottom, 6)
-                    }
+                    selectedSectionContent
+                        .id(selectedSection)
+                        .transition(
+                            suppressMotion
+                                ? .opacity
+                                : .opacity.combined(with: .offset(y: 5))
+                        )
                 }
                 .padding(.horizontal, 30)
                 .padding(.top, 14)
@@ -127,12 +95,19 @@ struct SatelliteStoryView: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var identityHeader: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(story.eyebrow)
-                .font(Typography.statusTag)
-                .tracking(1.35)
-                .foregroundStyle(object.identityTint.opacity(0.82))
+    private var identityHero: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Image(systemName: missionRoleSymbol)
+                    .font(.system(size: 10, weight: .medium))
+                Text(missionRoleTitle)
+                Spacer(minLength: 8)
+                Text(object.orbitClass)
+            }
+            .font(Typography.statusTag)
+            .tracking(language == .english ? 0.85 : 0.18)
+            .foregroundStyle(object.identityTint.opacity(0.88))
+            .padding(.bottom, 10)
 
             Text(object.deepArchiveTitle)
                 .font(.system(.title2, design: .monospaced, weight: .semibold))
@@ -141,22 +116,205 @@ struct SatelliteStoryView: View {
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
 
-            Text(story.program)
-                .font(Typography.guide)
-                .tracking(1.0)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+            Text(missionRoleSummary)
+                .font(.system(.headline, design: .default, weight: .medium))
+                .foregroundStyle(Palette.inkHigh.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 13)
 
-            HStack(spacing: 9) {
-                Rectangle()
-                    .fill(object.identityTint.opacity(0.62))
-                    .frame(width: 22, height: 0.7)
-                Text(story.organization)
-                    .font(Typography.statusTag)
-                    .tracking(0.75)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-                    .lineLimit(2)
+            HStack(spacing: 7) {
+                archiveBadge(story.eyebrow)
+                archiveBadge("NORAD \(object.noradId)")
+                if object.family != nil {
+                    archiveBadge(copy("archive.badge.series"))
+                }
             }
-            .padding(.top, 3)
+            .padding(.top, 14)
+        }
+    }
+
+    private func archiveBadge(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+            .tracking(language == .english ? 0.45 : 0.08)
+            .foregroundStyle(Palette.inkMid.opacity(0.74))
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(Palette.inkHigh.opacity(0.035), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.5)
+            }
+    }
+
+    private var archiveSectionPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(ArchiveSection.allCases) { section in
+                Button {
+                    withAnimation(suppressMotion ? .easeOut(duration: 0.1) : .easeInOut(duration: 0.22)) {
+                        selectedSection = section
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: section.symbolName)
+                            .font(.system(size: 9.5, weight: .medium))
+                        Text(copy(section.titleKey))
+                            .lineLimit(1)
+                    }
+                    .font(.system(.caption, design: .default, weight: .medium))
+                    .foregroundStyle(
+                        selectedSection == section
+                            ? Palette.inkHigh.opacity(0.92)
+                            : Palette.inkLow.opacity(0.68)
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                    .background {
+                        if selectedSection == section {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(object.identityTint.opacity(0.09))
+                                .matchedGeometryEffect(id: "archive-section", in: sectionSelection)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
+            }
+        }
+        .padding(3)
+        .background(Palette.inkHigh.opacity(0.025), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.55)
+        }
+    }
+
+    @ViewBuilder
+    private var selectedSectionContent: some View {
+        switch selectedSection {
+        case .observation:
+            observationSection
+        case .mission:
+            missionSection
+        case .data:
+            dataSection
+        }
+    }
+
+    private var observationSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionLabel(copy("archive.section.observe_now"))
+            if let ephemeris {
+                observationSnapshot(ephemeris)
+                    .padding(.top, 11)
+            } else {
+                Text(copy("archive.observation.unavailable"))
+                    .font(Typography.readingCompact)
+                    .foregroundStyle(Palette.inkMid.opacity(0.7))
+                    .padding(.top, 13)
+            }
+
+            sectionLabel(copy("archive.section.orbit_at_glance"))
+                .padding(.top, 24)
+            OrbitFingerprintView(
+                fingerprint: object.orbitFingerprint,
+                tint: object.identityTint,
+                motion: insight?.motion
+            )
+            .padding(.top, 8)
+            HStack(spacing: 0) {
+                compactMetric(
+                    copy("archive.field.period"),
+                    String(format: "%.1f MIN", object.orbitFingerprint.periodMinutes)
+                )
+                observationDivider
+                compactMetric(
+                    copy("archive.field.inclination"),
+                    String(format: "%.2f°", object.orbitFingerprint.inclinationDegrees)
+                )
+                observationDivider
+                compactMetric(
+                    copy("archive.field.apsides_compact"),
+                    String(
+                        format: "%.0f / %.0f KM",
+                        object.orbitFingerprint.perigeeKm,
+                        object.orbitFingerprint.apogeeKm
+                    )
+                )
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    private var missionSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            sectionLabel(copy(story.scope == .family ? "archive.section.family" : "archive.section.mission_brief"))
+            Text(story.lead)
+                .font(Typography.readingBody)
+                .tracking(Typography.readingBodyTracking)
+                .lineSpacing(Typography.readingBodyLineSpacing)
+                .foregroundStyle(Palette.inkMid.opacity(0.88))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 12)
+                .padding(.bottom, story.officialReference == nil ? 22 : 14)
+
+            if let reference = story.officialReference {
+                officialReferenceLink(reference)
+                    .padding(.bottom, 22)
+            }
+
+            if !preferredFacts.isEmpty {
+                sectionLabel(copy("archive.section.facts"))
+                VStack(spacing: 0) {
+                    ForEach(preferredFacts) { fact in
+                        storyField(fact.label, fact.value)
+                    }
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 24)
+            }
+
+            if !story.chapters.isEmpty {
+                sectionLabel(copy("archive.section.notes"))
+                VStack(spacing: 0) {
+                    ForEach(story.chapters) { chapter in
+                        chapterDisclosure(chapter)
+                    }
+                }
+                .padding(.top, 7)
+                .padding(.bottom, 20)
+            }
+
+            if !story.milestones.isEmpty {
+                compactDisclosure(
+                    title: copy("archive.history.title"),
+                    detail: L10n.format("archive.history.count", table: "SatelliteText", language: language, story.milestones.count),
+                    isExpanded: $missionHistoryExpanded
+                ) {
+                    milestoneRail
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                }
+            }
+        }
+    }
+
+    private var dataSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            orbitFingerprintModule
+                .padding(.bottom, 24)
+            currentTargetModule
+                .padding(.bottom, 20)
+            compactDisclosure(
+                title: copy("archive.sources.title"),
+                detail: L10n.format("archive.sources.count", table: "SatelliteText", language: language, story.sources.count),
+                isExpanded: $sourcesExpanded
+            ) {
+                sourceNote
+                    .padding(.top, 12)
+                    .padding(.bottom, 6)
+            }
         }
     }
 
@@ -169,7 +327,7 @@ struct SatelliteStoryView: View {
                     .font(.system(size: 12, weight: .medium))
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("官方任务页面")
+                    Text(copy("archive.official_reference"))
                         .font(Typography.guide)
                         .foregroundStyle(Palette.inkHigh.opacity(0.9))
                     Text(reference.title)
@@ -218,6 +376,76 @@ struct SatelliteStoryView: View {
             .map { $0 }
     }
 
+    private var missionFilter: CatalogFilter? {
+        switch object.family {
+        case .starlink: return .starlink
+        case .oneweb: return .oneweb
+        case .qianfan, .hulianwang: return .chinaConstellations
+        case .kuiper: return .kuiper
+        case .iridium, .globalstar, .orbcomm: return .mobileConstellations
+        case nil: break
+        }
+        if object.kind == "nav" { return .navigation }
+        if object.kind == "comms" { return .communications }
+        if object.isRecognizedHumanScienceMission { return .humanScience }
+        if object.isRecognizedEarthMission { return .earthObservation }
+        if object.category == .legacy || object.status != .active { return .orbitalHeritage }
+        return nil
+    }
+
+    private var missionRoleTitle: String {
+        explicitMissionRole?.title
+            ?? missionFilter?.title
+            ?? object.category.title(language: language)
+    }
+
+    private var missionRoleSummary: String {
+        explicitMissionRole?.summary
+            ?? missionFilter?.subtitle
+            ?? object.category.subtitle(language: language)
+    }
+
+    private var missionRoleSymbol: String {
+        explicitMissionRole?.symbol
+            ?? missionFilter?.symbolName
+            ?? object.category.symbolName
+    }
+
+    private var explicitMissionRole: (title: String, summary: String, symbol: String)? {
+        let key: String
+        let symbol: String
+        switch object.kind {
+        case "telescope":
+            key = "telescope"
+            symbol = "telescope"
+        case "station":
+            key = "station"
+            symbol = "person.2"
+        case "nav":
+            key = "navigation"
+            symbol = "location.north.line"
+        case "comms":
+            key = "communications"
+            symbol = "antenna.radiowaves.left.and.right"
+        case "weather":
+            key = "weather"
+            symbol = "cloud.sun"
+        case "science":
+            key = "science"
+            symbol = "sparkles"
+        case "debris", "rocket_body":
+            key = "orbital_remnant"
+            symbol = "circle.dashed"
+        default:
+            return nil
+        }
+        return (
+            copy("archive.role.\(key).title"),
+            copy("archive.role.\(key).summary"),
+            symbol
+        )
+    }
+
     private func observationSnapshot(_ ephemeris: Ephemeris) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             if let insight {
@@ -229,11 +457,6 @@ struct SatelliteStoryView: View {
 
             HStack(spacing: 0) {
                 observationCell(
-                    label: "AZ",
-                    value: String(format: "%03.0f°", normalizedDegrees(ephemeris.azimuth))
-                )
-                observationDivider
-                observationCell(
                     label: "EL",
                     value: String(format: "%+.1f°", ephemeris.elevation * 180 / .pi)
                 )
@@ -242,32 +465,31 @@ struct SatelliteStoryView: View {
                     label: copy("archive.field.range"),
                     value: String(format: "%.0f KM", ephemeris.rangeKm)
                 )
-            }
-
-            HStack(spacing: 0) {
-                observationCell(
-                    label: copy("archive.field.altitude"),
-                    value: String(format: "%.0f KM", ephemeris.altitudeKm)
-                )
                 observationDivider
                 observationCell(
                     label: copy("archive.field.speed"),
                     value: String(format: "%.2f KM/S", ephemeris.velocityKmS)
                 )
-                observationDivider
-                observationCell(label: copy("archive.field.orbit"), value: object.orbitClass)
             }
 
-            Text(observationSentence(ephemeris))
-                .font(Typography.archiveNarrative)
-                .tracking(0.25)
-                .foregroundStyle(Palette.inkMid.opacity(0.72))
-                .fixedSize(horizontal: false, vertical: true)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(observationSentence(ephemeris))
+                    .font(Typography.archiveNarrative)
+                    .tracking(0.15)
+                    .foregroundStyle(Palette.inkMid.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Text(String(format: "AZ %03.0f°", normalizedDegrees(ephemeris.azimuth)))
+                    .font(Typography.statusTag)
+                    .tracking(0.45)
+                    .foregroundStyle(Palette.inkLow.opacity(0.64))
+                    .lineLimit(1)
+            }
 
             if let movement = insight?.movementLabel(language: language) {
-                Text(movement)
+                Label(movement, systemImage: "arrow.up.right")
                     .font(Typography.statusTag)
-                    .tracking(0.55)
+                    .tracking(language == .english ? 0.45 : 0.12)
                     .foregroundStyle(object.identityTint.opacity(0.78))
             }
         }
@@ -283,6 +505,22 @@ struct SatelliteStoryView: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(observationSentence(ephemeris))
+    }
+
+    private func compactMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label)
+                .font(Typography.statusTag)
+                .tracking(language == .english ? 0.65 : 0.12)
+                .foregroundStyle(Palette.inkLow.opacity(0.66))
+                .lineLimit(1)
+            Text(value)
+                .font(Typography.archiveDataValue)
+                .foregroundStyle(Palette.inkMid.opacity(0.88))
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+        }
+        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
     }
 
     private var orbitFingerprintModule: some View {

@@ -63,6 +63,7 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(silent.scanProgress, 0, accuracy: 0.0001)
         XCTAssertEqual(silent.systemPhase, .initializing)
         XCTAssertLessThan(silent.letterActivation(at: 8), 0.25)
+        XCTAssertLessThan(silent.moduleActivation(at: 2), 0.05)
 
         let syncing = BootVisualTimeline(
             elapsed: 1.6,
@@ -74,6 +75,10 @@ final class TimeTests: XCTestCase {
         XCTAssertGreaterThan(
             syncing.letterActivation(at: 0),
             syncing.letterActivation(at: 8)
+        )
+        XCTAssertGreaterThan(
+            syncing.moduleActivation(at: 0),
+            syncing.moduleActivation(at: 2)
         )
 
         let fastReady = BootVisualTimeline(
@@ -97,6 +102,7 @@ final class TimeTests: XCTestCase {
         )
         XCTAssertEqual(ready.systemPhase, .ready)
         XCTAssertGreaterThan(ready.readyEmphasis, 0.7)
+        XCTAssertEqual(ready.moduleActivation(at: 2), 1, accuracy: 0.0001)
 
         let final = BootVisualTimeline(
             elapsed: 3.5,

@@ -322,7 +322,14 @@
     "进入观测" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Begin Observation" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "进入观测" } } } },
     "选择会实时作用于当前天空" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Selections update the current sky immediately" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择会实时作用于当前天空" } } } },
     "重置" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置" } } } },
-    "默认视域" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Default Field of View" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "默认视域" } } } }
+    "默认视域" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Default Field of View" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "默认视域" } } } },
+    "boot.intro.body" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Raise your iPhone to identify human-made objects crossing the sky, then move through time to inspect their paths." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "举起手机，辨认此刻经过上空的人造天体，并沿时间查看它们的轨迹。" } } } },
+    "boot.intro.eyebrow" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBITAL FIELD INSTRUMENT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道观测仪" } } } },
+    "boot.intro.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "A precise instrument for the real sky." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一台面向真实天空的精密观测仪。" } } } },
+    "boot.module.attitude" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ATTITUDE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "姿态" } } } },
+    "boot.module.catalog" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CATALOG" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录" } } } },
+    "boot.module.orbit" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBIT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道" } } } },
+    "boot.system.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "OBSERVATION SYSTEM" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "观测系统" } } } }
   },
   "version" : "1.0"
 }

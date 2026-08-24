@@ -34,7 +34,7 @@ struct BootSequenceView: View {
             .ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("ORBITAL FIELD INSTRUMENT")
+                Text(L10n.text("boot.intro.eyebrow"))
                     .font(Typography.statusTag)
                     .tracking(1.65)
                     .foregroundStyle(Palette.signal.opacity(0.72))
@@ -54,14 +54,14 @@ struct BootSequenceView: View {
                     .frame(width: titleVisible ? 54 : 0, height: 0.5)
                     .padding(.vertical, 20)
 
-                Text("一台面向真实天空的轨道观测仪。")
+                Text(L10n.text("boot.intro.title"))
                     .font(.system(.body, design: .default, weight: .light))
                     .tracking(SupportedLanguage.current == .english ? 0.2 : 0.1)
                     .foregroundStyle(Palette.inkMid.opacity(0.82))
                     .opacity(bodyVisible ? 1 : 0)
                     .offset(y: suppressMotion || bodyVisible ? 0 : 2)
 
-                Text("举起手机，辨认此刻经过你上空的人造天体，沿时间查看它们的轨迹。")
+                Text(L10n.text("boot.intro.body"))
                     .font(.system(.footnote, design: .default, weight: .regular))
                     .tracking(SupportedLanguage.current == .english ? 0.1 : 0.05)
                     .lineSpacing(6)
@@ -75,7 +75,7 @@ struct BootSequenceView: View {
                     finish(interrupted: true)
                 } label: {
                     HStack(spacing: 11) {
-                        Text("进入观测")
+                        Text(L10n.text("boot.action.enter"))
                             .font(.system(.footnote, design: .default, weight: .medium))
                             .tracking(SupportedLanguage.current == .english ? 0.25 : 0.5)
                         Rectangle()

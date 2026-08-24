@@ -1,50 +1,47 @@
-# 当前任务：全局双语与卫星轨道动效重构
+# 当前任务：启动系统与卫星深度档案视觉重构
 
-状态：已完成（2026-08-21）
+状态：已完成（2026-08-24）
 
 ## 目标
 
-让 StarCatch 的简体中文与英文成为两套完整、互斥且跟随 iOS 的界面；轨道目录保持语言
-中立，所有卫星都能按当前语言生成可信档案。重做摘要与深度档案中的轨道图形，使动画由
-真实过境、轨道相位与轨道类型驱动，同时保持 Canvas 热路径轻量。
+解决启动页过于简陋、中文状态基线错位，以及深度档案第一眼无法说明卫星用途的问题；在不
+改变轨道事实源和性能边界的前提下，重建中英文一致的视觉层级和阅读路径。
 
 ## 已完成
 
-- 工程开发/回退语言改为英文，加入 `zh-Hans`；新增界面与卫星资料两个 String Catalog，
-  中英文定位和姿态权限说明，以及仅跟随系统 Locale 的 `SupportedLanguage`。
-- 清理启动、主天空、灵动岛功能翼、筛选、全局星图、时间轴、设置、记录、手册、隐私、
-  错误页、辅助功能和卫星档案中的直接信息混排；官方名称和标准技术标识继续保留原文。
-- 内容页导航改为稳定三列布局，返回标题过长时自动退化为图标；中英文正文改用系统字体，
-  等宽体只承担编号、短标签和数据。设置开关使用固定 44pt 右侧槽位，长中文不再挤出屏幕。
-- 轨道目录移除 16,395 条 `STARCATCH_POETIC` / `poetic` 字段；`CatalogObject` 与观测日志
-  不再持久化某一种语言的描述。旧日志额外字段保持兼容读取并自然丢弃。
-- 档案资源升级为 schema v4 `structured-localized`。3,817 份逐星资料与 8 份系列资料继续
-  提供来源；其余目标也由真实身份、轨道指纹和 CelesTrak 来源生成完整中英文档案入口。
-- 新增 `SatelliteMotionSignature` 与纯值 `OrbitMotionModel`。可见过境使用真实进度；即将
-  升起只移动扫描信号；LEO/MEO/HEO/GEO 分别使用周期、方向、离心率和稳定站位表达。
-- 摘要和深入档案共用 30fps Canvas 动效，每帧不执行 SGP4、IO 或目录扫描；系统/应用
-  减少动态效果、页面隐藏和后台状态会暂停时间轴。
-- 新增英文公开隐私政策及完整 `en-US` App Store 元数据；公开隐私链接随当前语言选择。
-- 发布校验新增双 String Catalog 翻译/插值一致性、权限本地化、schema v4 和语言中立目录检查。
+- 启动页保留固定 `STARCATCH` 标题，以窄幅焦平面逐字激活，新增分段校准轨、光学边界及
+  目录／轨道／姿态三项模块状态；背景沿用低密度星场，不加入大型圆环或移动准星。
+- 状态点、系统名称和实时阶段改为同一基线的自适应布局，删除导致“正在检测”错位的固定
+  英文宽度；首次启动介绍也全部进入 String Catalog。
+- 深度档案首屏改为身份主视觉：先显示可靠任务角色、轨道层级、目标名、用途短句和可信
+  身份徽标，让用户在进入参数之前知道目标是什么、用来做什么。
+- 档案改为“观测／任务／数据”三视图：当前天空与轨道概览负责即时理解，任务页承载本星／
+  系列资料和官方来源，数据页承载完整轨道参数、标识与来源。
+- 角色文案只使用现有可靠分类和资料范围映射；未知信息不猜测。HST 等已知类型可直接显示
+  “空间望远镜／Space telescope”，NORAD、LEO、AZ／EL 等标准标识保持原文。
+- 摘要动效继续复用既有真实轨道运动模型；新布局未把 SGP4、IO 或目录扫描放入帧循环。
+
+## 涉及文件
+
+- `StarCatch/App/BootFieldView.swift`
+- `StarCatch/App/BootSequenceView.swift`
+- `StarCatch/Archive/SatelliteStoryView.swift`
+- `StarCatch/Localization/Localizable.xcstrings`
+- `StarCatch/Localization/SatelliteText.xcstrings`
+- `StarCatchTests/TimeTests.swift`
+- `Documentation/PROJECT_OVERVIEW.md`
 
 ## 验证
 
-- `satellite_knowledge.py compile` 通过：3,817 份逐星资料、8 份系列资料。
+- iOS Simulator Debug 构建通过。
+- `TimeTests/testBootTimelineWakesLettersAndReportsRealSystemState` 通过。
+- iPhone 17 Pro / iOS 26.3 分别以简体中文和英文检查启动页与深度档案；中文用途、英文
+  `Space telescope`、三视图标签、长说明和轨道数据均未出现截断或跨语言正文。
 - `release_check.py --now 2026-08-21T00:00:00Z` 通过：16,395 个对象，目录年龄 0.3 天。
-- iOS Simulator Debug 构建通过；iPhone Air / iOS 26.3 以英文和简体中文分别启动并截图核验。
-- `OrbitTests` 与 `TimeTests` 覆盖全目录双语档案、旧日志、过境、顺逆行、HEO 非匀速、
-  GEO 稳定和确定性轨迹。
-- `git diff --check` 通过。
+- String Catalog JSON 解析与 `git diff --check` 通过。
 
 ## 发布边界
 
-- 模拟器不能验证真机 Dynamic Type、VoiceOver 阅读顺序、磁力计姿态和户外对比度；提交前
-  仍需在 iPhone 17 Air 与 17 Pro 真机分别以中英文完成一次连续对焦和深度档案检查。
-- 运行时继续完全离线；外部隐私、支持和官方任务链接仅由用户主动在系统浏览器中打开。
-
-## GitHub 同步（2026-08-24）
-
-- 检查确认本地 `main` 比 `origin/main` 多 10 个已提交 commit，工作区和暂存区均为空。
-- 核对提交范围未包含环境变量、签名凭据、构建产物、缓存或日志；`git diff --check` 通过。
-- 用户授权后，已使用普通 push 将这 10 个 commit 从 `c284ef3` 推送至 GitHub `main`，远端到达 `ef88815`。
-- 未使用强制推送，未重写已有历史；后续继续保持 `main` 为唯一开发与发布分支。
+- 模拟器不能替代真机的最大动态字体、VoiceOver 阅读顺序和户外低亮度检查；提交 App Store
+  前仍应在 iPhone 17 Air 与 17 Pro 真机各完成一次中英文档案巡检。
+- 运行时继续完全离线；本轮未修改目录、捕获阈值、轨道传播或观测记录语义。

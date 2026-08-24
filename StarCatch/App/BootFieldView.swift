@@ -98,6 +98,13 @@ struct BootVisualTimeline: Equatable {
         return CGFloat(max(0, 0.72 * (1 - activation)))
     }
 
+    func moduleActivation(at index: Int) -> Double {
+        if systemPhase == .ready { return 1 }
+        let thresholds = [0.12, 0.48, 0.78]
+        guard thresholds.indices.contains(index) else { return 0 }
+        return Self.smoothstep((scanProgress - thresholds[index]) / 0.18)
+    }
+
     private static func smoothstep(_ value: Double) -> Double {
         let t = min(1, max(0, value))
         return t * t * (3 - 2 * t)
@@ -223,8 +230,11 @@ struct SystemWakeView: View {
             BootFieldView(timeline: timeline)
                 .ignoresSafeArea()
 
-            VStack(spacing: 12) {
+            VStack(spacing: 0) {
                 wordmark(timeline)
+                    .padding(.bottom, 14)
+                BootModuleRail(timeline: timeline)
+                    .padding(.bottom, 15)
                 BootStatusText(
                     phase: timeline.systemPhase,
                     readyEmphasis: timeline.readyEmphasis
@@ -237,39 +247,81 @@ struct SystemWakeView: View {
 
     private func wordmark(_ timeline: BootVisualTimeline) -> some View {
         let letters = Array("STARCATCH")
-        let titleWidth: CGFloat = 184
+        let titleWidth: CGFloat = 216
         let cellWidth = titleWidth / CGFloat(letters.count)
 
         return ZStack(alignment: .topLeading) {
+            // A soft focus plane moves through the wordmark. It is deliberately
+            // wider than a light streak so the result reads as optical calibration.
+            LinearGradient(
+                colors: [
+                    .clear,
+                    Palette.signal.opacity(0.035 * timeline.loopStrength),
+                    Palette.signal.opacity(0.12 * timeline.loopStrength),
+                    Palette.signal.opacity(0.035 * timeline.loopStrength),
+                    .clear,
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .frame(width: 46, height: 39)
+            .blur(radius: 4)
+            .offset(x: -23 + CGFloat(timeline.signalProgress) * titleWidth, y: -4)
+
             HStack(spacing: 0) {
                 ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
                     Text(String(letter))
-                        .font(.system(size: 18, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 21, weight: .semibold, design: .monospaced))
                         .foregroundStyle(
                             Palette.inkHigh.opacity(
                                 0.16 + 0.78 * timeline.letterActivation(at: index)
                             )
                         )
                         .blur(radius: timeline.letterBlur(at: index))
-                        .frame(width: cellWidth, height: 28)
+                        .frame(width: cellWidth, height: 31)
                 }
             }
 
-            Circle()
-                .fill(Palette.signal.opacity(
-                    (0.56 + 0.24 * timeline.loopStrength) * timeline.wordmarkOpacity
-                ))
-                .frame(width: 3.5, height: 3.5)
-                .shadow(color: Palette.signal.opacity(0.2), radius: 2)
-                .offset(
-                    x: cellWidth / 2 - 1.75
-                        + CGFloat(timeline.signalProgress) * cellWidth * 8,
-                    y: 29
-                )
+            HStack(spacing: 4) {
+                ForEach(0 ..< letters.count, id: \.self) { index in
+                    Capsule()
+                        .fill(
+                            index <= Int(timeline.signalProgress * 8.01)
+                                ? Palette.signal.opacity(0.58 * timeline.loopStrength)
+                                : Palette.inkFaint.opacity(0.25)
+                        )
+                        .frame(width: cellWidth - 4, height: index == Int(timeline.signalProgress * 8.01) ? 1.4 : 0.55)
+                }
+            }
+            .frame(width: titleWidth)
+            .offset(y: 36)
+
+            calibrationBracket(leading: true)
+                .offset(x: -13, y: 7)
+            calibrationBracket(leading: false)
+                .offset(x: titleWidth + 7, y: 7)
         }
-        .frame(width: titleWidth, height: 34, alignment: .topLeading)
+        .frame(width: titleWidth, height: 42, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("StarCatch")
+    }
+
+    private func calibrationBracket(leading: Bool) -> some View {
+        Path { path in
+            if leading {
+                path.move(to: CGPoint(x: 5, y: 0))
+                path.addLine(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: 0, y: 17))
+                path.addLine(to: CGPoint(x: 5, y: 17))
+            } else {
+                path.move(to: CGPoint(x: 0, y: 0))
+                path.addLine(to: CGPoint(x: 5, y: 0))
+                path.addLine(to: CGPoint(x: 5, y: 17))
+                path.addLine(to: CGPoint(x: 0, y: 17))
+            }
+        }
+        .stroke(Palette.inkFaint.opacity(0.42), lineWidth: 0.55)
+        .frame(width: 5, height: 17)
     }
 
     #if DEBUG
@@ -284,6 +336,45 @@ struct SystemWakeView: View {
     #endif
 }
 
+private struct BootModuleRail: View {
+    let timeline: BootVisualTimeline
+
+    private let keys = [
+        "boot.module.catalog",
+        "boot.module.orbit",
+        "boot.module.attitude",
+    ]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
+                HStack(spacing: 6) {
+                    ZStack {
+                        Circle()
+                            .stroke(Palette.inkFaint.opacity(0.48), lineWidth: 0.55)
+                        Circle()
+                            .fill(Palette.signal.opacity(0.82))
+                            .padding(2.2)
+                            .opacity(timeline.moduleActivation(at: index))
+                    }
+                    .frame(width: 7, height: 7)
+
+                    Text(L10n.text(key))
+                        .lineLimit(1)
+                }
+                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                .tracking(SupportedLanguage.current == .english ? 0.65 : 0.2)
+                .foregroundStyle(
+                    Palette.inkLow.opacity(0.35 + 0.38 * timeline.moduleActivation(at: index))
+                )
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .frame(width: 244, height: 16)
+        .accessibilityHidden(true)
+    }
+}
+
 private struct BootStatusText: View {
     let phase: BootVisualTimeline.SystemPhase
     let readyEmphasis: Double
@@ -292,17 +383,26 @@ private struct BootStatusText: View {
     @State private var phaseVisible = true
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text("OBSERVATION SYSTEM ·")
-                .frame(width: 154, alignment: .trailing)
-
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Circle()
+                .fill(
+                    displayedPhase == .ready
+                        ? Palette.signal.opacity(0.76 + 0.18 * readyEmphasis)
+                        : Palette.inkLow.opacity(0.54)
+                )
+                .frame(width: 3.5, height: 3.5)
+                .alignmentGuide(.firstTextBaseline) { dimensions in
+                    dimensions[VerticalAlignment.center] + 2
+                }
+            Text(L10n.text("boot.system.title"))
+            Text("·")
+                .foregroundStyle(Palette.inkFaint.opacity(0.62))
             Text(displayedPhase.localizedLabel)
-                .frame(width: 92, alignment: .leading)
                 .opacity(phaseVisible ? 1 : 0)
                 .offset(y: phaseVisible ? 0 : 1)
         }
         .font(.system(size: 9, weight: .medium, design: .monospaced))
-        .tracking(0.72)
+        .tracking(SupportedLanguage.current == .english ? 0.72 : 0.18)
         .foregroundStyle(
             Palette.inkLow.opacity(
                 displayedPhase == .ready
@@ -310,7 +410,7 @@ private struct BootStatusText: View {
                     : 0.52
             )
         )
-        .frame(width: 260)
+        .frame(minWidth: 220, minHeight: 18, alignment: .center)
         .onAppear { displayedPhase = phase }
         .onChange(of: phase) { _, next in
             guard next != displayedPhase else { return }
