@@ -47,8 +47,9 @@ RootView
   项目共享 Markdown；schema v3 为每条内容保留来源 ID、`object/family` 范围与可信类型。
 - `EphemerisEngine.swift`：负责传播调度、缓存、LIVE 插值与冻结时刻快照。
 - `TrackSampler.swift` / `PassPredictor.swift`：基于星历的低频派生能力。
-- `SatelliteInsights.swift`：只为当前感应目标在 utility 任务中计算星下点、距离趋势、
-  完整过境窗口、轨道指纹、发射批次和系列中位数差异；由 `SkySession` 会话级持有。
+- `SatelliteInsights.swift`：为当前感应目标在 utility 任务中计算星下点、距离趋势、单次
+  过境窗口、内部轨道参数、发射批次和系列中位数差异；深度档案打开后再按需生成可取消、
+  可缓存的 24 小时 `PassForecast`。服务由 `SkySession` 会话级持有。
 - `Scripts/update_catalog.py`：仅发布期联网；APP 运行时保持完全离线。
 
 不要把轨道元素解码字段泄漏到 UI，也不要让页面直接创建 `Satellite`。
@@ -86,10 +87,10 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 1. 不在 Canvas 循环中做文件 IO、JSON 解码或网络调用。
 2. 大目录使用批量绘制；只有捕获目标和精选对象保留独立细节。
 3. SGP4 批量传播在后台任务执行，主线程只接收完整快照。
-4. 24 小时过境扫描和系列比较不得进入 SwiftUI `body`、Canvas 或点击回调；摘要卡先用
-   已缓存星历与目录指纹出现，高级洞察完成后在固定版式内补齐。
-5. 档案连续动效只能读取低频生成的 `SatelliteMotionSignature` 并做几何插值；页面隐藏、
-   App 进入后台或减少动态效果启用时必须暂停 `TimelineView`。
+4. 24 小时过境扫描和系列比较不得进入 SwiftUI `body`、Canvas 或首次对焦路径；摘要卡先用
+   已缓存星历出现，完整 `PassForecast` 只在深度档案固定区域异步补齐。
+5. 档案时间带和过境曲线只读取不可变预测值；每秒更新当前时刻线、倒计时和真实位置，
+   不在帧循环中传播轨道。页面隐藏或目标切换时必须取消旧预测任务。
 
 ## 本地化与资料边界
 

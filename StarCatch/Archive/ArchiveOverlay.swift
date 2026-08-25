@@ -186,30 +186,24 @@ struct ArchiveOverlay: View {
 
     @ViewBuilder
     private var insightGraphic: some View {
-        Group {
-            if let insight {
-                SatelliteInsightGraphic(
-                    insight: insight,
-                    tint: object.identityTint,
-                    compact: true
-                )
-            } else {
-                OrbitFingerprintView(
-                    fingerprint: object.orbitFingerprint,
-                    tint: object.identityTint,
-                    compact: true
-                )
+        if let insight,
+           let pass = insight.pass,
+           pass.phase != .stationary {
+            SatelliteInsightGraphic(
+                insight: insight,
+                tint: object.identityTint,
+                compact: true
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Palette.voidBlack.opacity(0.16),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Palette.inkFaint.opacity(0.2), lineWidth: 0.5)
             }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .background(
-            Palette.voidBlack.opacity(0.16),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Palette.inkFaint.opacity(0.2), lineWidth: 0.5)
         }
     }
 

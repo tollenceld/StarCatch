@@ -132,10 +132,57 @@ struct PassWindow: Equatable, Sendable {
     let peak: Date?
     let set: Date?
     let maximumElevationDegrees: Double?
+    let riseAzimuthDegrees: Double?
+    let setAzimuthDegrees: Double?
+
+    init(
+        phase: Phase,
+        rise: Date?,
+        peak: Date?,
+        set: Date?,
+        maximumElevationDegrees: Double?,
+        riseAzimuthDegrees: Double? = nil,
+        setAzimuthDegrees: Double? = nil
+    ) {
+        self.phase = phase
+        self.rise = rise
+        self.peak = peak
+        self.set = set
+        self.maximumElevationDegrees = maximumElevationDegrees
+        self.riseAzimuthDegrees = riseAzimuthDegrees
+        self.setAzimuthDegrees = setAzimuthDegrees
+    }
+
+    var duration: TimeInterval? {
+        guard let rise, let set, set > rise else { return nil }
+        return set.timeIntervalSince(rise)
+    }
 
     func progress(at date: Date) -> Double? {
         guard phase == .visible, let rise, let set, set > rise else { return nil }
         return min(1, max(0, date.timeIntervalSince(rise) / set.timeIntervalSince(rise)))
+    }
+}
+
+/// A bounded, immutable view of the next day. It is produced only for the
+/// deep archive and never participates in the capture/rendering hot path.
+struct PassForecast: Equatable, Sendable {
+    let objectID: String
+    let referenceDate: Date
+    let endDate: Date
+    let windows: [PassWindow]
+    let isStationary: Bool
+    let stationaryElevationDegrees: Double?
+
+    func defaultWindowIndex(at date: Date) -> Int? {
+        if let active = windows.firstIndex(where: { window in
+            guard let rise = window.rise, let set = window.set else { return false }
+            return rise ... set ~= date
+        }) {
+            return active
+        }
+        return windows.firstIndex(where: { ($0.rise ?? .distantPast) >= date })
+            ?? windows.indices.first
     }
 }
 
@@ -365,8 +412,16 @@ final class SatelliteInsightEngine {
         let fiveMinuteBucket: Int64
     }
 
+    private struct ForecastCacheKey: Hashable {
+        let objectID: String
+        let latitudeCentidegrees: Int
+        let longitudeCentidegrees: Int
+        let fifteenMinuteBucket: Int64
+    }
+
     private let store: CatalogStore
     private var cache: [CacheKey: SatelliteInsightSnapshot] = [:]
+    private var forecastCache: [ForecastCacheKey: PassForecast] = [:]
 
     init(store: CatalogStore) {
         self.store = store
@@ -416,6 +471,38 @@ final class SatelliteInsightEngine {
         at date: Date
     ) async {
         _ = await insight(for: objectID, observer: observer, at: date)
+    }
+
+    func forecast(
+        for objectID: String,
+        observer: ObserverLocation.Coordinates,
+        at date: Date
+    ) async -> PassForecast? {
+        let key = ForecastCacheKey(
+            objectID: objectID,
+            latitudeCentidegrees: Int((observer.latitude * 100).rounded()),
+            longitudeCentidegrees: Int((observer.longitude * 100).rounded()),
+            fifteenMinuteBucket: Int64(date.timeIntervalSince1970 / 900)
+        )
+        if let cached = forecastCache[key] { return cached }
+        guard let satellite = store.satellites[objectID] else { return nil }
+        let task = Task.detached(priority: .utility) {
+            Self.computeForecast(
+                objectID: objectID,
+                satellite: satellite,
+                observer: observer,
+                start: date
+            )
+        }
+        let result = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        guard !Task.isCancelled, let result else { return nil }
+        forecastCache[key] = result
+        if forecastCache.count > 24 { forecastCache = [key: result] }
+        return result
     }
 
     nonisolated private static func compute(
@@ -588,6 +675,119 @@ final class SatelliteInsightEngine {
             previousElevation = value
         }
         return nil
+    }
+
+    nonisolated private static func computeForecast(
+        objectID: String,
+        satellite: Satellite,
+        observer: ObserverLocation.Coordinates,
+        start: Date
+    ) -> PassForecast? {
+        let location = LatLonAlt(
+            observer.latitude,
+            observer.longitude,
+            observer.altitudeMeters / 1000
+        )
+        func elevation(_ date: Date) -> Double? {
+            (try? satellite.topPosition(julianDays: date.julianDate, observer: location))?.elev
+        }
+        func azimuth(_ date: Date) -> Double? {
+            (try? satellite.topPosition(julianDays: date.julianDate, observer: location))?.azim
+        }
+        guard let initialElevation = elevation(start) else { return nil }
+        let end = start.addingTimeInterval(24 * 3600)
+        if let laterElevation = elevation(start.addingTimeInterval(3600)),
+           initialElevation > 0,
+           abs(laterElevation - initialElevation) < 0.5 {
+            return PassForecast(
+                objectID: objectID,
+                referenceDate: start,
+                endDate: end,
+                windows: [],
+                isStationary: true,
+                stationaryElevationDegrees: initialElevation
+            )
+        }
+
+        let step: TimeInterval = 60
+        var windows: [PassWindow] = []
+        var rise: Date?
+        var scan = start
+        var previousElevation = initialElevation
+
+        if initialElevation > 0 {
+            var back = start
+            var current = initialElevation
+            let backLimit = start.addingTimeInterval(-12 * 3600)
+            while back > backLimit, !Task.isCancelled {
+                let candidate = back.addingTimeInterval(-step)
+                guard let value = elevation(candidate) else { break }
+                if value <= 0, current > 0 {
+                    rise = refineCrossing(
+                        satellite: satellite,
+                        observer: location,
+                        lower: candidate,
+                        upper: back,
+                        rising: true
+                    )
+                    break
+                }
+                back = candidate
+                current = value
+            }
+        }
+
+        while scan < end, windows.count < 8, !Task.isCancelled {
+            let candidate = min(end, scan.addingTimeInterval(step))
+            guard let value = elevation(candidate) else { return nil }
+            if rise == nil, previousElevation <= 0, value > 0 {
+                rise = refineCrossing(
+                    satellite: satellite,
+                    observer: location,
+                    lower: scan,
+                    upper: candidate,
+                    rising: true
+                )
+            }
+            if let currentRise = rise, previousElevation > 0, value <= 0 {
+                let set = refineCrossing(
+                    satellite: satellite,
+                    observer: location,
+                    lower: scan,
+                    upper: candidate,
+                    rising: false
+                )
+                let peak = findPeak(
+                    satellite: satellite,
+                    observer: location,
+                    rise: currentRise,
+                    set: set
+                )
+                windows.append(
+                    PassWindow(
+                        phase: currentRise <= start && start <= set ? .visible : .approaching,
+                        rise: currentRise,
+                        peak: peak.date,
+                        set: set,
+                        maximumElevationDegrees: peak.elevation,
+                        riseAzimuthDegrees: azimuth(currentRise),
+                        setAzimuthDegrees: azimuth(set)
+                    )
+                )
+                rise = nil
+            }
+            scan = candidate
+            previousElevation = value
+        }
+        guard !Task.isCancelled else { return nil }
+        return PassForecast(
+            objectID: objectID,
+            referenceDate: start,
+            endDate: end,
+            windows: windows,
+            isStationary: false,
+            stationaryElevationDegrees: nil
+        )
     }
 
     nonisolated private static func refineCrossing(

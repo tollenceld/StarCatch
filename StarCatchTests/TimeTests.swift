@@ -57,21 +57,21 @@ final class TimeTests: XCTestCase {
     func testBootTimelineWakesLettersAndReportsRealSystemState() {
         let silent = BootVisualTimeline(
             elapsed: 0,
-            isReady: false,
+            preparation: .initial,
             handoffProgress: 0
         )
-        XCTAssertEqual(silent.scanProgress, 0, accuracy: 0.0001)
+        XCTAssertEqual(silent.registrationProgress, 0, accuracy: 0.0001)
         XCTAssertEqual(silent.systemPhase, .initializing)
         XCTAssertLessThan(silent.letterActivation(at: 8), 0.25)
         XCTAssertLessThan(silent.moduleActivation(at: 2), 0.05)
 
         let syncing = BootVisualTimeline(
-            elapsed: 1.6,
-            isReady: false,
+            elapsed: 1.0,
+            preparation: BootPreparationState(catalogReady: true),
             handoffProgress: 0
         )
         XCTAssertEqual(syncing.systemPhase, .catalogSync)
-        XCTAssertGreaterThan(syncing.signalProgress, 0)
+        XCTAssertGreaterThan(syncing.registrationProgress, 0)
         XCTAssertGreaterThan(
             syncing.letterActivation(at: 0),
             syncing.letterActivation(at: 8)
@@ -83,21 +83,24 @@ final class TimeTests: XCTestCase {
 
         let fastReady = BootVisualTimeline(
             elapsed: 1.6,
-            isReady: true,
+            preparation: .ready,
             handoffProgress: 0
         )
         XCTAssertEqual(fastReady.systemPhase, .ready)
 
         let calibrating = BootVisualTimeline(
             elapsed: 2.5,
-            isReady: false,
+            preparation: BootPreparationState(
+                catalogReady: true,
+                orbitEngineReady: true
+            ),
             handoffProgress: 0
         )
         XCTAssertEqual(calibrating.systemPhase, .calibrating)
 
         let ready = BootVisualTimeline(
             elapsed: 3.2,
-            isReady: true,
+            preparation: .ready,
             handoffProgress: 0
         )
         XCTAssertEqual(ready.systemPhase, .ready)
@@ -106,7 +109,7 @@ final class TimeTests: XCTestCase {
 
         let final = BootVisualTimeline(
             elapsed: 3.5,
-            isReady: true,
+            preparation: .ready,
             handoffProgress: 1
         )
         XCTAssertEqual(final.finalFrame, 1, accuracy: 0.0001)
@@ -197,16 +200,22 @@ final class TimeTests: XCTestCase {
         XCTAssertNotEqual(quarter, .pi / 2, accuracy: 0.05)
     }
 
-    func testBootTimelineLoopsWithoutReturningToBlack() {
-        let waiting = BootVisualTimeline(
+    func testBootTimelineSettlesWithoutLooping() {
+        let preparation = BootPreparationState(catalogReady: true)
+        let settled = BootVisualTimeline(
             elapsed: 6.95,
-            isReady: false,
+            preparation: preparation,
             handoffProgress: 0
         )
-        XCTAssertGreaterThanOrEqual(waiting.phaseTime, BootVisualTimeline.loopStart)
-        XCTAssertLessThan(waiting.phaseTime, BootVisualTimeline.loopEnd)
-        XCTAssertEqual(waiting.loopStrength, 0.38, accuracy: 0.0001)
-        XCTAssertGreaterThan(waiting.wordmarkOpacity, 0.99)
+        let muchLater = BootVisualTimeline(
+            elapsed: 60,
+            preparation: preparation,
+            handoffProgress: 0
+        )
+        XCTAssertEqual(settled.registrationProgress, 1, accuracy: 0.0001)
+        XCTAssertEqual(muchLater.registrationProgress, 1, accuracy: 0.0001)
+        XCTAssertEqual(settled.letterActivation(at: 8), muchLater.letterActivation(at: 8))
+        XCTAssertEqual(settled.wordmarkOpacity, 1, accuracy: 0.0001)
     }
 
     func testSatelliteVisualTreatmentIsStableForTargetID() {
@@ -1230,6 +1239,53 @@ final class TimeTests: XCTestCase {
             at: observation
         )
         XCTAssertEqual(first, cached, "相同目标、位置和时间桶应复用完全一致的洞察")
+    }
+
+    func testFullDayForecastIsBoundedDeterministicAndCarriesPassFacts() async throws {
+        let engine = SatelliteInsightEngine(store: Self.store)
+        let observation = Self.store.generatedAt ?? Date(timeIntervalSince1970: 1_750_000_000)
+        let generated = await engine.forecast(
+            for: "iss",
+            observer: ObserverLocation.fallback,
+            at: observation
+        )
+        let first = try XCTUnwrap(generated)
+        let cached = await engine.forecast(
+            for: "iss",
+            observer: ObserverLocation.fallback,
+            at: observation
+        )
+
+        XCTAssertEqual(first, cached)
+        XCTAssertEqual(first.objectID, "iss")
+        XCTAssertEqual(first.endDate.timeIntervalSince(first.referenceDate), 24 * 3600, accuracy: 0.1)
+        XCTAssertLessThanOrEqual(first.windows.count, 8)
+        XCTAssertFalse(first.windows.isEmpty)
+        for window in first.windows {
+            let rise = try XCTUnwrap(window.rise)
+            let peak = try XCTUnwrap(window.peak)
+            let set = try XCTUnwrap(window.set)
+            XCTAssertLessThan(rise, peak)
+            XCTAssertLessThan(peak, set)
+            XCTAssertGreaterThan(try XCTUnwrap(window.duration), 0)
+            XCTAssertNotNil(window.riseAzimuthDegrees)
+            XCTAssertNotNil(window.setAzimuthDegrees)
+        }
+        XCTAssertNotNil(first.defaultWindowIndex(at: observation))
+    }
+
+    func testFullDayForecastKeepsGeoStationaryWithoutFakePassCurve() async throws {
+        let engine = SatelliteInsightEngine(store: Self.store)
+        let observation = Self.store.generatedAt ?? Date(timeIntervalSince1970: 1_750_000_000)
+        let generated = await engine.forecast(
+            for: "himawari9",
+            observer: ObserverLocation.fallback,
+            at: observation
+        )
+        let forecast = try XCTUnwrap(generated)
+        XCTAssertTrue(forecast.isStationary)
+        XCTAssertTrue(forecast.windows.isEmpty)
+        XCTAssertNotNil(forecast.stationaryElevationDegrees)
     }
 
     func testTargetDetailWaitsThreeSecondsAfterFocusLeaves() {

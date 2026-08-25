@@ -3,8 +3,8 @@ import SwiftUI
 /// 仅首次启动出现的产品署名。它不伪装成加载进度，也不承担手册职责；
 /// 回访用户使用不带介绍文案的 StartupLoadingView。
 struct BootSequenceView: View {
-    /// 轨道目录已在后台完成准备。未完成时仍保持可见，不把用户退回纯黑画面。
-    let isReady: Bool
+    /// 后台准备的真实阶段。未完成时仍保持可见，不把用户退回纯黑画面。
+    let preparation: BootPreparationState
     /// true 表示用户主动打断；调用方可直接进入主观测界面。
     let onFinished: (Bool) -> Void
 
@@ -20,6 +20,7 @@ struct BootSequenceView: View {
     @State private var startedAt = Date()
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var isReady: Bool { preparation.isReady }
     private var fadeOutDuration: TimeInterval { suppressMotion ? 0.08 : 0.18 }
 
     var body: some View {
@@ -27,7 +28,7 @@ struct BootSequenceView: View {
             Palette.voidBlack.ignoresSafeArea()
 
             SystemWakeView(
-                isReady: isReady,
+                preparation: preparation,
                 handoffProgress: handoffProgress,
                 suppressMotion: suppressMotion
             )
@@ -173,7 +174,7 @@ struct BootSequenceView: View {
 /// 回访用户只看到极简品牌准备层，不重复首启文案；数据完成即进入天空。
 /// 与首启共用同一自检层，因此两条入口读作同一台仪器的不同开机时长。
 struct StartupLoadingView: View {
-    let isReady: Bool
+    let preparation: BootPreparationState
     let onFinished: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -184,13 +185,14 @@ struct StartupLoadingView: View {
     @State private var startedAt = Date()
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var isReady: Bool { preparation.isReady }
 
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
             SystemWakeView(
-                isReady: isReady,
+                preparation: preparation,
                 handoffProgress: handoffProgress,
                 suppressMotion: suppressMotion
             )

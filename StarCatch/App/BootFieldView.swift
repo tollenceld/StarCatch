@@ -1,9 +1,41 @@
 import SwiftUI
 
+/// 启动页只展示真实完成的准备节点。三个布尔值按顺序由 `RootView`
+/// 在目录、轨道引擎和捕获管线真正可用后更新。
+struct BootPreparationState: Equatable, Sendable {
+    var catalogReady = false
+    var orbitEngineReady = false
+    var observationModelReady = false
+
+    static let initial = BootPreparationState()
+    static let ready = BootPreparationState(
+        catalogReady: true,
+        orbitEngineReady: true,
+        observationModelReady: true
+    )
+
+    var isReady: Bool {
+        catalogReady && orbitEngineReady && observationModelReady
+    }
+
+    func isModuleReady(at index: Int) -> Bool {
+        switch index {
+        case 0: catalogReady
+        case 1: orbitEngineReady
+        case 2: observationModelReady
+        default: false
+        }
+    }
+
+    var activeModuleIndex: Int? {
+        (0 ..< 3).first { !isModuleReady(at: $0) }
+    }
+}
+
 /// 启动文字系统的纯值时间轴。
 ///
-/// 首轮逐字完成模块确认；数据等待时间超过 3.2 秒后只以更弱的强度重复扫描，
-/// 不重新黑场，也不重置已经建立的星场。
+/// 字形注册只执行一次。数据等待时间超过 3.2 秒后保持稳定终帧，
+/// 不循环、不重新黑场，也不重置已经建立的星场。
 struct BootVisualTimeline: Equatable {
     enum SystemPhase: String, Equatable {
         case initializing = "INITIALIZING"
@@ -23,58 +55,29 @@ struct BootVisualTimeline: Equatable {
 
     static let minimumPresentationDuration: TimeInterval = 3.2
     static let fullDuration: TimeInterval = 3.6
-    static let scanStart: TimeInterval = 0.35
-    static let scanEnd: TimeInterval = 2.75
-    static let loopStart: TimeInterval = 0.55
-    static let loopEnd: TimeInterval = 3.05
-    private static let loopDuration = loopEnd - loopStart
+    static let registrationStart: TimeInterval = 0.4
+    static let registrationEnd: TimeInterval = 1.8
 
     let elapsed: TimeInterval
-    let isReady: Bool
+    let preparation: BootPreparationState
     let handoffProgress: Double
 
-    var phaseTime: TimeInterval {
-        guard elapsed > Self.minimumPresentationDuration else {
-            return max(0, elapsed)
-        }
-        let loop = (elapsed - Self.loopStart)
-            .truncatingRemainder(dividingBy: Self.loopDuration)
-        return Self.loopStart + max(0, loop)
-    }
-
-    var loopStrength: Double {
-        elapsed <= Self.minimumPresentationDuration ? 1 : 0.38
-    }
-
-    var scanProgress: Double {
+    var registrationProgress: Double {
         Self.smoothstep(
-            (phaseTime - Self.scanStart) / (Self.scanEnd - Self.scanStart)
+            (elapsed - Self.registrationStart)
+                / (Self.registrationEnd - Self.registrationStart)
         )
-    }
-
-    /// 信号点并非匀速穿过标题。每个字母附近有一段短暂停顿，再缓慢吸附到下一格。
-    var signalProgress: Double {
-        let raw = min(0.9999, max(0, scanProgress)) * 8
-        let index = floor(raw)
-        let local = raw - index
-        let moving = Self.smoothstep((local - 0.24) / 0.62)
-        return min(1, (index + moving) / 8)
     }
 
     var systemPhase: SystemPhase {
-        if isReady { return .ready }
-        if elapsed < 1.05 { return .initializing }
-        if elapsed < 2.15 { return .catalogSync }
-        return .calibrating
+        if preparation.isReady { return .ready }
+        if preparation.orbitEngineReady { return .calibrating }
+        if preparation.catalogReady { return .catalogSync }
+        return .initializing
     }
 
     var readyEmphasis: Double {
-        guard systemPhase == .ready else { return 0 }
-        let readyTime = max(
-            0,
-            elapsed - (Self.minimumPresentationDuration - 0.18)
-        )
-        return 0.72 + 0.28 * Self.smoothstep(readyTime / 0.24)
+        preparation.isReady ? 1 : 0
     }
 
     var finalFrame: Double {
@@ -86,23 +89,18 @@ struct BootVisualTimeline: Equatable {
     }
 
     func letterActivation(at index: Int) -> Double {
-        let position = Double(index) / 8
-        let passed = Self.smoothstep((scanProgress - position + 0.035) / 0.12)
-        let focus = max(0, 1 - abs(signalProgress - position) / 0.12)
-        let settled = 0.18 + 0.66 * passed
-        return min(1, settled + 0.22 * focus * loopStrength)
+        let position = Double(index) / 9
+        return Self.smoothstep(
+            (registrationProgress - position * 0.72) / 0.2
+        )
     }
 
-    func letterBlur(at index: Int) -> CGFloat {
-        let activation = letterActivation(at: index)
-        return CGFloat(max(0, 0.72 * (1 - activation)))
+    func registrationOffset(at index: Int) -> CGFloat {
+        CGFloat(0.95 * (1 - letterActivation(at: index)))
     }
 
     func moduleActivation(at index: Int) -> Double {
-        if systemPhase == .ready { return 1 }
-        let thresholds = [0.12, 0.48, 0.78]
-        guard thresholds.indices.contains(index) else { return 0 }
-        return Self.smoothstep((scanProgress - thresholds[index]) / 0.18)
+        preparation.isModuleReady(at: index) ? 1 : 0
     }
 
     private static func smoothstep(_ value: Double) -> Double {
@@ -136,44 +134,16 @@ struct BootFieldView: View {
                 )
             )
 
-            drawLocalSignalResponse(context, size: size)
             SkyRenderer.drawVignette(context, size: size)
         }
         .accessibilityHidden(true)
     }
-
-    private func drawLocalSignalResponse(
-        _ context: GraphicsContext,
-        size: CGSize
-    ) {
-        guard timeline.finalFrame < 0.9 else { return }
-        let x = size.width / 2 - 82 + 164 * CGFloat(timeline.signalProgress)
-        let strength = 0.12 * timeline.loopStrength * timeline.wordmarkOpacity
-        guard strength > 0.01 else { return }
-
-        let points = [
-            CGPoint(x: x - 7, y: size.height / 2 - 34),
-            CGPoint(x: x + 12, y: size.height / 2 + 38),
-        ]
-        for (index, point) in points.enumerated() {
-            let radius: CGFloat = index == 0 ? 0.72 : 0.5
-            context.fill(
-                Path(ellipseIn: CGRect(
-                    x: point.x - radius,
-                    y: point.y - radius,
-                    width: radius * 2,
-                    height: radius * 2
-                )),
-                with: .color(Palette.signal.opacity(strength * (index == 0 ? 1 : 0.68)))
-            )
-        }
-    }
 }
 
-/// 固定在画面中央的品牌唤醒层。字号、字距和位置始终不变；只有字母清晰度、
-/// 信号点与副标题状态参与加载过程。
+/// 固定在画面中央的品牌唤醒层。字号、字距和位置始终不变；只有字母注册进度
+/// 与模块验证状态参与加载过程。
 struct SystemWakeView: View {
-    let isReady: Bool
+    let preparation: BootPreparationState
     let handoffProgress: Double
     let suppressMotion: Bool
 
@@ -185,7 +155,7 @@ struct SystemWakeView: View {
             wakeContent(
                 BootVisualTimeline(
                     elapsed: previewElapsed,
-                    isReady: isReady,
+                    preparation: preparation,
                     handoffProgress: handoffProgress
                 )
             )
@@ -207,7 +177,7 @@ struct SystemWakeView: View {
         wakeContent(
             BootVisualTimeline(
                 elapsed: BootVisualTimeline.minimumPresentationDuration,
-                isReady: isReady,
+                preparation: preparation,
                 handoffProgress: handoffProgress
             )
         )
@@ -218,7 +188,7 @@ struct SystemWakeView: View {
             wakeContent(
                 BootVisualTimeline(
                     elapsed: frame.date.timeIntervalSince(startedAt),
-                    isReady: isReady,
+                    preparation: preparation,
                     handoffProgress: handoffProgress
                 )
             )
@@ -232,9 +202,12 @@ struct SystemWakeView: View {
 
             VStack(spacing: 0) {
                 wordmark(timeline)
-                    .padding(.bottom, 14)
-                BootModuleRail(timeline: timeline)
-                    .padding(.bottom, 15)
+                    .padding(.bottom, 27)
+                BootModuleLedger(
+                    preparation: preparation,
+                    timeline: timeline
+                )
+                .padding(.bottom, 21)
                 BootStatusText(
                     phase: timeline.systemPhase,
                     readyEmphasis: timeline.readyEmphasis
@@ -251,46 +224,27 @@ struct SystemWakeView: View {
         let cellWidth = titleWidth / CGFloat(letters.count)
 
         return ZStack(alignment: .topLeading) {
-            // A soft focus plane moves through the wordmark. It is deliberately
-            // wider than a light streak so the result reads as optical calibration.
-            LinearGradient(
-                colors: [
-                    .clear,
-                    Palette.signal.opacity(0.035 * timeline.loopStrength),
-                    Palette.signal.opacity(0.12 * timeline.loopStrength),
-                    Palette.signal.opacity(0.035 * timeline.loopStrength),
-                    .clear,
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(width: 46, height: 39)
-            .blur(radius: 4)
-            .offset(x: -23 + CGFloat(timeline.signalProgress) * titleWidth, y: -4)
-
             HStack(spacing: 0) {
                 ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
-                    Text(String(letter))
-                        .font(.system(size: 21, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(
-                            Palette.inkHigh.opacity(
-                                0.16 + 0.78 * timeline.letterActivation(at: index)
-                            )
-                        )
-                        .blur(radius: timeline.letterBlur(at: index))
-                        .frame(width: cellWidth, height: 31)
+                    registeredGlyph(
+                        String(letter),
+                        activation: timeline.letterActivation(at: index),
+                        offset: timeline.registrationOffset(at: index)
+                    )
+                    .frame(width: cellWidth, height: 31)
                 }
             }
 
-            HStack(spacing: 4) {
+            HStack(spacing: 0) {
                 ForEach(0 ..< letters.count, id: \.self) { index in
-                    Capsule()
-                        .fill(
-                            index <= Int(timeline.signalProgress * 8.01)
-                                ? Palette.signal.opacity(0.58 * timeline.loopStrength)
-                                : Palette.inkFaint.opacity(0.25)
-                        )
-                        .frame(width: cellWidth - 4, height: index == Int(timeline.signalProgress * 8.01) ? 1.4 : 0.55)
+                    Rectangle()
+                        .fill(Palette.inkFaint.opacity(0.24 + 0.28 * timeline.letterActivation(at: index)))
+                        .frame(width: cellWidth, height: 0.5)
+                        .overlay(alignment: .center) {
+                            Rectangle()
+                                .fill(Palette.signal.opacity(0.38 * timeline.letterActivation(at: index)))
+                                .frame(width: 0.5, height: 5)
+                        }
                 }
             }
             .frame(width: titleWidth)
@@ -304,6 +258,43 @@ struct SystemWakeView: View {
         .frame(width: titleWidth, height: 42, alignment: .topLeading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("StarCatch")
+    }
+
+    private func registeredGlyph(
+        _ glyph: String,
+        activation: Double,
+        offset: CGFloat
+    ) -> some View {
+        let font = Font.system(size: 21, weight: .semibold, design: .monospaced)
+        return ZStack {
+            Text(glyph)
+                .font(font)
+                .foregroundStyle(Palette.inkHigh.opacity(0.12 + 0.84 * activation))
+
+            Text(glyph)
+                .font(font)
+                .foregroundStyle(Palette.signal.opacity(0.24 * (1 - activation)))
+                .offset(x: -offset, y: -0.35)
+                .mask(alignment: .top) {
+                    VStack(spacing: 5) {
+                        Rectangle().frame(height: 0.8)
+                        Rectangle().frame(height: 0.6)
+                        Rectangle().frame(height: 0.8)
+                    }
+                }
+
+            Text(glyph)
+                .font(font)
+                .foregroundStyle(Palette.inkMid.opacity(0.2 * (1 - activation)))
+                .offset(x: offset, y: 0.45)
+                .mask(alignment: .bottom) {
+                    VStack(spacing: 6) {
+                        Rectangle().frame(height: 0.7)
+                        Rectangle().frame(height: 0.55)
+                        Rectangle().frame(height: 0.7)
+                    }
+                }
+        }
     }
 
     private func calibrationBracket(leading: Bool) -> some View {
@@ -336,42 +327,64 @@ struct SystemWakeView: View {
     #endif
 }
 
-private struct BootModuleRail: View {
+private struct BootModuleLedger: View {
+    let preparation: BootPreparationState
     let timeline: BootVisualTimeline
 
-    private let keys = [
-        "boot.module.catalog",
-        "boot.module.orbit",
-        "boot.module.attitude",
+    private let modules = [
+        ("boot.module.catalog", "books.vertical"),
+        ("boot.module.orbit_solver", "circle.dotted.and.circle"),
+        ("boot.module.observation_model", "viewfinder"),
     ]
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(keys.enumerated()), id: \.offset) { index, key in
-                HStack(spacing: 6) {
-                    ZStack {
-                        Circle()
-                            .stroke(Palette.inkFaint.opacity(0.48), lineWidth: 0.55)
-                        Circle()
-                            .fill(Palette.signal.opacity(0.82))
-                            .padding(2.2)
-                            .opacity(timeline.moduleActivation(at: index))
-                    }
-                    .frame(width: 7, height: 7)
-
-                    Text(L10n.text(key))
-                        .lineLimit(1)
+        VStack(spacing: 0) {
+            ForEach(Array(modules.enumerated()), id: \.offset) { index, module in
+                HStack(spacing: 11) {
+                    Image(systemName: module.1)
+                        .font(.system(size: 10, weight: .light))
+                        .frame(width: 16)
+                    Text(L10n.text(module.0))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(statusKey(for: index))
+                        .foregroundStyle(
+                            preparation.isModuleReady(at: index)
+                                ? Palette.signal.opacity(0.78)
+                                : Palette.inkLow.opacity(0.48)
+                        )
+                    Image(systemName: preparation.isModuleReady(at: index) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 8, weight: .medium))
+                        .frame(width: 10)
+                        .foregroundStyle(
+                            preparation.isModuleReady(at: index)
+                                ? Palette.signal.opacity(0.82)
+                                : Palette.inkFaint.opacity(0.44)
+                        )
                 }
-                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
-                .tracking(SupportedLanguage.current == .english ? 0.65 : 0.2)
-                .foregroundStyle(
-                    Palette.inkLow.opacity(0.35 + 0.38 * timeline.moduleActivation(at: index))
-                )
-                .frame(maxWidth: .infinity)
+                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                .tracking(SupportedLanguage.current == .english ? 0.55 : 0.12)
+                .foregroundStyle(Palette.inkMid.opacity(0.54 + 0.26 * timeline.moduleActivation(at: index)))
+                .frame(height: 35)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Palette.inkFaint.opacity(0.22))
+                        .frame(height: 0.5)
+                }
             }
         }
-        .frame(width: 244, height: 16)
+        .frame(width: 238)
         .accessibilityHidden(true)
+    }
+
+    private func statusKey(for index: Int) -> String {
+        if preparation.isModuleReady(at: index) {
+            return L10n.text("boot.module.verified")
+        }
+        return L10n.text(
+            preparation.activeModuleIndex == index
+                ? "boot.module.working"
+                : "boot.module.waiting"
+        )
     }
 }
 

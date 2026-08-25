@@ -328,7 +328,12 @@
     "boot.intro.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "A precise instrument for the real sky." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "一台面向真实天空的精密观测仪。" } } } },
     "boot.module.attitude" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ATTITUDE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "姿态" } } } },
     "boot.module.catalog" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CATALOG" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录" } } } },
+    "boot.module.observation_model" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "OBSERVATION MODEL" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "观测模型" } } } },
     "boot.module.orbit" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBIT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道" } } } },
+    "boot.module.orbit_solver" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBIT SOLVER" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道解算" } } } },
+    "boot.module.verified" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "VERIFIED" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已验证" } } } },
+    "boot.module.waiting" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "WAITING" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "等待" } } } },
+    "boot.module.working" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "VERIFYING" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "验证中" } } } },
     "boot.system.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "OBSERVATION SYSTEM" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "观测系统" } } } }
   },
   "version" : "1.0"

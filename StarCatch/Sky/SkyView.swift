@@ -70,6 +70,7 @@ struct SkyView: View {
     @State private var overviewScaleModified = false
     @State private var overviewResetRequest = 0
     @State private var presentedStoryObjectID: String?
+    @State private var presentedPassForecast: PassForecast?
     @State private var engagedPreciseEphemeris: Ephemeris?
     @State private var engagedInsight: SatelliteInsightSnapshot?
 
@@ -304,6 +305,9 @@ struct SkyView: View {
         }
         .task(id: capture.engagedObjectId) {
             await prepareEngagedTargetData(for: capture.engagedObjectId)
+        }
+        .task(id: presentedStoryObjectID) {
+            await preparePresentedForecast(for: presentedStoryObjectID)
         }
         .task(id: detailGraceDeadline) {
             guard let deadline = detailGraceDeadline else { return }
@@ -1996,6 +2000,9 @@ struct SkyView: View {
                 story: presentation.story,
                 ephemeris: engagedDisplayEphemeris(for: id),
                 insight: engagedInsight?.objectID == id ? engagedInsight : nil,
+                forecast: presentedPassForecast?.objectID == id
+                    ? presentedPassForecast
+                    : nil,
                 onDismiss: {
                     withAnimation(
                         suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.22)
@@ -2121,6 +2128,21 @@ struct SkyView: View {
         else { return }
         engagedPreciseEphemeris = precise
         engagedInsight = insight
+    }
+
+    /// Full-day propagation belongs to the reading surface, not first focus.
+    /// The task modifier cancels this work as soon as the archive closes or the
+    /// selected target changes.
+    private func preparePresentedForecast(for objectID: String?) async {
+        presentedPassForecast = nil
+        guard let objectID else { return }
+        let forecast = await session.insights.forecast(
+            for: objectID,
+            observer: session.observer.coordinates,
+            at: clock.observationTime()
+        )
+        guard !Task.isCancelled, presentedStoryObjectID == objectID else { return }
+        presentedPassForecast = forecast
     }
 
     /// 方位、距离和高度跟随批量 LIVE 帧平滑更新；精确速度使用感应阶段的后台

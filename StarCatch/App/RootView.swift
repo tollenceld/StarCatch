@@ -23,6 +23,7 @@ struct RootView: View {
     /// 11 MB 轨道目录必须在首帧之后于后台解析；同步构造会让系统 Launch Screen
     /// 持续占据屏幕，用户只能看到一段没有反馈的纯黑。
     @State private var session: SkySession?
+    @State private var bootPreparation = BootPreparationState.initial
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
@@ -110,7 +111,7 @@ struct RootView: View {
             // 启动序列
             if stage == .booting {
                 if manualSeen {
-                    StartupLoadingView(isReady: session != nil) {
+                    StartupLoadingView(preparation: bootPreparation) {
                         withAnimation(
                             reducedMotion || systemReducedMotion
                                 ? .easeOut(duration: 0.16)
@@ -121,7 +122,7 @@ struct RootView: View {
                     }
                         .transition(.opacity)
                 } else {
-                    BootSequenceView(isReady: session != nil) { interrupted in
+                    BootSequenceView(preparation: bootPreparation) { interrupted in
                         withAnimation(sceneAnimation) {
                             if interrupted {
                                 manualSeen = true
@@ -213,10 +214,13 @@ struct RootView: View {
             return catalog
         }.value
         guard !Task.isCancelled else { return }
+        bootPreparation.catalogReady = true
 
         let preparedSession = SkySession(catalog: catalog)
+        bootPreparation.orbitEngineReady = true
         await preparedSession.prewarmCapturePipeline()
         guard !Task.isCancelled else { return }
+        bootPreparation.observationModelReady = true
         session = preparedSession
         // 启动文字仍在屏幕上时预热触觉管线。第一次卫星进入准星不再承担
         // UIImpactFeedbackGenerator 的冷启动成本。

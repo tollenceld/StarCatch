@@ -18,19 +18,13 @@ struct SatelliteStoryView: View {
             }
         }
 
-        var symbolName: String {
-            switch self {
-            case .observation: "scope"
-            case .mission: "sparkles"
-            case .data: "waveform.path.ecg"
-            }
-        }
     }
 
     let object: CatalogObject
     let story: SatelliteStory
     let ephemeris: Ephemeris?
     let insight: SatelliteInsightSnapshot?
+    let forecast: PassForecast?
     let onDismiss: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -40,6 +34,7 @@ struct SatelliteStoryView: View {
     @State private var missionHistoryExpanded = false
     @State private var sourcesExpanded = false
     @State private var selectedSection: ArchiveSection = .observation
+    @State private var selectedPassIndex: Int?
     @Namespace private var sectionSelection
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
@@ -149,30 +144,27 @@ struct SatelliteStoryView: View {
     }
 
     private var archiveSectionPicker: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 22) {
             ForEach(ArchiveSection.allCases) { section in
                 Button {
                     withAnimation(suppressMotion ? .easeOut(duration: 0.1) : .easeInOut(duration: 0.22)) {
                         selectedSection = section
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: section.symbolName)
-                            .font(.system(size: 9.5, weight: .medium))
-                        Text(copy(section.titleKey))
-                            .lineLimit(1)
-                    }
+                    Text(copy(section.titleKey))
+                        .lineLimit(1)
                     .font(.system(.caption, design: .default, weight: .medium))
                     .foregroundStyle(
                         selectedSection == section
                             ? Palette.inkHigh.opacity(0.92)
                             : Palette.inkLow.opacity(0.68)
                     )
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .background {
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .overlay(alignment: .bottom) {
                         if selectedSection == section {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .fill(object.identityTint.opacity(0.09))
+                            Rectangle()
+                                .fill(object.identityTint.opacity(0.82))
+                                .frame(height: 1)
                                 .matchedGeometryEffect(id: "archive-section", in: sectionSelection)
                         }
                     }
@@ -182,11 +174,10 @@ struct SatelliteStoryView: View {
                 .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
             }
         }
-        .padding(3)
-        .background(Palette.inkHigh.opacity(0.025), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.55)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.28))
+                .frame(height: 0.5)
         }
     }
 
@@ -204,7 +195,17 @@ struct SatelliteStoryView: View {
 
     private var observationSection: some View {
         VStack(alignment: .leading, spacing: 0) {
+            forecastSectionHeader
+            PassForecastLedgerView(
+                forecast: forecast,
+                fallbackPass: insight?.pass,
+                selectedIndex: $selectedPassIndex,
+                tint: object.identityTint
+            )
+            .padding(.top, 11)
+
             sectionLabel(copy("archive.section.observe_now"))
+                .padding(.top, 24)
             if let ephemeris {
                 observationSnapshot(ephemeris)
                     .padding(.top, 11)
@@ -215,35 +216,27 @@ struct SatelliteStoryView: View {
                     .padding(.top, 13)
             }
 
-            sectionLabel(copy("archive.section.orbit_at_glance"))
-                .padding(.top, 24)
-            OrbitFingerprintView(
-                fingerprint: object.orbitFingerprint,
-                tint: object.identityTint,
-                motion: insight?.motion
-            )
-            .padding(.top, 8)
-            HStack(spacing: 0) {
-                compactMetric(
-                    copy("archive.field.period"),
-                    String(format: "%.1f MIN", object.orbitFingerprint.periodMinutes)
-                )
-                observationDivider
-                compactMetric(
-                    copy("archive.field.inclination"),
-                    String(format: "%.2f°", object.orbitFingerprint.inclinationDegrees)
-                )
-                observationDivider
-                compactMetric(
-                    copy("archive.field.apsides_compact"),
-                    String(
-                        format: "%.0f / %.0f KM",
-                        object.orbitFingerprint.perigeeKm,
-                        object.orbitFingerprint.apogeeKm
-                    )
-                )
+        }
+    }
+
+    private var forecastSectionHeader: some View {
+        HStack(spacing: 10) {
+            Text(copy("archive.section.future_24h"))
+                .font(Typography.fieldLabel)
+                .tracking(Typography.fieldLabelTracking)
+                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                .lineLimit(1)
+            Spacer(minLength: 10)
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(object.identityTint.opacity(0.65))
+                    .frame(width: 14, height: 0.7)
+                Text(copy("archive.forecast.above_horizon"))
+                    .font(Typography.statusTag)
+                    .tracking(language == .english ? 0.35 : 0.08)
+                    .foregroundStyle(Palette.inkLow.opacity(0.64))
+                    .lineLimit(1)
             }
-            .padding(.top, 2)
         }
     }
 
@@ -302,7 +295,7 @@ struct SatelliteStoryView: View {
 
     private var dataSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            orbitFingerprintModule
+            orbitParametersModule
                 .padding(.bottom, 24)
             currentTargetModule
                 .padding(.bottom, 20)
@@ -507,29 +500,9 @@ struct SatelliteStoryView: View {
         .accessibilityLabel(observationSentence(ephemeris))
     }
 
-    private func compactMetric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(Typography.statusTag)
-                .tracking(language == .english ? 0.65 : 0.12)
-                .foregroundStyle(Palette.inkLow.opacity(0.66))
-                .lineLimit(1)
-            Text(value)
-                .font(Typography.archiveDataValue)
-                .foregroundStyle(Palette.inkMid.opacity(0.88))
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-        }
-        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-    }
-
-    private var orbitFingerprintModule: some View {
+    private var orbitParametersModule: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionLabel(copy("archive.section.orbit_fingerprint"))
-            OrbitFingerprintView(
-                fingerprint: object.orbitFingerprint,
-                tint: object.identityTint
-            )
+            sectionLabel(copy("archive.section.orbit_parameters"))
             VStack(spacing: 0) {
                 storyField(
                     copy("archive.field.period"),
@@ -829,6 +802,331 @@ struct SatelliteStoryView: View {
         } else {
             content
         }
+    }
+}
+
+/// A 24-hour ephemeris ledger. Geometry is derived from the forecast once;
+/// the only live work is a one-second current-time marker and countdown.
+private struct PassForecastLedgerView: View {
+    let forecast: PassForecast?
+    let fallbackPass: PassWindow?
+    @Binding var selectedIndex: Int?
+    let tint: Color
+
+    @State private var forecastLoadedAt = Date()
+
+    private var copyLanguage: SupportedLanguage { .current }
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            VStack(alignment: .leading, spacing: 13) {
+                if let forecast {
+                    let forecastNow = forecast.referenceDate.addingTimeInterval(
+                        timeline.date.timeIntervalSince(forecastLoadedAt)
+                    )
+                    if forecast.isStationary {
+                        stationaryState(forecast)
+                    } else if forecast.windows.isEmpty {
+                        forecastEmptyState
+                    } else {
+                        forecastTimeline(forecast, now: forecastNow)
+                        if let window = selectedWindow(in: forecast, at: forecastNow) {
+                            selectedPassPanel(window, now: forecastNow)
+                        }
+                    }
+                } else if let fallbackPass {
+                    if fallbackPass.phase == .stationary {
+                        waitingState(key: "archive.forecast.stationary")
+                    } else {
+                        selectedPassPanel(fallbackPass, now: timeline.date)
+                            .redacted(reason: .placeholder)
+                            .accessibilityHidden(true)
+                    }
+                } else {
+                    waitingState(key: "archive.forecast.loading")
+                }
+            }
+        }
+        .onChange(of: forecast) { _, value in
+            forecastLoadedAt = Date()
+            selectedIndex = value?.defaultWindowIndex(at: value?.referenceDate ?? Date())
+        }
+        .onAppear {
+            if selectedIndex == nil {
+                selectedIndex = forecast?.defaultWindowIndex(
+                    at: forecast?.referenceDate ?? Date()
+                )
+            }
+        }
+    }
+
+    private func text(_ key: String) -> String {
+        L10n.text(key, table: "SatelliteText", language: copyLanguage)
+    }
+
+    private func forecastTimeline(_ forecast: PassForecast, now: Date) -> some View {
+        VStack(spacing: 7) {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Palette.inkFaint.opacity(0.16))
+                        .frame(height: 2)
+
+                    ForEach(Array(forecast.windows.enumerated()), id: \.offset) { index, window in
+                        if let rise = window.rise, let set = window.set {
+                            let x = timeX(rise, forecast: forecast, width: proxy.size.width)
+                            let endX = timeX(set, forecast: forecast, width: proxy.size.width)
+                            Button {
+                                selectedIndex = index
+                            } label: {
+                                Capsule()
+                                    .fill(
+                                        tint.opacity(selectedIndex == index ? 0.86 : 0.38)
+                                    )
+                                    .frame(width: max(7, endX - x), height: selectedIndex == index ? 6 : 3)
+                                    .contentShape(Rectangle().inset(by: -12))
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: x)
+                            .accessibilityLabel(passAccessibility(window))
+                        }
+                    }
+
+                    if forecast.referenceDate ... forecast.endDate ~= now {
+                        Rectangle()
+                            .fill(Palette.inkHigh.opacity(0.76))
+                            .frame(width: 0.6, height: 15)
+                            .offset(x: timeX(now, forecast: forecast, width: proxy.size.width))
+                    }
+                }
+                .frame(maxHeight: .infinity)
+            }
+            .frame(height: 20)
+
+            HStack {
+                Text("00H")
+                Spacer()
+                Text("06H")
+                Spacer()
+                Text("12H")
+                Spacer()
+                Text("18H")
+                Spacer()
+                Text("24H")
+            }
+            .font(Typography.statusTag)
+            .tracking(0.45)
+            .foregroundStyle(Palette.inkLow.opacity(0.66))
+        }
+    }
+
+    private func selectedPassPanel(_ pass: PassWindow, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 0) {
+                ledgerMetric(
+                    text(pass.phase == .visible ? "archive.forecast.current_event" : "archive.forecast.next_event"),
+                    eventValue(pass, now: now)
+                )
+                ledgerDivider
+                ledgerMetric(
+                    text("archive.forecast.maximum_elevation"),
+                    pass.maximumElevationDegrees.map { String(format: "%.0f°", $0) } ?? "—"
+                )
+                ledgerDivider
+                ledgerMetric(
+                    text("archive.forecast.duration"),
+                    pass.duration.map(durationText) ?? "—"
+                )
+            }
+
+            Canvas { context, size in
+                drawPass(pass, now: now, context: &context, size: size)
+            }
+            .frame(height: 62)
+            .accessibilityHidden(true)
+
+            HStack(alignment: .firstTextBaseline) {
+                eventLabel(text("archive.forecast.rise"), date: pass.rise)
+                Spacer()
+                eventLabel(text("archive.forecast.peak"), date: pass.peak)
+                Spacer()
+                eventLabel(text("archive.forecast.set"), date: pass.set)
+            }
+
+            if let riseAzimuth = pass.riseAzimuthDegrees,
+               let setAzimuth = pass.setAzimuthDegrees {
+                Text(String(format: "AZ %03.0f°  →  %03.0f°", riseAzimuth, setAzimuth))
+                    .font(Typography.statusTag)
+                    .tracking(0.5)
+                    .foregroundStyle(Palette.inkLow.opacity(0.7))
+            }
+        }
+        .padding(.horizontal, 13)
+        .padding(.vertical, 13)
+        .background(
+            tint.opacity(0.045),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(tint.opacity(0.25), lineWidth: 0.55)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(passAccessibility(pass))
+    }
+
+    private func stationaryState(_ forecast: PassForecast) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "scope")
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(tint.opacity(0.82))
+                .frame(width: 34, height: 34)
+                .overlay(Circle().stroke(tint.opacity(0.28), lineWidth: 0.6))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(text("archive.forecast.stationary"))
+                    .font(Typography.guide)
+                    .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                if let elevation = forecast.stationaryElevationDegrees {
+                    Text(String(format: "EL %+.1f°", elevation))
+                        .font(Typography.statusTag)
+                        .foregroundStyle(Palette.inkMid.opacity(0.72))
+                }
+            }
+            Spacer()
+        }
+        .padding(13)
+        .background(Palette.inkHigh.opacity(0.025), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).stroke(Palette.inkFaint.opacity(0.3), lineWidth: 0.5))
+    }
+
+    private var forecastEmptyState: some View {
+        waitingState(key: "archive.forecast.no_pass")
+    }
+
+    private func waitingState(key: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: key == "archive.forecast.loading" ? "ellipsis" : "horizon")
+                .font(.system(size: 12, weight: .light))
+                .foregroundStyle(tint.opacity(0.7))
+                .frame(width: 24)
+            Text(text(key))
+                .font(Typography.readingCompact)
+                .foregroundStyle(Palette.inkMid.opacity(0.76))
+            Spacer()
+        }
+        .padding(.horizontal, 13)
+        .frame(minHeight: 52)
+        .background(Palette.inkHigh.opacity(0.02), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func selectedWindow(in forecast: PassForecast, at date: Date) -> PassWindow? {
+        let index = selectedIndex ?? forecast.defaultWindowIndex(at: date)
+        guard let index, forecast.windows.indices.contains(index) else { return nil }
+        return forecast.windows[index]
+    }
+
+    private func timeX(_ date: Date, forecast: PassForecast, width: CGFloat) -> CGFloat {
+        let fraction = date.timeIntervalSince(forecast.referenceDate)
+            / forecast.endDate.timeIntervalSince(forecast.referenceDate)
+        return width * CGFloat(min(1, max(0, fraction)))
+    }
+
+    private func drawPass(
+        _ pass: PassWindow,
+        now: Date,
+        context: inout GraphicsContext,
+        size: CGSize
+    ) {
+        let baseline = size.height - 9
+        let inset: CGFloat = 5
+        let peakRatio = CGFloat(min(1, max(0.16, (pass.maximumElevationDegrees ?? 30) / 90)))
+        let peakY = baseline - 18 - peakRatio * 29
+        var path = Path()
+        path.move(to: CGPoint(x: inset, y: baseline))
+        path.addCurve(
+            to: CGPoint(x: size.width - inset, y: baseline),
+            control1: CGPoint(x: size.width * 0.31, y: peakY),
+            control2: CGPoint(x: size.width * 0.69, y: peakY)
+        )
+        context.stroke(path, with: .color(tint.opacity(0.56)), style: StrokeStyle(lineWidth: 0.7, lineCap: .round))
+
+        var horizon = Path()
+        horizon.move(to: CGPoint(x: 0, y: baseline))
+        horizon.addLine(to: CGPoint(x: size.width, y: baseline))
+        context.stroke(horizon, with: .color(Palette.inkFaint.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
+
+        guard let progress = pass.progress(at: now),
+              let point = path.trimmedPath(from: 0, to: max(0.002, progress)).currentPoint
+        else { return }
+        context.fill(Path(ellipseIn: CGRect(x: point.x - 2.5, y: point.y - 2.5, width: 5, height: 5)), with: .color(tint.opacity(0.92)))
+    }
+
+    private func ledgerMetric(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.inkLow.opacity(0.68))
+                .lineLimit(1)
+            Text(value)
+                .font(Typography.archiveDataValue)
+                .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var ledgerDivider: some View {
+        Rectangle()
+            .fill(Palette.inkFaint.opacity(0.25))
+            .frame(width: 0.5, height: 30)
+            .padding(.horizontal, 7)
+    }
+
+    private func eventLabel(_ label: String, date: Date?) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+            Text(date.map(timeText) ?? "—")
+                .foregroundStyle(Palette.inkMid.opacity(0.82))
+        }
+        .font(Typography.statusTag)
+        .foregroundStyle(Palette.inkLow.opacity(0.65))
+    }
+
+    private func eventValue(_ pass: PassWindow, now: Date) -> String {
+        if pass.phase == .visible, let set = pass.set {
+            return countdown(to: set, from: now)
+        }
+        return pass.rise.map(timeText) ?? "—"
+    }
+
+    private func timeText(_ date: Date) -> String {
+        date.formatted(
+            .dateTime
+                .hour(.twoDigits(amPM: .omitted))
+                .minute(.twoDigits)
+        )
+    }
+
+    private func durationText(_ interval: TimeInterval) -> String {
+        let minutes = max(1, Int((interval / 60).rounded()))
+        return L10n.format("archive.forecast.minutes", table: "SatelliteText", language: copyLanguage, minutes)
+    }
+
+    private func countdown(to date: Date, from now: Date) -> String {
+        let seconds = max(0, Int(date.timeIntervalSince(now)))
+        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func passAccessibility(_ pass: PassWindow) -> String {
+        L10n.format(
+            "accessibility.pass_window",
+            table: "SatelliteText",
+            language: copyLanguage,
+            pass.rise.map(timeText) ?? "—",
+            pass.maximumElevationDegrees ?? 0,
+            pass.set.map(timeText) ?? "—"
+        )
     }
 }
 
