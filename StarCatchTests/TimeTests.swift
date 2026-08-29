@@ -249,14 +249,16 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(air.family, .air)
         XCTAssertGreaterThan(air.wingWidth, regular.wingWidth)
         XCTAssertEqual(air.directionWingWidth, air.statusWingWidth)
-        XCTAssertEqual(air.islandCenterY, 32)
+        XCTAssertEqual(air.islandVisualCenterY, 38)
+        XCTAssertEqual(air.islandCenterY, 38)
+        XCTAssertEqual(air.topPadding, 16)
 
         let proMax = DynamicIslandWingMetrics(
             viewportSize: CGSize(width: 440, height: 956),
             nativePixelSize: CGSize(width: 1_320, height: 2_868)
         )
         XCTAssertEqual(proMax.family, .proMax)
-        XCTAssertGreaterThan(proMax.topPadding, air.topPadding)
+        XCTAssertEqual(proMax.topPadding, 11)
         XCTAssertEqual(proMax.directionWingWidth, proMax.statusWingWidth)
         XCTAssertEqual(proMax.islandCenterY, 33)
 

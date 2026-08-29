@@ -26,6 +26,7 @@ final class SkySession: ObservableObject {
     @Published private(set) var visibleObjects: [CatalogObject] = []
     @Published private(set) var displayObjects: [CatalogObject] = []
     @Published private(set) var overviewObjects: [CatalogObject] = []
+    @Published private(set) var overviewTrailObjects: [CatalogObject] = []
     private var overviewPropagationActive = false
 
     /// TLE 快照龄期（天）—— 档案层的 EPOCH AGE 字段。
@@ -53,6 +54,7 @@ final class SkySession: ObservableObject {
         visibleObjects = catalog.objects
         displayObjects = initialDisplayObjects
         overviewObjects = initialOverviewObjects
+        overviewTrailObjects = OverviewAmbientTrailPolicy.select(from: initialOverviewObjects)
 
         #if targetEnvironment(simulator)
         let manual = ManualPointingProvider()
@@ -236,6 +238,7 @@ final class SkySession: ObservableObject {
         visibleObjects = objects
         displayObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 8)
         overviewObjects = Self.makeOverviewSample(from: displayObjects)
+        overviewTrailObjects = OverviewAmbientTrailPolicy.select(from: overviewObjects)
         ephemeris.setPropagationObjects(
             overviewPropagationActive ? overviewObjects : displayObjects
         )

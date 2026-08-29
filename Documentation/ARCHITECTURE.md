@@ -15,6 +15,7 @@ RootView
           ├── Projection（纯几何）
           ├── SkyRenderer（Canvas 绘制）
           ├── TrailStore（短生命周期轨迹）
+          ├── BrightStarStore / BrightStarProjector（离线恒星与缓存投影）
           └── 独立 SwiftUI 控件
 ```
 
@@ -32,6 +33,7 @@ RootView
 | 瞬时识别、候选、明确锁定、明确换锁、释放 | `CaptureStateMachine` | 感应档案可自动呈现；持续捕获仍需明确意图 |
 | 主天空局部动画、缩放、面板测量 | `SkyView` | 只影响当前视图生命周期 |
 | 时间/全景拖尾 | `TrailStore` | 由所属视图创建和销毁 |
+| 亮星目录与天球投影 | `BrightStarStore` / `CelestialViewFrame` | 只读离线资源；进入全局时固定相机，后台解码和投影 |
 | 观测记录 | `ObservationLog` | 本地持久化，不依赖页面是否打开 |
 
 任何新的 `@State` 都应先回答：它是否只是呈现状态？如果答案是否定的，它通常应该
@@ -94,7 +96,10 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 6. `SkyPresentationMode` 是局部天空与地球仪模式切换的唯一事实源；两种模式内部的捏合只改变
    自身尺度。局部天空越过最广视场只激活显式入口，地球仪只能由左上返回或无障碍 Escape 退出。
 7. 地球仪只能传播会话级稳定 `overviewObjects`；完整 `visibleObjects` 只用于结果计数。入口预热、
-   捏合、拖动和静止状态不得切换点集，非锁定目标不得绘制历史轨迹。
+   捏合、拖动和静止状态不得切换点集。非锁定历史轨迹仅允许 `overviewTrailObjects` 中最多 24 个
+   确定性目标在 LIVE、静止、非 Reduced Motion 时以 10fps 有界采样；任一交互或时间移动必须清空。
+8. `BrightStarStore` 只在后台映射并解码一次星表；J2000 恒星只在天球相机或画布尺寸改变时投影。
+   Canvas 只能批量绘制缓存 Path，不得逐帧读取资源、筛选星表或让恒星跟随 Arcball 与地球缩放。
 
 ## 本地化与资料边界
 

@@ -57,16 +57,18 @@ struct DynamicIslandWingMetrics: Equatable {
     let islandGapWidth: CGFloat
     let statusWingWidth: CGFloat
     let directionWingWidth: CGFloat
-    let topPadding: CGFloat
+    /// Visual center of the physical island for this calibrated display family.
+    let islandVisualCenterY: CGFloat
     let wingHeight: CGFloat
     let wingCornerRadius: CGFloat
 
     var usesIslandLayout: Bool { family != .unsupported }
     /// 左右翼统一宽度；保留单一入口供布局与测试读取。
     var wingWidth: CGFloat { directionWingWidth }
-    var islandCenterY: CGFloat {
-        topPadding + SkyTopBarMetrics.controlHeight / 2
+    var topPadding: CGFloat {
+        islandVisualCenterY - SkyTopBarMetrics.controlHeight / 2
     }
+    var islandCenterY: CGFloat { islandVisualCenterY }
 
     init(viewportSize: CGSize, nativePixelSize: CGSize? = nil) {
         #if canImport(UIKit)
@@ -81,7 +83,7 @@ struct DynamicIslandWingMetrics: Equatable {
             islandGapWidth = 0
             directionWingWidth = 116
             statusWingWidth = directionWingWidth
-            topPadding = 0
+            islandVisualCenterY = SkyTopBarMetrics.controlHeight / 2
             wingHeight = SkyTopBarMetrics.visualHeight
             wingCornerRadius = AppChromeMetrics.wingCornerRadius
             return
@@ -90,26 +92,28 @@ struct DynamicIslandWingMetrics: Equatable {
         let referenceWidth: CGFloat
         let baseGapWidth: CGFloat
         let baseWingWidth: CGFloat
-        let baseTopPadding: CGFloat
+        let baseIslandVisualCenterY: CGFloat
 
         if nativeShortEdge >= 1_300 {
             family = .proMax
             referenceWidth = 440
             baseGapWidth = 136
             baseWingWidth = 126
-            baseTopPadding = 11
+            baseIslandVisualCenterY = 33
         } else if nativeShortEdge >= 1_230 {
             family = .air
             referenceWidth = 420
             baseGapWidth = 136
             baseWingWidth = 122
-            baseTopPadding = 10
+            // Calibrated from the iPhone Air 420x912 simulator capture. The
+            // island's visual bounds center at 38.2pt, rounded to a stable 38pt.
+            baseIslandVisualCenterY = 38
         } else {
             family = .regular
             referenceWidth = 402
             baseGapWidth = 134
             baseWingWidth = 116
-            baseTopPadding = 9
+            baseIslandVisualCenterY = 31
         }
 
         // Xcode 的优化截图和 Display Zoom 可能让 SwiftUI 画布小于官方 point 宽度。
@@ -119,7 +123,8 @@ struct DynamicIslandWingMetrics: Equatable {
         islandGapWidth = baseGapWidth * scale
         statusWingWidth = baseWingWidth * scale
         directionWingWidth = baseWingWidth * scale
-        topPadding = baseTopPadding * scale
+        islandVisualCenterY = SkyTopBarMetrics.controlHeight / 2
+            + (baseIslandVisualCenterY - SkyTopBarMetrics.controlHeight / 2) * scale
         wingHeight = SkyTopBarMetrics.visualHeight
         wingCornerRadius = AppChromeMetrics.wingCornerRadius
     }

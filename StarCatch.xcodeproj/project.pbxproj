@@ -18,6 +18,7 @@
 		1DD6FD7136765D4481A4F5CF /* CatalogModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D529FC8AA69FD2F1FA7517C0 /* CatalogModels.swift */; };
 		21D59B20FF04950F82A29C03 /* TimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4F255374E7857BC413B1C5 /* TimeTests.swift */; };
 		21F5EF356F93C7D06E28E3F2 /* ManualBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B847A4F87DAAF9559DDBA0 /* ManualBookView.swift */; };
+		26E5EFACEF7E03DD64169A4C /* bright_stars_bsc5p.bin in Resources */ = {isa = PBXBuildFile; fileRef = DE151DF9DAA8D2B9D855B010 /* bright_stars_bsc5p.bin */; };
 		2FCC2E3974F45F4973293A3A /* SkyClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */; };
 		352EAAF4270E9334DC47F26E /* Grain.metal in Sources */ = {isa = PBXBuildFile; fileRef = 54D43B6181117F9B6935B886 /* Grain.metal */; };
 		39A138A742BE73310774170E /* satellite_profiles.json in Resources */ = {isa = PBXBuildFile; fileRef = 7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */; };
@@ -30,6 +31,7 @@
 		5E50679C759F41669BB6A568 /* SkySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1242DAD73E4C1124A97F05 /* SkySession.swift */; };
 		5ED6B3516EEDE0915D439471 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F2A45838C56EA1F6114C60 /* RootView.swift */; };
 		606A8D0AEF6B51252C88DE5A /* Projection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */; };
+		73C3BE50D1FA30FC38D0FEF9 /* OverviewAtmosphereTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E3592F1D02D6A366D866CF /* OverviewAtmosphereTests.swift */; };
 		787205462F44B77336DE3CB2 /* EphemerisEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAEF5F15EA29265AD47221C /* EphemerisEngine.swift */; };
 		79807E3EBF4A6032770A5EF3 /* SkyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */; };
 		7F255E890DCD37471227A734 /* TrackSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790DFD44DB0F129F096490F9 /* TrackSampler.swift */; };
@@ -52,6 +54,7 @@
 		CA51C079E576A541FD7085AD /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A82392A041A3771106B6DE8D /* Localization.swift */; };
 		CAD8B2F75A7A3832A66F80DA /* ObservationHaptics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */; };
 		CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */; };
+		CD45D853E0586732FB9B0572 /* OverviewAmbientTrailPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */; };
 		D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */; };
 		D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */; };
 		D25E6AC16A24F696AB385FE6 /* StarDust.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */; };
@@ -61,6 +64,7 @@
 		E3E01010329E67DE6D88DD2A /* PassPredictor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B87AB74CC95F0BA75141AA /* PassPredictor.swift */; };
 		E6C65C8211E88265E6DD9236 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D976A484B9038440BEB460B3 /* Assets.xcassets */; };
 		E7270D554FD76E845317E301 /* Motion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB167B224BDD0ECF02BBB8EB /* Motion.swift */; };
+		E8DB6B6CA9E940A598ABD9F8 /* BrightStarField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA3613AB785EE9DC5B915AA7 /* BrightStarField.swift */; };
 		F260B9BA3A5AA778CCC17F6B /* Palette.swift in Sources */ = {isa = PBXBuildFile; fileRef = B47C592100FBDC1B43902AB9 /* Palette.swift */; };
 		F662AE819F0CFCE71508A820 /* CaptureStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC72F3D341678B6E05B6865B /* CaptureStateMachine.swift */; };
 		FCB1336A7CB2A8C3208BEF0B /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 7BCF9F6E821508EF468F9B83 /* Localizable.xcstrings */; };
@@ -88,6 +92,7 @@
 		1C04E10A71AC0927222EF0D5 /* SkyStatusIndicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyStatusIndicator.swift; sourceTree = "<group>"; };
 		1F56DD137CFA306BC531DC61 /* TimeDial.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimeDial.swift; sourceTree = "<group>"; };
 		22944084EE07EF80863E4089 /* CatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogStore.swift; sourceTree = "<group>"; };
+		2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewAmbientTrailPolicy.swift; sourceTree = "<group>"; };
 		2D697FD63957941C7BC7CBAE /* SatelliteStoryLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryLibrary.swift; sourceTree = "<group>"; };
 		2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyClock.swift; sourceTree = "<group>"; };
 		342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = earth_coastlines_50m.bin; sourceTree = "<group>"; };
@@ -113,6 +118,7 @@
 		8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyRenderer.swift; sourceTree = "<group>"; };
 		8E2E05D9DE4E02C4A53A4729 /* ArchiveTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveTopBar.swift; sourceTree = "<group>"; };
 		8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryView.swift; sourceTree = "<group>"; };
+		94E3592F1D02D6A366D866CF /* OverviewAtmosphereTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewAtmosphereTests.swift; sourceTree = "<group>"; };
 		9861BF03D2309E5C83352667 /* ObserverLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverLocation.swift; sourceTree = "<group>"; };
 		A3ED49626A8ECAFCCD5421A5 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		A82392A041A3771106B6DE8D /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
@@ -127,6 +133,7 @@
 		C2CCEDFEA2F14F120C28C217 /* SatelliteKnowledge */ = {isa = PBXFileReference; lastKnownFileType = folder; path = SatelliteKnowledge; sourceTree = SOURCE_ROOT; };
 		C382E9DA8F45A051D5D6CD0D /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		C46654E6CDC6B538BA4F54DF /* StarCatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarCatchApp.swift; sourceTree = "<group>"; };
+		CA3613AB785EE9DC5B915AA7 /* BrightStarField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightStarField.swift; sourceTree = "<group>"; };
 		CAED47075CCD0A05E34BD0F4 /* ArchiveOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOverlay.swift; sourceTree = "<group>"; };
 		CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationHaptics.swift; sourceTree = "<group>"; };
 		CC1242DAD73E4C1124A97F05 /* SkySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkySession.swift; sourceTree = "<group>"; };
@@ -136,6 +143,7 @@
 		D8D39BE6D95DEEAE2EE45F4A /* SkyOverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyOverviewView.swift; sourceTree = "<group>"; };
 		D976A484B9038440BEB460B3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DBCBF174ADA5422354480551 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		DE151DF9DAA8D2B9D855B010 /* bright_stars_bsc5p.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = bright_stars_bsc5p.bin; sourceTree = "<group>"; };
 		E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarDust.swift; sourceTree = "<group>"; };
 		E25E6EC5BF476DE6E6D759FF /* TrailStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrailStore.swift; sourceTree = "<group>"; };
 		FED1030585A23748457611A8 /* BootFieldView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootFieldView.swift; sourceTree = "<group>"; };
@@ -240,6 +248,7 @@
 		6C98543E69C3B3221969354C /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				DE151DF9DAA8D2B9D855B010 /* bright_stars_bsc5p.bin */,
 				7CDEE5FF1B933D8AF1C1D67B /* catalog.json */,
 				342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */,
 				7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */,
@@ -286,6 +295,7 @@
 			isa = PBXGroup;
 			children = (
 				17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */,
+				94E3592F1D02D6A366D866CF /* OverviewAtmosphereTests.swift */,
 				0E4F255374E7857BC413B1C5 /* TimeTests.swift */,
 			);
 			path = StarCatchTests;
@@ -294,9 +304,11 @@
 		EB3B6C783F5BA70B92324F2C /* Sky */ = {
 			isa = PBXGroup;
 			children = (
+				CA3613AB785EE9DC5B915AA7 /* BrightStarField.swift */,
 				36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */,
 				564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */,
 				CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */,
+				2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */,
 				4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */,
 				116D67906640E5C006C8B390 /* SkyActionControls.swift */,
 				2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */,
@@ -424,6 +436,7 @@
 				FCB1336A7CB2A8C3208BEF0B /* Localizable.xcstrings in Resources */,
 				95ADA40FA7051C75178FE81F /* PrivacyInfo.xcprivacy in Resources */,
 				194E41686045CADF77B98116 /* SatelliteText.xcstrings in Resources */,
+				26E5EFACEF7E03DD64169A4C /* bright_stars_bsc5p.bin in Resources */,
 				C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */,
 				4DBEA44D0F54B8662D9030A1 /* earth_coastlines_50m.bin in Resources */,
 				39A138A742BE73310774170E /* satellite_profiles.json in Resources */,
@@ -461,6 +474,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */,
+				73C3BE50D1FA30FC38D0FEF9 /* OverviewAtmosphereTests.swift in Sources */,
 				21D59B20FF04950F82A29C03 /* TimeTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -474,6 +488,7 @@
 				0D43A8E52081657EA908BB87 /* ArchiveTopBar.swift in Sources */,
 				9C6F502C1BCEB4A05156F06F /* BootFieldView.swift in Sources */,
 				47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */,
+				E8DB6B6CA9E940A598ABD9F8 /* BrightStarField.swift in Sources */,
 				F662AE819F0CFCE71508A820 /* CaptureStateMachine.swift in Sources */,
 				100E9ECA0F4E99680CD2DA35 /* CatalogFilterControl.swift in Sources */,
 				1DD6FD7136765D4481A4F5CF /* CatalogModels.swift in Sources */,
@@ -490,6 +505,7 @@
 				CAD8B2F75A7A3832A66F80DA /* ObservationHaptics.swift in Sources */,
 				5D275617161364BBE646062E /* ObservationLog.swift in Sources */,
 				D8047DD627EAA63983B35DDC /* ObserverLocation.swift in Sources */,
+				CD45D853E0586732FB9B0572 /* OverviewAmbientTrailPolicy.swift in Sources */,
 				F260B9BA3A5AA778CCC17F6B /* Palette.swift in Sources */,
 				E3E01010329E67DE6D88DD2A /* PassPredictor.swift in Sources */,
 				41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */,

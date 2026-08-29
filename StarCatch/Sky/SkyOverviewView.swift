@@ -149,18 +149,23 @@ struct SkyOverviewView: View {
     @ObservedObject var session: SkySession
     @ObservedObject var clock: SkyClock
     @ObservedObject private var coastlineStore = EarthCoastlineStore.shared
+    @ObservedObject private var brightStarStore = BrightStarStore.shared
 
     let observation: Date
     let frameTime: TimeInterval
     let motionTime: TimeInterval
     let trails: TrailStore
+    let ambientTrails: TrailStore
+    let ambientTrailsVisible: Bool
     let focusedObjectId: String?
     @Binding var scaleModified: Bool
     let resetRequest: Int
     let transitionProgress: Double
     let entryPointing: Pointing?
+    let celestialFrame: CelestialViewFrame?
     let transitionMotionEnabled: Bool
     let interactive: Bool
+    let onInteractionStateChanged: (Bool) -> Void
 
     /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
     /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
@@ -183,6 +188,7 @@ struct SkyOverviewView: View {
     @State private var observerLabelEmphasized = false
     @State private var observerLabelEvent = 0
     @State private var transientGestureHintVisible = true
+    @State private var projectedBrightStars: [ProjectedBrightStar] = []
     @AppStorage("overviewGestureHintsSeen") private var gestureHintsSeen = false
 
     private struct RenderSample {
@@ -248,6 +254,10 @@ struct SkyOverviewView: View {
 
                 let baseGeometry = Self.globeGeometry(in: size)
                 let geometry = renderedGeometry(in: size)
+                context.drawLayer { starField in
+                    starField.opacity = transitionVisuals.orbitalPresence
+                    drawBrightStarField(starField)
+                }
                 drawAmbientSpace(context, geometry: geometry)
 
                 let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
@@ -288,6 +298,11 @@ struct SkyOverviewView: View {
                     if !renderingSimplified {
                         drawOrbitGuides(backField, geometry: geometry)
                     }
+                    drawAmbientSpatialTrails(
+                        backField,
+                        geometry: geometry,
+                        front: false
+                    )
                     drawSpatialTrails(
                         backField,
                         geometry: geometry,
@@ -310,6 +325,11 @@ struct SkyOverviewView: View {
                 }
                 context.drawLayer { frontField in
                     frontField.opacity = transitionVisuals.orbitalPresence
+                    drawAmbientSpatialTrails(
+                        frontField,
+                        geometry: geometry,
+                        front: true
+                    )
                     drawSpatialTrails(
                         frontField,
                         geometry: geometry,
@@ -368,6 +388,7 @@ struct SkyOverviewView: View {
             }
             .onAppear {
                 coastlineStore.prepare()
+                brightStarStore.prepare()
                 #if DEBUG
                 let arguments = ProcessInfo.processInfo.arguments
                 if arguments.contains("--previewOverviewMaxZoom") {
@@ -381,6 +402,12 @@ struct SkyOverviewView: View {
                 }
                 #endif
                 scaleModified = abs(zoom - 1) > 0.015
+            }
+            .task(id: celestialProjectionKey(size: proxy.size)) {
+                await updateBrightStarProjection(size: proxy.size)
+            }
+            .onChange(of: renderingSimplified) { _, active in
+                onInteractionStateChanged(active)
             }
             .task(id: gestureHintsSeen) {
                 guard !gestureHintsSeen else {
@@ -398,6 +425,7 @@ struct SkyOverviewView: View {
             .onDisappear {
                 cancelSpatialInertia()
                 scaleModified = false
+                onInteractionStateChanged(false)
             }
         }
         .accessibilityElement(children: .ignore)
@@ -997,7 +1025,76 @@ struct SkyOverviewView: View {
         sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
     }
 
+    private func celestialProjectionKey(size: CGSize) -> BrightStarProjectionKey? {
+        guard let celestialFrame, !brightStarStore.stars.isEmpty else { return nil }
+        return BrightStarProjectionKey(
+            frame: celestialFrame,
+            size: size,
+            catalogCount: brightStarStore.stars.count
+        )
+    }
+
+    @MainActor
+    private func updateBrightStarProjection(size: CGSize) async {
+        guard let celestialFrame, !brightStarStore.stars.isEmpty else {
+            projectedBrightStars = []
+            return
+        }
+        let stars = brightStarStore.stars
+        let projection = await Task.detached(priority: .userInitiated) {
+            BrightStarProjector.project(
+                stars: stars,
+                frame: celestialFrame,
+                size: size
+            )
+        }.value
+        guard !Task.isCancelled else { return }
+        projectedBrightStars = projection
+    }
+
     // MARK: - 绘制
+
+    /// Fixed inertial star field. All J2000 projection work is cached outside Canvas;
+    /// this function only batches already projected ellipses by luminance and tint.
+    private func drawBrightStarField(_ context: GraphicsContext) {
+        guard !projectedBrightStars.isEmpty else { return }
+        var faint = Path()
+        var cool = Path()
+        var neutral = Path()
+        var warm = Path()
+        var halo = Path()
+
+        for star in projectedBrightStars {
+            let diameter = star.radius * 2
+            let rect = CGRect(
+                x: star.point.x - star.radius,
+                y: star.point.y - star.radius,
+                width: diameter,
+                height: diameter
+            )
+            if star.opacity < 0.48 {
+                faint.addEllipse(in: rect)
+            } else if star.temperature > 0.22 {
+                cool.addEllipse(in: rect)
+            } else if star.temperature < -0.22 {
+                warm.addEllipse(in: rect)
+            } else {
+                neutral.addEllipse(in: rect)
+            }
+            if star.radius > 1.05 {
+                halo.addEllipse(in: rect.insetBy(dx: -2.2, dy: -2.2))
+            }
+        }
+
+        context.fill(faint, with: .color(Palette.inkHigh.opacity(0.3)))
+        context.fill(cool, with: .color(Color(red: 0.76, green: 0.86, blue: 1).opacity(0.72)))
+        context.fill(neutral, with: .color(Palette.inkHigh.opacity(0.74)))
+        context.fill(warm, with: .color(Color(red: 0.94, green: 0.86, blue: 0.7).opacity(0.7)))
+        context.drawLayer { glow in
+            glow.addFilter(.blur(radius: 2.4))
+            glow.fill(halo, with: .color(Palette.inkHigh.opacity(0.1)))
+        }
+    }
 
     private func drawAmbientSpace(
         _ context: GraphicsContext,
@@ -1285,6 +1382,77 @@ struct SkyOverviewView: View {
         )
     }
 
+    private func drawAmbientSpatialTrails(
+        _ context: GraphicsContext,
+        geometry: GlobeGeometry,
+        front: Bool
+    ) {
+        guard ambientTrailsVisible, !renderingSimplified else { return }
+
+        for object in session.overviewTrailObjects where object.id != focusedObjectId {
+            guard let spatialPoints = ambientTrails.spatialTrails[object.id],
+                  spatialPoints.count > 1
+            else { continue }
+            let projected = spatialPoints.compactMap { point -> (Projected3D, TimeInterval)? in
+                guard let projection = Self.project(
+                    orbitalPosition: point.position,
+                    center: geometry.center,
+                    radius: geometry.radius,
+                    orientation: renderedOrientation,
+                    zoom: zoom
+                ) else { return nil }
+                return (projection, point.at)
+            }
+            let amplified = OverviewAmbientTrailPolicy.amplifiedScreenPoints(
+                projected.map { $0.0.point }
+            )
+            guard amplified.count == projected.count else { continue }
+
+            var segment: [TrailStore.TrailPoint] = []
+            for index in projected.indices {
+                if (projected[index].0.depth >= 0) == front {
+                    segment.append(
+                        TrailStore.TrailPoint(
+                            point: amplified[index],
+                            at: projected[index].1
+                        )
+                    )
+                } else {
+                    drawAmbientTrailSegment(
+                        context,
+                        points: segment,
+                        tint: object.identityTint,
+                        front: front
+                    )
+                    segment.removeAll(keepingCapacity: true)
+                }
+            }
+            drawAmbientTrailSegment(
+                context,
+                points: segment,
+                tint: object.identityTint,
+                front: front
+            )
+        }
+    }
+
+    private func drawAmbientTrailSegment(
+        _ context: GraphicsContext,
+        points: [TrailStore.TrailPoint],
+        tint: Color,
+        front: Bool
+    ) {
+        guard points.count > 1 else { return }
+        SkyRenderer.drawTrail(
+            context,
+            points: points,
+            frameTime: frameTime,
+            tint: tint,
+            intensity: front ? 0.72 : 0.16,
+            lifetime: ambientTrails.trailLifetime
+        )
+    }
+
     private func drawSpatialTrails(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
@@ -1456,6 +1624,11 @@ struct SkyOverviewView: View {
             with: .color(Palette.inkMid.opacity(0.54)),
             style: StrokeStyle(lineWidth: 0.82)
         )
+        context.stroke(
+            Path(ellipseIn: earthRect.insetBy(dx: -1.45, dy: -1.45)),
+            with: .color(Palette.observationTint.opacity(simplified ? 0.1 : 0.16)),
+            style: StrokeStyle(lineWidth: 0.46)
+        )
 
         var illuminatedLimb = Path()
         illuminatedLimb.addArc(
@@ -1565,6 +1738,15 @@ struct SkyOverviewView: View {
                 )
             }
             strokeSegments(context, projected: points, front: true, color: tint)
+            if !simplified {
+                strokeSegments(
+                    context,
+                    projected: points,
+                    front: true,
+                    color: Palette.inkMid.opacity(0.045 * surfaceDetailPresence),
+                    minimumFrontDepth: Self.earthDisplayRadius * 0.34
+                )
+            }
         }
         for longitude in stride(
             from: 0.0,
@@ -1586,6 +1768,15 @@ struct SkyOverviewView: View {
                 )
             }
             strokeSegments(context, projected: points, front: true, color: tint)
+            if !simplified {
+                strokeSegments(
+                    context,
+                    projected: points,
+                    front: true,
+                    color: Palette.inkMid.opacity(0.045 * surfaceDetailPresence),
+                    minimumFrontDepth: Self.earthDisplayRadius * 0.34
+                )
+            }
         }
     }
 
@@ -1684,7 +1875,7 @@ struct SkyOverviewView: View {
             projected: projected,
             front: true,
             color: Palette.observationTint.opacity(
-                (simplified ? 0.19 : 0.4) * surfaceDetailPresence
+                (simplified ? 0.16 : 0.2) * surfaceDetailPresence
             ),
             style: StrokeStyle(
                 lineWidth: simplified ? 0.4 : 0.56,
@@ -1692,6 +1883,16 @@ struct SkyOverviewView: View {
                 lineJoin: .round
             )
         )
+        if !simplified {
+            strokeSegments(
+                context,
+                projected: projected,
+                front: true,
+                color: Palette.inkHigh.opacity(0.23 * surfaceDetailPresence),
+                style: StrokeStyle(lineWidth: 0.42, lineCap: .round, lineJoin: .round),
+                minimumFrontDepth: Self.earthDisplayRadius * 0.28
+            )
+        }
     }
 
     /// 默认可见区域是一块真正贴在球面的球冠，而不是屏幕坐标中的平面圆。
@@ -2044,12 +2245,14 @@ struct SkyOverviewView: View {
         projected: [Projected3D],
         front: Bool,
         color: Color,
-        style: StrokeStyle = StrokeStyle(lineWidth: 0.42)
+        style: StrokeStyle = StrokeStyle(lineWidth: 0.42),
+        minimumFrontDepth: Double = 0
     ) {
         var path = Path()
         var drawing = false
         for point in projected {
             let matches = (point.depth >= 0) == front
+                && (!front || point.depth >= minimumFrontDepth)
             if matches {
                 if drawing {
                     path.addLine(to: point.point)

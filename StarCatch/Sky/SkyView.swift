@@ -35,6 +35,11 @@ struct SkyView: View {
         maximumPointsPerObject: 90,
         minimumPointDistance: 0.08
     )
+    @StateObject private var overviewAmbientTrails = TrailStore(
+        lifetime: OverviewAmbientTrailPolicy.lifetime,
+        maximumPointsPerObject: OverviewAmbientTrailPolicy.maximumPointCount,
+        minimumPointDistance: 0
+    )
     @State private var viewportSize: CGSize = .zero
     /// 局部天空与全局轨道使用互斥模式。缩放手势只在当前模式内部工作，
     /// 只有入口按钮和返回按钮能够改变模式。
@@ -44,6 +49,9 @@ struct SkyView: View {
     @State private var globalEntryArmed = false
     @State private var globalEntryHapticSent = false
     @State private var overviewEntryPointing: Pointing?
+    @State private var overviewCelestialFrame: CelestialViewFrame?
+    @State private var overviewInteractionActive = false
+    @State private var overviewIdleBeganAt: Date?
     @State private var filterExpanded = false
     @State private var topPanel: TopPanel?
     /// 锁定事实与详情可见性相互独立：收起摘要不会释放目标。
@@ -208,6 +216,8 @@ struct SkyView: View {
                 presentationMode = .global
                 persistentOverviewProgress = 1
                 overviewEntryPointing = session.pointing
+                overviewCelestialFrame = makeCelestialViewFrame()
+                overviewIdleBeganAt = Date()
                 onInitialOverviewHandled()
             }
             if !captureConfirmationEnabled {
@@ -268,10 +278,13 @@ struct SkyView: View {
                 presentationMode = progress >= 1 ? .global : .enteringGlobal
                 persistentOverviewProgress = min(1, max(0, progress))
                 overviewEntryPointing = session.pointing
+                overviewCelestialFrame = makeCelestialViewFrame()
             } else if arguments.contains("--openOverview") {
                 presentationMode = .global
                 persistentOverviewProgress = 1
                 overviewEntryPointing = session.pointing
+                overviewCelestialFrame = makeCelestialViewFrame()
+                overviewIdleBeganAt = Date()
             } else if arguments.contains("--previewWideField") {
                 fieldMagnification = 0.66
                 settledFieldMagnification = fieldMagnification
@@ -407,8 +420,15 @@ struct SkyView: View {
             )
             if !oldMode.presentsOverview, newMode.presentsOverview {
                 overviewTrails.clear()
+                overviewAmbientTrails.clear()
                 screenTrails.clear()
                 lastOverviewTrailSample = -.infinity
+            }
+            if newMode == .global {
+                overviewIdleBeganAt = Date()
+            } else if newMode != .enteringGlobal {
+                overviewAmbientTrails.clear()
+                overviewIdleBeganAt = nil
             }
         }
         .onChange(of: globalEntryArmed) { _, armed in
@@ -420,11 +440,13 @@ struct SkyView: View {
             capture.returnToExploring()
             screenTrails.clear()
             overviewTrails.clear()
+            overviewAmbientTrails.clear()
         }
         .onChange(of: session.catalogFilters) { _, _ in
             capture.returnToExploring()
             screenTrails.clear()
             overviewTrails.clear()
+            overviewAmbientTrails.clear()
         }
         .onChange(of: captureConfirmationEnabled) { _, enabled in
             guard !enabled else { return }
@@ -927,6 +949,7 @@ struct SkyView: View {
         // 只保留这一次回归生成的轨迹，避免与上一次拖动残影混在一起。
         screenTrails.clear()
         overviewTrails.clear()
+        overviewAmbientTrails.clear()
         ObservationHaptics.shared.mediumImpact(intensity: 0.82)
         clock.returnToLive()
     }
@@ -944,6 +967,7 @@ struct SkyView: View {
             globalEntryHapticSent = false
             persistentOverviewProgress = 0
             overviewEntryPointing = nil
+            overviewCelestialFrame = nil
             withAnimation(Motion.fieldReset) {
                 fieldMagnification = ObservationScale.defaultLocalMagnification
             }
@@ -1037,6 +1061,9 @@ struct SkyView: View {
         globalEntryGateProgress = 0
         globalEntryHapticSent = false
         overviewEntryPointing = session.pointing
+        overviewCelestialFrame = makeCelestialViewFrame()
+        overviewAmbientTrails.clear()
+        overviewIdleBeganAt = nil
         persistentOverviewProgress = 0
         presentationMode = .enteringGlobal
         withAnimation(Motion.interfaceCollapse) {
@@ -1074,7 +1101,26 @@ struct SkyView: View {
             else { return }
             presentationMode = .local
             overviewEntryPointing = nil
+            overviewCelestialFrame = nil
+            overviewAmbientTrails.clear()
+            overviewInteractionActive = false
+            overviewIdleBeganAt = nil
         }
+    }
+
+    private func makeCelestialViewFrame() -> CelestialViewFrame {
+        CelestialViewFrame(
+            pointing: session.pointing,
+            observer: session.observer.coordinates,
+            observation: clock.observationTime(realNow: Date())
+        )
+    }
+
+    private func setOverviewInteractionActive(_ active: Bool) {
+        guard overviewInteractionActive != active else { return }
+        overviewInteractionActive = active
+        overviewAmbientTrails.clear()
+        overviewIdleBeganAt = active ? nil : Date()
     }
 
     private func globalEntryThresholdHaptic() {
@@ -1561,6 +1607,40 @@ struct SkyView: View {
             frameTime: frameDate.timeIntervalSince(startDate),
             forceRecording: forceRecording
         )
+
+        let ambientAllowed = OverviewAmbientTrailPolicy.shouldRender(
+            isLive: clock.isLive,
+            isScrubbing: clock.isScrubbing,
+            interactionActive: overviewInteractionActive,
+            isTransitioning: overviewTransitioning,
+            suppressMotion: suppressMotion
+        )
+        guard ambientAllowed,
+              let idleBeganAt = overviewIdleBeganAt,
+              frameDate.timeIntervalSince(idleBeganAt)
+                >= OverviewAmbientTrailPolicy.idleDelay
+        else {
+            overviewAmbientTrails.clear()
+            return
+        }
+
+        var ambientPositions: [String: SIMD3<Double>] = [:]
+        ambientPositions.reserveCapacity(session.overviewTrailObjects.count)
+        for object in session.overviewTrailObjects {
+            if let ephemeris = session.ephemeris.cachedEphemeris(
+                object.id,
+                at: observation,
+                live: true
+            ) {
+                ambientPositions[object.id] = ephemeris.orbitalPosition
+            }
+        }
+        overviewAmbientTrails.updateSpatial(
+            offset: 0,
+            positions: ambientPositions,
+            frameTime: frameDate.timeIntervalSince(startDate),
+            forceRecording: true
+        )
     }
 
     // MARK: - 时间镜头
@@ -1589,13 +1669,23 @@ struct SkyView: View {
                 frameTime: time,
                 motionTime: suppressMotion ? 0 : time,
                 trails: overviewTrails,
+                ambientTrails: overviewAmbientTrails,
+                ambientTrailsVisible: OverviewAmbientTrailPolicy.shouldRender(
+                    isLive: clock.isLive,
+                    isScrubbing: clock.isScrubbing,
+                    interactionActive: overviewInteractionActive,
+                    isTransitioning: overviewTransitioning,
+                    suppressMotion: suppressMotion
+                ),
                 focusedObjectId: capture.engagedObjectId,
                 scaleModified: $overviewScaleModified,
                 resetRequest: overviewResetRequest,
                 transitionProgress: progress,
                 entryPointing: overviewEntryPointing,
+                celestialFrame: overviewCelestialFrame,
                 transitionMotionEnabled: !suppressMotion,
-                interactive: presentationMode.ownsGlobalInteraction
+                interactive: presentationMode.ownsGlobalInteraction,
+                onInteractionStateChanged: setOverviewInteractionActive
             )
             .opacity(globePresence)
             .transition(
