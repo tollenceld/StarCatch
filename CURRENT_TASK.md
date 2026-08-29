@@ -58,3 +58,10 @@
 
 1. 发布验收时只需在 iPhone Air 真机感受环境拖尾亮度与顶部中轴；不需要重复逐帧巡检。
 2. Archive 前刷新轨道目录；当前快照已超过 72 小时发布门槛。
+
+## GitHub 同步（2026-08-29）
+
+- 检查确认本地 `main` 比 `origin/main` 多 6 个已提交 commit；工作区只保留两个既有 String Catalog 格式化变更。
+- 核对本次 6 个 commit 共涉及 30 个项目文件，未发现环境变量、签名凭据、缓存、构建产物或日志；`git diff --check` 通过。
+- 用户授权后，已使用普通 push 将这 6 个 commit 从 `008b363` 推送至 GitHub `main`，远端到达 `b3bcbff`。
+- 未使用强制推送，未将两个未提交的 String Catalog 格式化噪声混入远端；后续继续保持 `main` 为唯一开发与发布分支。
