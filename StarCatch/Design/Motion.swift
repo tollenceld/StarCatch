@@ -43,8 +43,8 @@ enum Motion {
     static let skyOverviewExit = Animation.timingCurve(0.2, 0.66, 0.22, 1, duration: 0.82)
 
     /// 独立全局星图是一次空间尺度切换，比时间轴预览更从容；显隐共用同一进度反向播放。
-    static let skyOverviewMode = Animation.timingCurve(0.18, 0.72, 0.18, 1, duration: 0.82)
-    static let skyOverviewModeDuration: Double = 0.82
+    static let skyOverviewMode = Animation.timingCurve(0.16, 0.78, 0.16, 1, duration: 0.92)
+    static let skyOverviewModeDuration: Double = 0.92
 
     /// 用户没有越过尺度门槛时，天空穹顶带一点阻力退回最广局部视野。
     static let scaleThresholdReturn = Animation.timingCurve(0.3, 0, 0.22, 1, duration: 0.34)

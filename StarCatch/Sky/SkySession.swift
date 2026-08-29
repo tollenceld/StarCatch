@@ -26,7 +26,6 @@ final class SkySession: ObservableObject {
     @Published private(set) var visibleObjects: [CatalogObject] = []
     @Published private(set) var displayObjects: [CatalogObject] = []
     @Published private(set) var overviewObjects: [CatalogObject] = []
-    @Published private(set) var visibleTrailObjects: [CatalogObject] = []
     private var overviewPropagationActive = false
 
     /// TLE 快照龄期（天）—— 档案层的 EPOCH AGE 字段。
@@ -44,14 +43,16 @@ final class SkySession: ObservableObject {
         tracks = TrackSampler(store: catalog)
         passes = PassPredictor(store: catalog)
         insights = SatelliteInsightEngine(store: catalog)
-        let initialOverviewObjects = Self.makeDisplaySample(
+        let initialDisplayObjects = Self.makeDisplaySample(
             from: catalog.objects,
-            starlinkDivisor: 14
+            starlinkDivisor: 8
+        )
+        let initialOverviewObjects = Self.makeOverviewSample(
+            from: initialDisplayObjects
         )
         visibleObjects = catalog.objects
-        displayObjects = Self.makeDisplaySample(from: catalog.objects, starlinkDivisor: 8)
+        displayObjects = initialDisplayObjects
         overviewObjects = initialOverviewObjects
-        visibleTrailObjects = Self.makeTrailSample(from: initialOverviewObjects)
 
         #if targetEnvironment(simulator)
         let manual = ManualPointingProvider()
@@ -215,7 +216,7 @@ final class SkySession: ObservableObject {
     func setOverviewPropagationActive(_ active: Bool) {
         guard overviewPropagationActive != active else { return }
         overviewPropagationActive = active
-        ephemeris.setPropagationObjects(active ? visibleObjects : displayObjects)
+        ephemeris.setPropagationObjects(active ? overviewObjects : displayObjects)
     }
 
     private func applyCatalogSelection() {
@@ -234,10 +235,9 @@ final class SkySession: ObservableObject {
         }
         visibleObjects = objects
         displayObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 8)
-        overviewObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 14)
-        visibleTrailObjects = Self.makeTrailSample(from: overviewObjects)
+        overviewObjects = Self.makeOverviewSample(from: displayObjects)
         ephemeris.setPropagationObjects(
-            overviewPropagationActive ? visibleObjects : displayObjects
+            overviewPropagationActive ? overviewObjects : displayObjects
         )
     }
 
@@ -262,28 +262,37 @@ final class SkySession: ObservableObject {
         }
     }
 
-    /// 显示点位仍参与捕捉和方向信标；只有长光轨使用稳定的代表性子集，
-    /// 避免上万条轨迹把星图涂成一整片亮面并占用过多内存。
-    private static func makeTrailSample(
+    /// 地球仪保留数千颗真实目标形成完整轨道密度，但使用局部天空已经传播过的
+    /// 集合做稳定上限抽样。这样开始缩小的第一帧便有位置数据，也不会在转场中
+    /// 突然启动完整目录传播。精选目标始终保留，其他目标按目录顺序均匀取样。
+    nonisolated static func makeOverviewSample(
         from objects: [CatalogObject],
-        limit: Int = 180
+        limit: Int = 4_600
     ) -> [CatalogObject] {
-        guard objects.count > limit else { return objects }
+        guard limit > 0, objects.count > limit else { return objects }
 
-        var result = Array(
+        var selected = Set(
             objects.lazy
-                .filter { $0.isFeatured || $0.isCurated }
-                .prefix(min(48, limit))
+                .filter { $0.isCurated || $0.isFeatured }
+                .map(\.id)
         )
-        var selected = Set(result.map(\.id))
-        let remaining = max(1, limit - result.count)
-        let strideLength = max(1, objects.count / remaining)
-        var index = 0
-        while index < objects.count, result.count < limit {
-            let object = objects[index]
-            if selected.insert(object.id).inserted { result.append(object) }
-            index += strideLength
+        let remaining = max(0, limit - selected.count)
+        guard remaining > 0 else {
+            return objects.filter { selected.contains($0.id) }
         }
-        return result
+
+        let step = Double(objects.count) / Double(remaining)
+        var cursor = step * 0.5
+        while selected.count < limit, Int(cursor) < objects.count {
+            selected.insert(objects[Int(cursor)].id)
+            cursor += step
+        }
+        if selected.count < limit {
+            for object in objects where selected.count < limit {
+                selected.insert(object.id)
+            }
+        }
+        return objects.filter { selected.contains($0.id) }
     }
+
 }

@@ -86,6 +86,9 @@ struct SkyView: View {
     private var wideFieldProgress: Double {
         ObservationScale.wideFieldProgress(magnification: fieldMagnification)
     }
+    private var overviewTransitionVisuals: ObservationScale.TransitionVisuals {
+        ObservationScale.transitionVisuals(progress: overviewPresentationProgress)
+    }
     private var localChromePresence: Double {
         let wideReduction = 1 - 0.46 * wideFieldProgress
         return wideReduction * (1 - overviewPresentationProgress)
@@ -96,9 +99,7 @@ struct SkyView: View {
         )
     }
     private var localSkyPresence: Double {
-        ObservationScale.localSkyPresence(
-            progress: overviewPresentationProgress
-        )
+        overviewTransitionVisuals.localSkyOpacity
     }
     private var scaleResetAvailable: Bool {
         if overviewCommitted {
@@ -126,7 +127,7 @@ struct SkyView: View {
                         .scaleEffect(
                             suppressMotion
                                 ? 1
-                                : 0.9 + 0.1 * localSkyPresence
+                                : overviewTransitionVisuals.localSkyScale
                         )
                         .opacity(localSkyPresence)
                     crosshairLayer
@@ -157,7 +158,6 @@ struct SkyView: View {
                         lastOverviewTrailSample = frameTime
                         updateOverviewTrails(
                             at: frameDate,
-                            in: viewportSize,
                             forceRecording: persistentOverviewPresented
                         )
                     }
@@ -269,7 +269,22 @@ struct SkyView: View {
                     }
                 }
             }
-            if arguments.contains("--openOverview") {
+            if let transitionArgument = arguments.first(where: {
+                $0.hasPrefix("--previewOverviewProgress=")
+            }), let progress = Double(
+                transitionArgument.replacingOccurrences(
+                    of: "--previewOverviewProgress=",
+                    with: ""
+                )
+            ) {
+                fieldMagnification = ObservationScale.minimumLocalMagnification
+                settledFieldMagnification = fieldMagnification
+                persistentOverviewPresented = true
+                overviewCommitted = progress >= 1
+                persistentOverviewProgress = min(1, max(0, progress))
+                overviewEntryPointing = session.pointing
+                overviewEntryMagnification = 1
+            } else if arguments.contains("--openOverview") {
                 persistentOverviewPresented = true
                 overviewCommitted = true
                 persistentOverviewProgress = 1
@@ -390,11 +405,14 @@ struct SkyView: View {
         .onChange(of: capture.replacementProgress) { _, progress in
             updateAcquisitionHaptic(progress: progress)
         }
+        .onChange(of: capture.engagedObjectId) { _, _ in
+            overviewTrails.clear()
+            lastOverviewTrailSample = -.infinity
+        }
         .onChange(of: clock.offset) { _, _ in
             if clock.isScrubbing, viewportSize != .zero {
                 updateOverviewTrails(
                     at: Date(),
-                    in: viewportSize,
                     forceRecording: persistentOverviewPresented
                 )
             }
@@ -591,6 +609,7 @@ struct SkyView: View {
                       let id = retainedDetailObjectID,
                       let object = session.catalog.objectsByID[id] {
                 lockedSummaryCard(object: object, objectID: id)
+                    .opacity(localBottomPresence)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {
                 skyControlRow
@@ -1539,20 +1558,19 @@ struct SkyView: View {
     /// 时间采样属于帧更新，不属于 Canvas 绘制副作用。
     private func updateOverviewTrails(
         at frameDate: Date,
-        in size: CGSize,
         forceRecording: Bool = false
     ) {
         let observation = clock.observationTime(realNow: frameDate)
-        var positions: [String: SIMD3<Double>] = [:]
-        positions.reserveCapacity(session.visibleTrailObjects.count)
-
-        for object in session.visibleTrailObjects {
-            guard let eph = session.ephemeris.cachedEphemeris(
-                object.id,
-                at: observation,
-                live: false
-            ) else { continue }
-            positions[object.id] = eph.orbitalPosition
+        let positions: [String: SIMD3<Double>]
+        if let objectID = capture.engagedObjectId,
+           let ephemeris = session.ephemeris.cachedEphemeris(
+               objectID,
+               at: observation,
+               live: clock.isLive
+           ) {
+            positions = [objectID: ephemeris.orbitalPosition]
+        } else {
+            positions = [:]
         }
 
         overviewTrails.updateSpatial(
@@ -1624,7 +1642,7 @@ struct SkyView: View {
             let p = persistentOverviewProgress
             VStack(spacing: 8) {
                 Spacer()
-                Text("继续缩小 · 查看完整轨道")
+                Text(L10n.text("overview.transition.cue"))
                     .font(Typography.statusTag)
                     .tracking(0.8)
                     .foregroundStyle(Palette.inkMid.opacity(0.48 + 0.4 * p))
@@ -1644,7 +1662,7 @@ struct SkyView: View {
             }
             .padding(.bottom, 164)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(ObservationScale.eased((p - 0.08) / 0.42))
+            .opacity(overviewTransitionVisuals.transitionCuePresence)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }

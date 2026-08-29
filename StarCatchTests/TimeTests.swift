@@ -345,6 +345,38 @@ final class TimeTests: XCTestCase {
         )
     }
 
+    func testObservationScaleUsesOneMonotonicCameraRetreatTimeline() {
+        let samples = stride(from: 0.0, through: 1.0, by: 0.05)
+            .map { ObservationScale.transitionVisuals(progress: $0) }
+        let start = try! XCTUnwrap(samples.first)
+        let end = try! XCTUnwrap(samples.last)
+
+        XCTAssertEqual(start.localSkyOpacity, 1, accuracy: 0.0001)
+        XCTAssertEqual(start.globeOpacity, 0, accuracy: 0.0001)
+        XCTAssertEqual(end.localSkyOpacity, 0, accuracy: 0.0001)
+        XCTAssertEqual(end.globeOpacity, 1, accuracy: 0.0001)
+        XCTAssertEqual(end.globeScale, 1, accuracy: 0.0001)
+        XCTAssertEqual(end.globeVerticalOffset, 0, accuracy: 0.0001)
+
+        for pair in zip(samples, samples.dropFirst()) {
+            XCTAssertLessThanOrEqual(pair.0.cameraRetreat, pair.1.cameraRetreat)
+            XCTAssertGreaterThanOrEqual(pair.0.globeScale, pair.1.globeScale)
+            XCTAssertGreaterThanOrEqual(pair.0.globeVerticalOffset, pair.1.globeVerticalOffset)
+            XCTAssertLessThanOrEqual(pair.0.orbitalPresence, pair.1.orbitalPresence)
+            XCTAssertLessThanOrEqual(
+                pair.0.surfaceDetailPresence,
+                pair.1.surfaceDetailPresence
+            )
+            XCTAssertLessThanOrEqual(pair.0.chromePresence, pair.1.chromePresence)
+        }
+        XCTAssertEqual(start.transitionCuePresence, 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(
+            ObservationScale.transitionVisuals(progress: 0.35).transitionCuePresence,
+            0.9
+        )
+        XCTAssertEqual(end.transitionCuePresence, 0, accuracy: 0.0001)
+    }
+
     func testLeftEdgeBackGestureRequiresDecisiveRightwardMotion() {
         XCTAssertTrue(
             AppEdgeBackGestureModifier.shouldNavigateBack(
@@ -939,6 +971,39 @@ final class TimeTests: XCTestCase {
         )
     }
 
+    func testOverviewSampleIsStableBoundedAndContainsOnlyRealCatalogObjects() {
+        let store = CatalogStore()
+        let display = SkySession.makeDisplaySample(
+            from: store.objects,
+            starlinkDivisor: 8
+        )
+        let sampleLimit = 5_000
+        let first = SkySession.makeOverviewSample(from: display, limit: sampleLimit)
+        let second = SkySession.makeOverviewSample(from: display, limit: sampleLimit)
+        let displayIDs = Set(display.map(\.id))
+        let overviewIDs = Set(first.map(\.id))
+
+        XCTAssertEqual(first.map(\.id), second.map(\.id))
+        XCTAssertEqual(first.count, min(sampleLimit, display.count))
+        XCTAssertTrue(first.allSatisfy { displayIDs.contains($0.id) })
+        XCTAssertTrue(
+            display
+                .filter { $0.isCurated || $0.isFeatured }
+                .allSatisfy { overviewIDs.contains($0.id) }
+        )
+
+        let session = SkySession(catalog: store)
+        session.setOverviewPropagationActive(true)
+        XCTAssertEqual(
+            session.ephemeris.activePropagationObjectCount,
+            session.overviewObjects.count
+        )
+        XCTAssertLessThan(
+            session.ephemeris.activePropagationObjectCount,
+            session.visibleObjects.count
+        )
+    }
+
     func testOverviewDragTreatsTheGlobeAsDirectlyManipulatedContent() {
         let rightward = SkyOverviewView.dragRotationDelta(
             translation: CGSize(width: 20, height: 0)
@@ -1119,8 +1184,9 @@ final class TimeTests: XCTestCase {
         session.setOverviewPropagationActive(true)
         XCTAssertEqual(
             session.ephemeris.activePropagationObjectCount,
-            session.visibleObjects.count
+            session.overviewObjects.count
         )
+        XCTAssertLessThan(session.overviewObjects.count, session.visibleObjects.count)
         session.setOverviewPropagationActive(false)
         XCTAssertEqual(
             session.ephemeris.activePropagationObjectCount,

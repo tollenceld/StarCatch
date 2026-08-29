@@ -5,8 +5,8 @@ import simd
 /// 沉浸式三维地球与轨道场。所有点位来自与主视野相同的 ECI 传播帧；
 /// 地球、观察者、地表可见区域和轨道目标共享同一套旋转与缩放。
 struct SkyOverviewView: View {
-    nonisolated private static let earthDisplayRadius: Double = 0.54
-    nonisolated private static let maximumOrbitDisplayRadius: Double = 0.86
+    nonisolated private static let earthDisplayRadius: Double = 0.57
+    nonisolated private static let maximumOrbitDisplayRadius: Double = 0.88
     /// Natural Earth 1:110m 海岸线经过约 2° 视觉简化后的坐标。
     /// 每条数组按 `[纬度, 经度, …]` 存储，避免运行时解析地图资源。
     nonisolated private static let coastlineSamples: [[Float]] = [
@@ -199,12 +199,16 @@ struct SkyOverviewView: View {
         let depth: Double
     }
 
+    private var transitionVisuals: ObservationScale.TransitionVisuals {
+        ObservationScale.transitionVisuals(progress: transitionProgress)
+    }
+
     private var controlHandoff: Double {
-        ObservationScale.eased((transitionProgress - 0.18) / 0.72)
+        transitionVisuals.cameraRetreat
     }
 
     private var surfaceDetailPresence: Double {
-        ObservationScale.eased((transitionProgress - 0.36) / 0.5)
+        transitionVisuals.surfaceDetailPresence
     }
 
     /// 转场初段仍会对设备姿态产生很轻的响应；接近全局尺度后固定到进入时的
@@ -246,22 +250,17 @@ struct SkyOverviewView: View {
                 )
 
                 let baseGeometry = Self.globeGeometry(in: size)
-                let p = min(1, max(0, transitionProgress))
                 let geometry = renderedGeometry(in: size)
                 drawAmbientSpace(context, geometry: geometry)
 
                 let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
                 let live = clock.isLive
-                let renderObjects = session.visibleObjects
-                let sampleDivisor = renderObjects.count < 1_400
-                    ? 1
-                    : Self.renderSampleDivisor(
-                        zoom: zoom,
-                        interactionActive: renderingSimplified
-                    )
+                // 全局点云使用会话级稳定样本。交互前后集合完全一致；完整目录
+                // 数量只用于图例，不再在 30fps Canvas 中逐颗投影。
+                let renderObjects = session.overviewObjects
 
                 var samples: [RenderSample] = []
-                samples.reserveCapacity(renderObjects.count / sampleDivisor + 1)
+                samples.reserveCapacity(renderObjects.count + 1)
                 @MainActor func appendSample(_ object: CatalogObject) {
                     guard let ephemeris = session.ephemeris.cachedEphemeris(
                         object.id,
@@ -280,9 +279,6 @@ struct SkyOverviewView: View {
                     ))
                 }
                 for object in renderObjects {
-                    guard object.id == focusedObjectId
-                            || object.noradId.isMultiple(of: sampleDivisor)
-                    else { continue }
                     appendSample(object)
                 }
                 if let focusedObject,
@@ -290,47 +286,55 @@ struct SkyOverviewView: View {
                     appendSample(focusedObject)
                 }
 
-                context.drawLayer { field in
+                context.drawLayer { backField in
+                    backField.opacity = transitionVisuals.orbitalPresence
                     if !renderingSimplified {
-                        drawOrbitGuides(field, geometry: geometry)
+                        drawOrbitGuides(backField, geometry: geometry)
                     }
                     drawSpatialTrails(
-                        field,
+                        backField,
                         geometry: geometry,
                         front: false,
                         simplified: renderingSimplified
                     )
                     drawField(
-                        field,
+                        backField,
                         samples: samples,
                         front: false,
                         simplified: renderingSimplified
                     )
+                }
+                context.drawLayer { earthLayer in
                     drawEarth(
-                        field,
+                        earthLayer,
                         geometry: geometry,
                         simplified: renderingSimplified
                     )
+                }
+                context.drawLayer { frontField in
+                    frontField.opacity = transitionVisuals.orbitalPresence
                     drawSpatialTrails(
-                        field,
+                        frontField,
                         geometry: geometry,
                         front: true,
                         simplified: renderingSimplified
                     )
                     drawField(
-                        field,
+                        frontField,
                         samples: samples,
                         front: true,
                         simplified: renderingSimplified
                     )
-                    drawFocusedObject(field, samples: samples)
+                    drawFocusedObject(frontField, samples: samples)
+                }
+                context.drawLayer { surfaceOverlay in
                     drawObserverVisibilityOverlay(
-                        field,
+                        surfaceOverlay,
                         geometry: geometry,
                         simplified: renderingSimplified
                     )
                     drawObserver(
-                        field,
+                        surfaceOverlay,
                         geometry: geometry,
                         simplified: renderingSimplified
                     )
@@ -341,7 +345,7 @@ struct SkyOverviewView: View {
                     geometry: baseGeometry,
                     displayed: samples.count,
                     total: session.visibleObjects.count,
-                    presence: ObservationScale.eased((p - 0.66) / 0.28),
+                    presence: transitionVisuals.chromePresence,
                     showGestureHint: interactive
                         && !gestureHintsSeen
                         && transientGestureHintVisible
@@ -923,12 +927,9 @@ struct SkyOverviewView: View {
 
     private func renderedGeometry(in size: CGSize) -> GlobeGeometry {
         let base = Self.globeGeometry(in: size)
-        let progress = min(1, max(0, transitionProgress))
-        let scale: CGFloat = transitionMotionEnabled
-            ? 1 + 2.55 * CGFloat(pow(1 - progress, 1.28))
-            : 1
-        let offset: CGFloat = transitionMotionEnabled
-            ? size.height * 0.24 * CGFloat(pow(1 - progress, 1.15))
+        let scale = transitionMotionEnabled ? transitionVisuals.globeScale : 1
+        let offset = transitionMotionEnabled
+            ? size.height * transitionVisuals.globeVerticalOffset
             : 0
         return GlobeGeometry(
             center: CGPoint(x: base.center.x, y: base.center.y + offset),
@@ -1013,19 +1014,59 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry
     ) {
         let earthRadius = geometry.radius * zoom * CGFloat(Self.earthDisplayRadius)
+        let shadowRect = CGRect(
+            x: geometry.center.x - earthRadius * 0.72,
+            y: geometry.center.y - earthRadius * 0.56,
+            width: earthRadius * 1.72,
+            height: earthRadius * 1.72
+        )
         let auraRect = CGRect(
             x: geometry.center.x - earthRadius * 1.28,
             y: geometry.center.y - earthRadius * 1.28,
             width: earthRadius * 2.56,
             height: earthRadius * 2.56
         )
-        context.drawLayer { glow in
-            glow.addFilter(.blur(radius: 26))
-            glow.fill(
-                Path(ellipseIn: auraRect),
-                with: .color(Palette.signal.opacity(0.018))
+        context.drawLayer { shadow in
+            shadow.addFilter(.blur(radius: renderingSimplified ? 16 : 28))
+            shadow.fill(
+                Path(ellipseIn: shadowRect),
+                with: .color(Palette.voidEdge.opacity(0.7))
             )
         }
+        context.drawLayer { glow in
+            glow.addFilter(.blur(radius: renderingSimplified ? 15 : 25))
+            glow.fill(
+                Path(ellipseIn: auraRect),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: Palette.observationTint.opacity(0.045), location: 0.42),
+                        .init(color: Palette.signal.opacity(0.012), location: 0.72),
+                        .init(color: .clear, location: 1),
+                    ]),
+                    center: CGPoint(
+                        x: geometry.center.x - earthRadius * 0.22,
+                        y: geometry.center.y - earthRadius * 0.2
+                    ),
+                    startRadius: earthRadius * 0.45,
+                    endRadius: earthRadius * 1.28
+                )
+            )
+        }
+
+        // 只在受光侧保留两段极细大气辉光，不用完整外圈包住地球。
+        var corona = Path()
+        corona.addArc(
+            center: geometry.center,
+            radius: earthRadius + 2.2,
+            startAngle: .degrees(138),
+            endAngle: .degrees(305),
+            clockwise: false
+        )
+        context.stroke(
+            corona,
+            with: .color(Palette.observationTint.opacity(0.18)),
+            style: StrokeStyle(lineWidth: 0.78, lineCap: .round)
+        )
     }
 
     /// 轨道参考只用不闭合的倾斜弧线表达空间方向，不再形成包裹页面的外圈。
@@ -1143,7 +1184,93 @@ struct SkyOverviewView: View {
                 coreRadius: 0.8,
                 haloStrength: simplified ? 0 : 0.032
             )
+            drawSatelliteSignatures(
+                context,
+                samples: samples,
+                simplified: simplified
+            )
         }
+    }
+
+    /// 在数千颗真实星核之上只为稳定子集增加 3–5pt 人造结构。轮廓按任务语义
+    /// 批量合并为固定数量的 Path，不为每颗卫星创建 SwiftUI 图层。
+    private func drawSatelliteSignatures(
+        _ context: GraphicsContext,
+        samples: [RenderSample],
+        simplified: Bool
+    ) {
+        guard !simplified else { return }
+        var network = Path()
+        var navigation = Path()
+        var observation = Path()
+        var science = Path()
+        var legacy = Path()
+
+        for sample in samples where sample.projected.depth > 0.08 {
+            let object = sample.object
+            guard object.isFeatured
+                    || object.isCurated
+                    || object.noradId.isMultiple(of: 17)
+            else { continue }
+
+            let point = sample.projected.point
+            let angle = SkyRenderer.satelliteSignatureAngle(seed: object.noradId)
+            let dx = CGFloat(cos(angle))
+            let dy = CGFloat(sin(angle))
+            let px = -dy
+            let py = dx
+            let start = CGPoint(x: point.x + dx * 2.1, y: point.y + dy * 2.1)
+            let end = CGPoint(x: point.x + dx * 5.2, y: point.y + dy * 5.2)
+
+            switch SkyRenderer.satelliteSignature(for: object) {
+            case .network:
+                for offset: CGFloat in [-0.65, 0.65] {
+                    network.move(to: CGPoint(x: start.x + px * offset, y: start.y + py * offset))
+                    network.addLine(to: CGPoint(x: end.x + px * offset, y: end.y + py * offset))
+                }
+            case .navigation:
+                navigation.move(to: start)
+                navigation.addLine(to: end)
+                navigation.addLine(to: CGPoint(
+                    x: end.x - dx * 1.5 + px * 1.25,
+                    y: end.y - dy * 1.5 + py * 1.25
+                ))
+            case .observation:
+                let arcCenter = CGPoint(
+                    x: point.x + dx * 3.4,
+                    y: point.y + dy * 3.4
+                )
+                let arcRadius: CGFloat = 2.05
+                let arcStart = angle - 0.72
+                observation.move(to: CGPoint(
+                    x: arcCenter.x + cos(arcStart) * arcRadius,
+                    y: arcCenter.y + sin(arcStart) * arcRadius
+                ))
+                observation.addArc(
+                    center: arcCenter,
+                    radius: arcRadius,
+                    startAngle: .radians(arcStart),
+                    endAngle: .radians(angle + 0.72),
+                    clockwise: false
+                )
+            case .science:
+                science.move(to: start)
+                science.addLine(to: end)
+                let midpoint = CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
+                science.move(to: CGPoint(x: midpoint.x - px * 1.25, y: midpoint.y - py * 1.25))
+                science.addLine(to: CGPoint(x: midpoint.x + px * 1.25, y: midpoint.y + py * 1.25))
+            case .legacy:
+                legacy.move(to: start)
+                legacy.addLine(to: CGPoint(x: start.x + dx * 2.1, y: start.y + dy * 2.1))
+            }
+        }
+
+        let style = StrokeStyle(lineWidth: 0.46, lineCap: .round, lineJoin: .round)
+        context.stroke(network, with: .color(Palette.networkTint.opacity(0.3)), style: style)
+        context.stroke(navigation, with: .color(Palette.signal.opacity(0.34)), style: style)
+        context.stroke(observation, with: .color(Palette.observationTint.opacity(0.34)), style: style)
+        context.stroke(science, with: .color(Palette.explorationTint.opacity(0.32)), style: style)
+        context.stroke(legacy, with: .color(Palette.legacyTint.opacity(0.24)), style: style)
     }
 
     private func drawFocusedObject(_ context: GraphicsContext, samples: [RenderSample]) {
@@ -1174,59 +1301,57 @@ struct SkyOverviewView: View {
         front: Bool,
         simplified: Bool
     ) {
-        for object in session.visibleTrailObjects {
-            if simplified, object.id != focusedObjectId { continue }
-            guard let spatialPoints = trails.spatialTrails[object.id], spatialPoints.count > 1 else {
-                continue
-            }
-            let pointStride = simplified ? max(1, spatialPoints.count / 18) : 1
-            let projected = spatialPoints.enumerated().compactMap {
-                index, point -> (Projected3D, TimeInterval)? in
-                guard index.isMultiple(of: pointStride)
-                        || index == spatialPoints.count - 1
-                else { return nil }
-                guard let projection = Self.project(
-                    orbitalPosition: point.position,
-                    center: geometry.center,
-                    radius: geometry.radius,
-                    orientation: renderedOrientation,
-                    zoom: zoom
-                ) else { return nil }
-                return (projection, point.at)
-            }
-            let tint = object.identityTint
-            let focused = object.id == focusedObjectId
-            var segment: [TrailStore.TrailPoint] = []
-            for item in projected {
-                if (item.0.depth >= 0) == front {
-                    segment.append(TrailStore.TrailPoint(point: item.0.point, at: item.1))
-                } else {
-                    drawTrailSegment(
-                        context,
-                        points: segment,
-                        tint: tint,
-                        front: front,
-                        focused: focused
-                    )
-                    segment.removeAll(keepingCapacity: true)
-                }
-            }
-            drawTrailSegment(
-                context,
-                points: segment,
-                tint: tint,
-                front: front,
-                focused: focused
-            )
+        // Thousands of simultaneous histories turn the globe into an unreadable wire cage.
+        // Satellite cores carry population density; a spatial trail is reserved for the
+        // object the user is actually following, so land, observer and visibility stay legible.
+        guard let focusedObjectId,
+              let object = session.catalog.objectsByID[focusedObjectId],
+              let spatialPoints = trails.spatialTrails[focusedObjectId],
+              spatialPoints.count > 1
+        else { return }
+        let pointStride = simplified ? max(1, spatialPoints.count / 18) : 1
+        let projected = spatialPoints.enumerated().compactMap {
+            index, point -> (Projected3D, TimeInterval)? in
+            guard index.isMultiple(of: pointStride)
+                    || index == spatialPoints.count - 1
+            else { return nil }
+            guard let projection = Self.project(
+                orbitalPosition: point.position,
+                center: geometry.center,
+                radius: geometry.radius,
+                orientation: renderedOrientation,
+                zoom: zoom
+            ) else { return nil }
+            return (projection, point.at)
         }
+        let tint = object.identityTint
+        var segment: [TrailStore.TrailPoint] = []
+        for item in projected {
+            if (item.0.depth >= 0) == front {
+                segment.append(TrailStore.TrailPoint(point: item.0.point, at: item.1))
+            } else {
+                drawTrailSegment(
+                    context,
+                    points: segment,
+                    tint: tint,
+                    front: front
+                )
+                segment.removeAll(keepingCapacity: true)
+            }
+        }
+        drawTrailSegment(
+            context,
+            points: segment,
+            tint: tint,
+            front: front
+        )
     }
 
     private func drawTrailSegment(
         _ context: GraphicsContext,
         points: [TrailStore.TrailPoint],
         tint: Color,
-        front: Bool,
-        focused: Bool
+        front: Bool
     ) {
         guard points.count > 1 else { return }
         SkyRenderer.drawTrail(
@@ -1234,9 +1359,7 @@ struct SkyOverviewView: View {
             points: points,
             frameTime: frameTime,
             tint: tint,
-            intensity: focused
-                ? (front ? 1.0 : 0.3)
-                : (front ? 0.62 : 0.12),
+            intensity: front ? 1.0 : 0.3,
             lifetime: trails.trailLifetime
         )
     }
@@ -1707,7 +1830,9 @@ struct SkyOverviewView: View {
             )
         )
 
+        let labelPresence = transitionVisuals.chromePresence
         guard !simplified,
+              labelPresence > 0.01,
               let labelAnchor = ring
                   .filter({ $0.depth >= 0 })
                   .min(by: { $0.point.y < $1.point.y })
@@ -1724,14 +1849,14 @@ struct SkyOverviewView: View {
         context.fill(labelShape, with: .color(Palette.voidBlack.opacity(0.78)))
         context.stroke(
             labelShape,
-            with: .color(Palette.signal.opacity(0.34 * surfaceDetailPresence)),
+            with: .color(Palette.signal.opacity(0.34 * labelPresence)),
             style: StrokeStyle(lineWidth: 0.5)
         )
         context.draw(
-            Text("默认视域")
+            Text(L10n.text("overview.visibility.default"))
                 .font(Typography.statusTag)
                 .tracking(0.5)
-                .foregroundStyle(Palette.inkHigh.opacity(0.82 * surfaceDetailPresence)),
+                .foregroundStyle(Palette.inkHigh.opacity(0.82 * labelPresence)),
             at: labelCenter,
             anchor: .center
         )
@@ -1835,11 +1960,13 @@ struct SkyOverviewView: View {
             with: .color(Palette.inkHigh.opacity(0.98 * alpha)),
             style: StrokeStyle(lineWidth: 0.9)
         )
+        let labelPresence = transitionVisuals.chromePresence
+        guard labelPresence > 0.01 else { return }
         let labelTint = observerLabelEmphasized ? Palette.signal : Palette.inkMid
         let baseLabelOpacity = observerLabelEmphasized
             ? 0.9
             : (simplified ? 0.68 : 0.78)
-        let labelOpacity = baseLabelOpacity * surfaceDetailPresence
+        let labelOpacity = baseLabelOpacity * labelPresence
         var leader = Path()
         leader.move(to: CGPoint(x: point.x + 8, y: point.y - 6))
         leader.addLine(to: CGPoint(x: point.x + 14, y: point.y - 11))
@@ -1858,7 +1985,7 @@ struct SkyOverviewView: View {
             style: StrokeStyle(lineWidth: 0.5)
         )
         context.draw(
-            Text("当前位置")
+            Text(L10n.text("overview.observer.current"))
                 .font(Typography.statusTag)
                 .tracking(0.55)
                 .foregroundStyle(labelTint.opacity(labelOpacity)),

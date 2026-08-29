@@ -103,6 +103,8 @@ final class EphemerisEngine: ObservableObject {
 
     /// 筛选不仅减少绘制，也缩小后续后台传播帧；单颗精算仍可读取完整目录。
     func setPropagationObjects(_ objects: [CatalogObject]) {
+        let nextObjectIDs = objects.map(\.id)
+        guard nextObjectIDs != propagationObjectIDs else { return }
         // 过滤器可能在旧的 16k 传播任务尚未结束时切换。取消旧任务并立即按新集合
         // 重建，避免上一帧在数秒后反向覆盖新筛选结果。
         liveTask?.cancel()
@@ -112,7 +114,7 @@ final class EphemerisEngine: ObservableObject {
         frozenTask?.cancel()
         frozenTask = nil
         pendingFrozenDate = nil
-        propagationObjectIDs = objects.map(\.id)
+        propagationObjectIDs = nextObjectIDs
         frozenSnapshotTime = nil
         frozenSnapshot.removeAll(keepingCapacity: true)
         preciseCache.removeAll(keepingCapacity: true)

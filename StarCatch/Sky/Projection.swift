@@ -14,6 +14,22 @@ enum ObservationScale {
     static let maximumOverviewZoom: CGFloat = 1.72
     static let overviewReturnTravel: CGFloat = 0.34
 
+    /// 局部天空与地球仪之间的唯一视觉时间轴。所有字段都由同一归一化进度
+    /// 推导，避免缩放、透明度、地球尺寸和轨道点云分别使用动画而产生跳帧。
+    struct TransitionVisuals: Equatable {
+        let progress: Double
+        let cameraRetreat: Double
+        let localSkyOpacity: Double
+        let localSkyScale: CGFloat
+        let globeOpacity: Double
+        let globeScale: CGFloat
+        let globeVerticalOffset: CGFloat
+        let orbitalPresence: Double
+        let surfaceDetailPresence: Double
+        let transitionCuePresence: Double
+        let chromePresence: Double
+    }
+
     nonisolated static func localMagnification(
         settled: CGFloat,
         gestureScale: CGFloat
@@ -50,19 +66,55 @@ enum ObservationScale {
         progress >= overviewCommitProgress
     }
 
+    nonisolated static func transitionVisuals(
+        progress rawProgress: Double
+    ) -> TransitionVisuals {
+        let progress = min(1, max(0, rawProgress))
+        let retreat = smoother(progress)
+        let localPresence = 1 - eased((progress - 0.06) / 0.62)
+        let globePresence = eased((progress - 0.015) / 0.64)
+
+        // 对数插值更接近相机持续后退：大尺度阶段移动更快，临近完整地球时
+        // 自然减速，不会在最后一段突然改变球体尺寸。
+        let initialGlobeScale = 4.85
+        let globeScale = exp(log(initialGlobeScale) * (1 - retreat))
+        let remaining = 1 - retreat
+        let cueIn = eased((progress - 0.05) / 0.22)
+        let cueOut = 1 - eased((progress - 0.56) / 0.22)
+
+        return TransitionVisuals(
+            progress: progress,
+            cameraRetreat: retreat,
+            localSkyOpacity: localPresence,
+            localSkyScale: CGFloat(1 - 0.17 * retreat),
+            globeOpacity: globePresence,
+            globeScale: CGFloat(globeScale),
+            globeVerticalOffset: CGFloat(0.31 * pow(remaining, 1.28)),
+            orbitalPresence: eased((progress - 0.17) / 0.63),
+            surfaceDetailPresence: eased((progress - 0.29) / 0.56),
+            transitionCuePresence: cueIn * cueOut,
+            chromePresence: eased((progress - 0.7) / 0.27)
+        )
+    }
+
     /// 局部天空和地球使用错开的单一交叉溶解曲线：中段只允许一个空间成为
     /// 视觉主体，避免两个完整页面以高不透明度叠在一起。
     nonisolated static func globePresence(progress: Double) -> Double {
-        eased((progress - 0.08) / 0.58)
+        transitionVisuals(progress: progress).globeOpacity
     }
 
     nonisolated static func localSkyPresence(progress: Double) -> Double {
-        1 - eased((progress - 0.08) / 0.64)
+        transitionVisuals(progress: progress).localSkyOpacity
     }
 
     nonisolated static func eased(_ value: Double) -> Double {
         let p = min(1, max(0, value))
         return p * p * (3 - 2 * p)
+    }
+
+    nonisolated private static func smoother(_ value: Double) -> Double {
+        let p = min(1, max(0, value))
+        return p * p * p * (p * (p * 6 - 15) + 10)
     }
 }
 
