@@ -1,5 +1,52 @@
 import SwiftUI
 
+/// 最广局部视场之后出现的显式模式入口。它是一次导航确认，不参与缩放手势。
+struct GlobalEntryControl: View {
+    let enabled: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *) {
+                button
+                    .glassEffect(
+                        .regular.tint(Palette.signal.opacity(0.12)).interactive(),
+                        in: Capsule()
+                    )
+            } else {
+                button
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .background(Palette.voidBlack.opacity(0.84), in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .stroke(Palette.signal.opacity(0.54), lineWidth: 0.7)
+                    }
+            }
+        }
+        .accessibilityLabel(L10n.text("overview.entry.title"))
+        .accessibilityHint(L10n.text("overview.entry.hint"))
+    }
+
+    private var button: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: "globe.asia.australia.fill")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Palette.signal.opacity(0.94))
+
+                Text(L10n.text("overview.entry.title"))
+                    .font(.system(size: 12, weight: .medium))
+                    .tracking(1.1)
+                    .foregroundStyle(Palette.inkHigh.opacity(0.96))
+            }
+            .frame(width: 194, height: 48)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(SkyCapsulePressStyle())
+        .disabled(!enabled)
+    }
+}
+
 /// 在设置中开启“确认捕获”后的主动作。它只负责建立或切换捕获；取消捕获由独立控件承担，
 /// 避免同一个按钮在“切换”和“结束”之间产生含混。
 enum FocusActionMode: Equatable {

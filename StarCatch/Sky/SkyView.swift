@@ -36,17 +36,14 @@ struct SkyView: View {
         minimumPointDistance: 0.08
     )
     @State private var viewportSize: CGSize = .zero
-    /// `presented` 表示全局图层已经插入；`committed` 表示控制权已经完成交接。
-    /// 临界区只改变同一个图层的进度，不交换两棵页面树。
-    @State private var persistentOverviewPresented = false
-    @State private var overviewCommitted = false
+    /// 局部天空与全局轨道使用互斥模式。缩放手势只在当前模式内部工作，
+    /// 只有入口按钮和返回按钮能够改变模式。
+    @State private var presentationMode: SkyPresentationMode = .local
     @State private var persistentOverviewProgress: Double = 0
-    @State private var overviewTransitioning = false
-    @State private var overviewReturnGestureActive = false
-    @State private var overviewThresholdHapticSent = false
+    @State private var globalEntryGateProgress: Double = 0
+    @State private var globalEntryArmed = false
+    @State private var globalEntryHapticSent = false
     @State private var overviewEntryPointing: Pointing?
-    /// 进入全局前的局部倍率。返回时同步恢复，避免地球淡出后突然落在 0.52× 广角。
-    @State private var overviewEntryMagnification: CGFloat?
     @State private var filterExpanded = false
     @State private var topPanel: TopPanel?
     /// 锁定事实与详情可见性相互独立：收起摘要不会释放目标。
@@ -89,6 +86,18 @@ struct SkyView: View {
     private var overviewTransitionVisuals: ObservationScale.TransitionVisuals {
         ObservationScale.transitionVisuals(progress: overviewPresentationProgress)
     }
+    private var persistentOverviewPresented: Bool {
+        presentationMode.presentsOverview
+    }
+    private var overviewCommitted: Bool {
+        presentationMode.presentsOverview
+    }
+    private var overviewTransitioning: Bool {
+        presentationMode.isTransitioning
+    }
+    private var globalEntryVisible: Bool {
+        presentationMode == .local && globalEntryArmed
+    }
     private var localChromePresence: Double {
         let wideReduction = 1 - 0.46 * wideFieldProgress
         return wideReduction * (1 - overviewPresentationProgress)
@@ -101,6 +110,13 @@ struct SkyView: View {
     private var localSkyPresence: Double {
         overviewTransitionVisuals.localSkyOpacity
     }
+    private var localSkyScale: CGFloat {
+        guard !suppressMotion else { return 1 }
+        return overviewTransitionVisuals.localSkyScale
+            * GlobalEntryGatePolicy.elasticScale(
+                progress: globalEntryGateProgress
+            )
+    }
     private var scaleResetAvailable: Bool {
         if overviewCommitted {
             return overviewScaleModified && !overviewTransitioning
@@ -112,10 +128,10 @@ struct SkyView: View {
     /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
     /// 避免按钮先切换、地球随后才出现。
     private var overviewChromeVisible: Bool {
-        overviewCommitted && overviewPresentationProgress > 0.58
+        presentationMode.presentsOverview && overviewPresentationProgress > 0.58
     }
 
-    var body: some View {
+    private var renderingSurface: some View {
         GeometryReader { geo in
             TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
                 let time = timeline.date.timeIntervalSince(startDate)
@@ -124,11 +140,7 @@ struct SkyView: View {
                 ZStack(alignment: .topLeading) {
                     canvasLayer(time: time, observation: obsTime)
                         .contentShape(Rectangle())
-                        .scaleEffect(
-                            suppressMotion
-                                ? 1
-                                : overviewTransitionVisuals.localSkyScale
-                        )
+                        .scaleEffect(localSkyScale)
                         .opacity(localSkyPresence)
                     crosshairLayer
                         .opacity(localChromePresence)
@@ -139,7 +151,6 @@ struct SkyView: View {
                             .opacity(localChromePresence)
                     }
                     timeOverviewLayer(time: time, observation: obsTime)
-                    scaleTransitionCueLayer
                 }
                 .colorEffect(
                     ShaderLibrary.grain(
@@ -148,47 +159,20 @@ struct SkyView: View {
                     )
                 )
                 .onChange(of: timeline.date) { _, frameDate in
-                    let frameTime = frameDate.timeIntervalSince(startDate)
-                    if !clock.isLive {
-                        session.ephemeris.prepareSnapshot(at: obsTime)
-                    }
-                    if (persistentOverviewPresented || clock.isScrubbing),
-                       viewportSize != .zero,
-                       frameTime - lastOverviewTrailSample >= 0.1 {
-                        lastOverviewTrailSample = frameTime
-                        updateOverviewTrails(
-                            at: frameDate,
-                            forceRecording: persistentOverviewPresented
-                        )
-                    }
-
-                    // 状态机在视图更新之后驱动，不在 Canvas 绘制闭包里发布状态。
-                    // 全览拖动中冻结捕捉；镜头回到天空后，无论 LIVE 或历史时刻都恢复观测。
-                    if !clock.isScrubbing,
-                       !overviewCommitted,
-                       frameTime - lastCaptureSample >= CaptureStateMachine.samplingInterval {
-                        lastCaptureSample = frameTime
-                        let sample: CaptureSample
-                        switch session.pointingAvailability {
-                        case .tracking, .manual:
-                            sample = captureSample(at: obsTime, in: geo.size)
-                        case .idle, .starting, .unavailable:
-                            // 初始 Pointing 是一个占位方向；传感器尚未给出第一帧时
-                            // 绝不能因为该方向恰好经过目标而弹出“已识别”资料。
-                            sample = CaptureSample(nearest: nil, trackedDistance: nil)
-                        }
-                        capture.update(
-                            nearest: sample.nearest,
-                            trackedDistance: sample.trackedDistance,
-                            captureEnabled: captureConfirmationEnabled,
-                            now: frameDate
-                        )
-                    }
+                    updateFrame(
+                        at: frameDate,
+                        observationTime: obsTime,
+                        viewport: geo.size
+                    )
                 }
             }
             .onAppear { viewportSize = geo.size }
             .onChange(of: geo.size) { _, size in viewportSize = size }
         }
+    }
+
+    private var interactionSurface: some View {
+        renderingSurface
         .ignoresSafeArea()
         .background(Palette.voidBlack)
         .contentShape(Rectangle())
@@ -208,20 +192,22 @@ struct SkyView: View {
         .overlay {
             satelliteStoryLayer
         }
-        .appEdgeBackGesture(
-            enabled: overviewChromeVisible
-                && presentedStoryObjectID == nil
-        ) {
+        .accessibilityAction(.escape) {
+            guard presentationMode == .global,
+                  presentedStoryObjectID == nil
+            else { return }
             exitOverviewToLocal()
         }
+    }
+
+    var body: some View {
+        interactionSurface
         .onAppear {
             EarthCoastlineStore.shared.prepare()
             if initialOverviewPresented {
-                persistentOverviewPresented = true
-                overviewCommitted = true
+                presentationMode = .global
                 persistentOverviewProgress = 1
                 overviewEntryPointing = session.pointing
-                overviewEntryMagnification = 1
                 onInitialOverviewHandled()
             }
             if !captureConfirmationEnabled {
@@ -279,32 +265,25 @@ struct SkyView: View {
             ) {
                 fieldMagnification = ObservationScale.minimumLocalMagnification
                 settledFieldMagnification = fieldMagnification
-                persistentOverviewPresented = true
-                overviewCommitted = progress >= 1
+                presentationMode = progress >= 1 ? .global : .enteringGlobal
                 persistentOverviewProgress = min(1, max(0, progress))
                 overviewEntryPointing = session.pointing
-                overviewEntryMagnification = 1
             } else if arguments.contains("--openOverview") {
-                persistentOverviewPresented = true
-                overviewCommitted = true
+                presentationMode = .global
                 persistentOverviewProgress = 1
                 overviewEntryPointing = session.pointing
-                overviewEntryMagnification = 1
             } else if arguments.contains("--previewWideField") {
                 fieldMagnification = 0.66
                 settledFieldMagnification = fieldMagnification
-            } else if arguments.contains("--previewScaleThreshold") {
+            } else if arguments.contains("--previewScaleThreshold")
+                        || arguments.contains("--previewGlobalEntry") {
                 fieldMagnification = ObservationScale.minimumLocalMagnification
                 settledFieldMagnification = fieldMagnification
-                fieldMagnificationActive = true
-                persistentOverviewPresented = true
-                overviewCommitted = false
-                persistentOverviewProgress = 0.58
-                overviewEntryPointing = session.pointing
-                overviewEntryMagnification = 1
+                globalEntryArmed = true
             } else if arguments.contains("--previewOverviewMode") {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(550))
+                    globalEntryArmed = true
                     togglePersistentOverview()
                     try? await Task.sleep(for: .milliseconds(2400))
                     togglePersistentOverview()
@@ -422,13 +401,20 @@ struct SkyView: View {
                 screenTrails.clear()
             }
         }
-        .onChange(of: persistentOverviewPresented) { _, presented in
-            session.setOverviewPropagationActive(presented)
-            if presented {
+        .onChange(of: presentationMode) { oldMode, newMode in
+            session.setOverviewPropagationActive(
+                newMode.presentsOverview || globalEntryArmed
+            )
+            if !oldMode.presentsOverview, newMode.presentsOverview {
                 overviewTrails.clear()
                 screenTrails.clear()
                 lastOverviewTrailSample = -.infinity
             }
+        }
+        .onChange(of: globalEntryArmed) { _, armed in
+            session.setOverviewPropagationActive(
+                presentationMode.presentsOverview || armed
+            )
         }
         .onChange(of: session.catalogScope) { _, _ in
             capture.returnToExploring()
@@ -448,6 +434,48 @@ struct SkyView: View {
                 capture.returnToExploring()
             }
         }
+    }
+
+    /// 帧循环只发布低频状态；Canvas 绘制本身保持无副作用。
+    private func updateFrame(
+        at frameDate: Date,
+        observationTime: Date,
+        viewport: CGSize
+    ) {
+        let frameTime = frameDate.timeIntervalSince(startDate)
+        if !clock.isLive {
+            session.ephemeris.prepareSnapshot(at: observationTime)
+        }
+        if (persistentOverviewPresented || clock.isScrubbing),
+           viewportSize != .zero,
+           frameTime - lastOverviewTrailSample >= 0.1 {
+            lastOverviewTrailSample = frameTime
+            updateOverviewTrails(
+                at: frameDate,
+                forceRecording: persistentOverviewPresented
+            )
+        }
+
+        guard !clock.isScrubbing,
+              presentationMode == .local,
+              frameTime - lastCaptureSample
+                >= CaptureStateMachine.samplingInterval
+        else { return }
+        lastCaptureSample = frameTime
+        let sample: CaptureSample
+        switch session.pointingAvailability {
+        case .tracking, .manual:
+            sample = captureSample(at: observationTime, in: viewport)
+        case .idle, .starting, .unavailable:
+            // 初始 Pointing 是占位方向；传感器尚未给出第一帧时不能误识别目标。
+            sample = CaptureSample(nearest: nil, trackedDistance: nil)
+        }
+        capture.update(
+            nearest: sample.nearest,
+            trackedDistance: sample.trackedDistance,
+            captureEnabled: captureConfirmationEnabled,
+            now: frameDate
+        )
     }
 
     /// 进入感应范围先给一次轻而清晰的接触感，表示准星已经吸附到真实目标。
@@ -601,10 +629,25 @@ struct SkyView: View {
     /// 全局星图才提供时间旅行。这样主页面不会在无全局语境时意外停留于过去/未来。
     private var bottomControlBand: some View {
         Group {
-            if overviewChromeVisible {
+            if globalEntryVisible {
+                GlobalEntryControl(
+                    enabled: !fieldMagnificationActive,
+                    action: enterGlobalOverview
+                )
+                .padding(.bottom, 8)
+                .transition(
+                    .opacity.combined(
+                        with: .scale(scale: 0.96, anchor: .bottom)
+                    )
+                )
+            } else if overviewChromeVisible {
                 overviewControlColumn
                     .opacity(overviewPresentationProgress)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
+            } else if overviewTransitioning {
+                Color.clear
+                    .frame(height: 56)
+                    .accessibilityHidden(true)
             } else if lockedDetailPresented,
                       let id = retainedDetailObjectID,
                       let object = session.catalog.objectsByID[id] {
@@ -617,6 +660,7 @@ struct SkyView: View {
             }
         }
         .animation(Motion.interfaceCollapse, value: overviewCommitted)
+        .animation(Motion.interfaceExpand, value: globalEntryVisible)
         .animation(Motion.interfaceExpand, value: archivePresentationReady)
         .zIndex(2)
     }
@@ -894,13 +938,14 @@ struct SkyView: View {
             overviewResetRequest &+= 1
         } else {
             fieldMagnificationActive = false
-            settledFieldMagnification = 1
+            settledFieldMagnification = ObservationScale.defaultLocalMagnification
+            globalEntryArmed = false
+            globalEntryGateProgress = 0
+            globalEntryHapticSent = false
             persistentOverviewProgress = 0
-            persistentOverviewPresented = false
             overviewEntryPointing = nil
-            overviewEntryMagnification = nil
             withAnimation(Motion.fieldReset) {
-                fieldMagnification = 1
+                fieldMagnification = ObservationScale.defaultLocalMagnification
             }
         }
     }
@@ -965,11 +1010,13 @@ struct SkyView: View {
     }
 
     private func togglePersistentOverview() {
-        guard !overviewTransitioning else { return }
-        if overviewCommitted {
+        switch presentationMode {
+        case .local:
+            enterGlobalOverview()
+        case .global:
             exitOverviewToLocal()
-        } else {
-            commitOverview()
+        case .enteringGlobal, .exitingGlobal:
+            break
         }
     }
 
@@ -981,121 +1028,56 @@ struct SkyView: View {
         suppressMotion ? 0.16 : Motion.skyOverviewModeDuration
     }
 
-    private func prepareOverviewLayer() {
-        guard !persistentOverviewPresented else { return }
+    private func enterGlobalOverview() {
+        guard presentationMode == .local,
+              globalEntryArmed
+        else { return }
+        ObservationHaptics.shared.mediumImpact(intensity: 0.72)
+        globalEntryArmed = false
+        globalEntryGateProgress = 0
+        globalEntryHapticSent = false
         overviewEntryPointing = session.pointing
-        overviewEntryMagnification = settledFieldMagnification
         persistentOverviewProgress = 0
-        persistentOverviewPresented = true
+        presentationMode = .enteringGlobal
         withAnimation(Motion.interfaceCollapse) {
             filterExpanded = false
             topPanel = nil
         }
-    }
-
-    private func commitOverview() {
-        prepareOverviewLayer()
-        overviewCommitted = true
-        overviewTransitioning = true
-        overviewReturnGestureActive = false
         DispatchQueue.main.async {
             withAnimation(overviewModeAnimation) {
                 persistentOverviewProgress = 1
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
-                guard overviewCommitted else { return }
-                overviewTransitioning = false
+                guard presentationMode == .enteringGlobal else { return }
+                presentationMode = .global
             }
         }
     }
 
     private func exitOverviewToLocal() {
-        guard persistentOverviewPresented else { return }
-        let returnMagnification = overviewEntryMagnification ?? 1
-        overviewTransitioning = true
-        overviewReturnGestureActive = false
+        guard presentationMode == .global else { return }
+        presentationMode = .exitingGlobal
+        globalEntryArmed = false
+        globalEntryGateProgress = 0
+        globalEntryHapticSent = false
         if !clock.isLive {
             returnToLiveFromCapsule()
         }
-        settledFieldMagnification = returnMagnification
+        settledFieldMagnification = ObservationScale.defaultLocalMagnification
         withAnimation(overviewModeAnimation) {
             persistentOverviewProgress = 0
-            fieldMagnification = returnMagnification
+            fieldMagnification = ObservationScale.defaultLocalMagnification
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
-            guard persistentOverviewProgress < 0.001 else { return }
-            overviewCommitted = false
-            persistentOverviewPresented = false
-            overviewTransitioning = false
+            guard presentationMode == .exitingGlobal,
+                  persistentOverviewProgress < 0.001
+            else { return }
+            presentationMode = .local
             overviewEntryPointing = nil
-            overviewEntryMagnification = nil
         }
     }
 
-    private func updateOverviewScaleGesture(progress: Double) {
-        guard !overviewCommitted else { return }
-        if progress > 0.001 {
-            prepareOverviewLayer()
-        }
-        persistentOverviewProgress = progress
-        if ObservationScale.shouldCommit(progress), !overviewThresholdHapticSent {
-            overviewThresholdHapticSent = true
-            scaleThresholdHaptic()
-        }
-    }
-
-    private func finishOverviewScaleGesture() {
-        if ObservationScale.shouldCommit(persistentOverviewProgress) {
-            commitOverview()
-        } else {
-            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : Motion.scaleThresholdReturn) {
-                persistentOverviewProgress = 0
-            }
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + (suppressMotion ? 0.12 : Motion.scaleThresholdReturnDuration)
-            ) {
-                guard !overviewCommitted, persistentOverviewProgress < 0.001 else { return }
-                persistentOverviewPresented = false
-                overviewEntryPointing = nil
-                overviewEntryMagnification = nil
-            }
-        }
-    }
-
-    private func updateOverviewReturnGesture(progress: Double) {
-        guard overviewCommitted else { return }
-        if progress <= 0.001, !overviewReturnGestureActive {
-            overviewThresholdHapticSent = false
-        }
-        overviewReturnGestureActive = progress > 0.001
-        persistentOverviewProgress = 1 - progress
-        if ObservationScale.shouldCommit(progress), !overviewThresholdHapticSent {
-            overviewThresholdHapticSent = true
-            scaleThresholdHaptic()
-        }
-    }
-
-    private func finishOverviewReturnGesture(commit: Bool) {
-        let hadReturnProgress = overviewReturnGestureActive
-            || persistentOverviewProgress < 0.999
-        overviewReturnGestureActive = false
-        guard hadReturnProgress else { return }
-        if commit {
-            exitOverviewToLocal()
-        } else {
-            overviewTransitioning = true
-            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : Motion.scaleThresholdReturn) {
-                persistentOverviewProgress = 1
-            }
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + (suppressMotion ? 0.12 : Motion.scaleThresholdReturnDuration)
-            ) {
-                overviewTransitioning = false
-            }
-        }
-    }
-
-    private func scaleThresholdHaptic() {
+    private func globalEntryThresholdHaptic() {
         ObservationHaptics.shared.rigidImpact(intensity: 0.38)
     }
 
@@ -1613,10 +1595,7 @@ struct SkyView: View {
                 transitionProgress: progress,
                 entryPointing: overviewEntryPointing,
                 transitionMotionEnabled: !suppressMotion,
-                interactive: overviewCommitted
-                    && (!overviewTransitioning || overviewReturnGestureActive),
-                onScaleReturnChanged: updateOverviewReturnGesture,
-                onScaleReturnEnded: finishOverviewReturnGesture
+                interactive: presentationMode.ownsGlobalInteraction
             )
             .opacity(globePresence)
             .transition(
@@ -1628,43 +1607,8 @@ struct SkyView: View {
                     )
             )
             .allowsHitTesting(
-                overviewCommitted
-                    && (!overviewTransitioning || overviewReturnGestureActive)
+                presentationMode.ownsGlobalInteraction
             )
-        }
-    }
-
-    @ViewBuilder
-    private var scaleTransitionCueLayer: some View {
-        if persistentOverviewPresented,
-           !overviewCommitted,
-           persistentOverviewProgress > 0.04 {
-            let p = persistentOverviewProgress
-            VStack(spacing: 8) {
-                Spacer()
-                Text(L10n.text("overview.transition.cue"))
-                    .font(Typography.statusTag)
-                    .tracking(0.8)
-                    .foregroundStyle(Palette.inkMid.opacity(0.48 + 0.4 * p))
-
-                HStack(spacing: 7) {
-                    Rectangle()
-                        .frame(width: 28, height: 0.5)
-                    Circle()
-                        .frame(width: 4, height: 4)
-                    Rectangle()
-                        .frame(width: 28, height: 0.5)
-                    Text("±24H")
-                        .font(.system(size: 7.5, weight: .medium, design: .monospaced))
-                        .tracking(0.7)
-                }
-                .foregroundStyle(Palette.signal.opacity(0.26 + 0.38 * p))
-            }
-            .padding(.bottom, 164)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .opacity(overviewTransitionVisuals.transitionCuePresence)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
         }
     }
 
@@ -2320,12 +2264,15 @@ struct SkyView: View {
     private var fieldMagnificationGesture: some Gesture {
         MagnificationGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
-                guard !overviewCommitted, !clock.isScrubbing else { return }
+                guard presentationMode == .local, !clock.isScrubbing else { return }
                 if !fieldMagnificationActive {
-                    overviewThresholdHapticSent = false
-                    if filterExpanded {
+                    if !globalEntryArmed {
+                        globalEntryHapticSent = false
+                    }
+                    if filterExpanded || topPanel != nil {
                         withAnimation(Motion.interfaceCollapse) {
                             filterExpanded = false
+                            topPanel = nil
                         }
                     }
                     fieldScaleGestureSample = value
@@ -2354,12 +2301,28 @@ struct SkyView: View {
                     settled: settledFieldMagnification,
                     gestureScale: value
                 )
-                updateOverviewScaleGesture(
-                    progress: ObservationScale.overviewProgress(
-                        settled: settledFieldMagnification,
-                        gestureScale: value
-                    )
+                let gateProgress = GlobalEntryGatePolicy.progress(
+                    settled: settledFieldMagnification,
+                    gestureScale: value
                 )
+                globalEntryGateProgress = gateProgress
+
+                if globalEntryArmed,
+                   GlobalEntryGatePolicy.shouldDismiss(
+                       magnification: fieldMagnification
+                   ) {
+                    withAnimation(Motion.interfaceCollapse) {
+                        globalEntryArmed = false
+                    }
+                    globalEntryHapticSent = false
+                } else if GlobalEntryGatePolicy.shouldArm(progress: gateProgress),
+                          !globalEntryArmed {
+                    globalEntryArmed = true
+                    if !globalEntryHapticSent {
+                        globalEntryHapticSent = true
+                        globalEntryThresholdHaptic()
+                    }
+                }
             }
             .onEnded { _ in
                 guard fieldMagnificationActive else { return }
@@ -2370,10 +2333,16 @@ struct SkyView: View {
                     lowerBound: ObservationScale.minimumLocalMagnification,
                     upperBound: ObservationScale.maximumLocalMagnification
                 )
-                let target: CGFloat = abs(projected - 1) < 0.055
-                    ? 1
+                let target: CGFloat = abs(
+                    projected - ObservationScale.defaultLocalMagnification
+                ) < 0.055
+                    ? ObservationScale.defaultLocalMagnification
                     : projected
                 settledFieldMagnification = target
+                if GlobalEntryGatePolicy.shouldDismiss(magnification: target) {
+                    globalEntryArmed = false
+                    globalEntryHapticSent = false
+                }
                 withAnimation(
                     suppressMotion
                         ? .easeOut(duration: 0.12)
@@ -2388,8 +2357,8 @@ struct SkyView: View {
                         )
                 ) {
                     fieldMagnification = target
+                    globalEntryGateProgress = 0
                 }
-                finishOverviewScaleGesture()
             }
     }
 }

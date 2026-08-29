@@ -5,14 +5,13 @@ import simd
 /// 局部天空与全局轨道场共享的连续尺度规则。
 ///
 /// 1× 以上是局部长焦；1× 到 `minimumLocalMagnification` 是扩展天空；
-/// 再继续缩小只积累带阻力的全局转场进度，不继续扩大平面投影。
+/// 再继续缩小只积累带阻力的入口揭示进度，不继续扩大平面投影。
 enum ObservationScale {
+    static let defaultLocalMagnification: CGFloat = 1
     static let minimumLocalMagnification: CGFloat = 0.52
     static let maximumLocalMagnification: CGFloat = 4
-    static let overviewTransitionTravel: CGFloat = 0.22
-    static let overviewCommitProgress: Double = 0.72
-    static let maximumOverviewZoom: CGFloat = 1.72
-    static let overviewReturnTravel: CGFloat = 0.34
+    static let minimumOverviewZoom: CGFloat = 0.72
+    static let maximumOverviewZoom: CGFloat = 2.2
 
     /// 局部天空与地球仪之间的唯一视觉时间轴。所有字段都由同一归一化进度
     /// 推导，避免缩放、透明度、地球尺寸和轨道点云分别使用动画而产生跳帧。
@@ -26,7 +25,6 @@ enum ObservationScale {
         let globeVerticalOffset: CGFloat
         let orbitalPresence: Double
         let surfaceDetailPresence: Double
-        let transitionCuePresence: Double
         let chromePresence: Double
     }
 
@@ -40,30 +38,10 @@ enum ObservationScale {
         )
     }
 
-    nonisolated static func overviewProgress(
-        settled: CGFloat,
-        gestureScale: CGFloat
-    ) -> Double {
-        let raw = settled * gestureScale
-        guard raw < minimumLocalMagnification else { return 0 }
-        return eased(
-            Double((minimumLocalMagnification - raw) / overviewTransitionTravel)
-        )
-    }
-
-    nonisolated static func overviewReturnProgress(rawZoom: CGFloat) -> Double {
-        let overshoot = max(0, rawZoom - maximumOverviewZoom)
-        return eased(Double(overshoot / overviewReturnTravel))
-    }
-
     nonisolated static func wideFieldProgress(magnification: CGFloat) -> Double {
         let span = 1 - minimumLocalMagnification
         guard span > 0 else { return 0 }
         return eased(Double((1 - magnification) / span))
-    }
-
-    nonisolated static func shouldCommit(_ progress: Double) -> Bool {
-        progress >= overviewCommitProgress
     }
 
     nonisolated static func transitionVisuals(
@@ -79,9 +57,6 @@ enum ObservationScale {
         let initialGlobeScale = 4.85
         let globeScale = exp(log(initialGlobeScale) * (1 - retreat))
         let remaining = 1 - retreat
-        let cueIn = eased((progress - 0.05) / 0.22)
-        let cueOut = 1 - eased((progress - 0.56) / 0.22)
-
         return TransitionVisuals(
             progress: progress,
             cameraRetreat: retreat,
@@ -92,7 +67,6 @@ enum ObservationScale {
             globeVerticalOffset: CGFloat(0.31 * pow(remaining, 1.28)),
             orbitalPresence: eased((progress - 0.17) / 0.63),
             surfaceDetailPresence: eased((progress - 0.29) / 0.56),
-            transitionCuePresence: cueIn * cueOut,
             chromePresence: eased((progress - 0.7) / 0.27)
         )
     }
@@ -115,6 +89,52 @@ enum ObservationScale {
     nonisolated private static func smoother(_ value: Double) -> Double {
         let p = min(1, max(0, value))
         return p * p * p * (p * (p * 6 - 15) + 10)
+    }
+}
+
+/// 局部天空和全局轨道是两个明确模式。捏合只改变各自模式内的尺度，
+/// 只有显式入口与返回动作能够推进这里的状态。
+enum SkyPresentationMode: Equatable {
+    case local
+    case enteringGlobal
+    case global
+    case exitingGlobal
+
+    var presentsOverview: Bool { self != .local }
+    var isTransitioning: Bool {
+        self == .enteringGlobal || self == .exitingGlobal
+    }
+    var ownsGlobalInteraction: Bool { self == .global }
+}
+
+/// 最广局部视场之后的弹性门槛。额外缩小只负责揭示入口，绝不直接驱动地球。
+enum GlobalEntryGatePolicy {
+    static let revealOverscroll: CGFloat = 0.10
+    static let dismissMagnification: CGFloat = 0.60
+    static let maximumElasticReduction: CGFloat = 0.02
+
+    nonisolated static func progress(
+        settled: CGFloat,
+        gestureScale: CGFloat
+    ) -> Double {
+        let rawMagnification = settled * gestureScale
+        let overscroll = max(
+            0,
+            ObservationScale.minimumLocalMagnification - rawMagnification
+        )
+        return ObservationScale.eased(Double(overscroll / revealOverscroll))
+    }
+
+    nonisolated static func shouldArm(progress: Double) -> Bool {
+        progress >= 0.999
+    }
+
+    nonisolated static func shouldDismiss(magnification: CGFloat) -> Bool {
+        magnification > dismissMagnification
+    }
+
+    nonisolated static func elasticScale(progress: Double) -> CGFloat {
+        1 - maximumElasticReduction * CGFloat(min(1, max(0, progress)))
     }
 }
 

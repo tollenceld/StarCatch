@@ -161,8 +161,6 @@ struct SkyOverviewView: View {
     let entryPointing: Pointing?
     let transitionMotionEnabled: Bool
     let interactive: Bool
-    var onScaleReturnChanged: (Double) -> Void = { _ in }
-    var onScaleReturnEnded: (Bool) -> Void = { _ in }
 
     /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
     /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
@@ -173,7 +171,6 @@ struct SkyOverviewView: View {
     @State private var zoom: CGFloat = 1
     @State private var settledZoom: CGFloat = 1
     @State private var scaleGestureActive = false
-    @State private var scaleReturnProgress: Double = 0
     @State private var orbitGestureActive = false
     @State private var rotationGestureActive = false
     @State private var spatialInertiaActive = false
@@ -372,7 +369,11 @@ struct SkyOverviewView: View {
             .onAppear {
                 coastlineStore.prepare()
                 #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--previewOverviewTransform") {
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains("--previewOverviewMaxZoom") {
+                    zoom = ObservationScale.maximumOverviewZoom
+                    settledZoom = zoom
+                } else if arguments.contains("--previewOverviewTransform") {
                     orientation = Self.orientation(yaw: 0.72, pitch: -0.36, roll: 0.18)
                     settledOrientation = orientation
                     zoom = 1.26
@@ -526,25 +527,14 @@ struct SkyOverviewView: View {
                 let rawZoom = settledZoom * value
                 zoom = min(
                     ObservationScale.maximumOverviewZoom,
-                    max(0.78, rawZoom)
+                    max(ObservationScale.minimumOverviewZoom, rawZoom)
                 )
                 scaleModified = abs(zoom - 1) > 0.015
-                scaleReturnProgress = ObservationScale.overviewReturnProgress(
-                    rawZoom: rawZoom
-                )
-                onScaleReturnChanged(scaleReturnProgress)
             }
             .onEnded { _ in
                 guard interactive else { return }
                 scaleGestureActive = false
-                let shouldReturn = ObservationScale.shouldCommit(scaleReturnProgress)
-                onScaleReturnEnded(shouldReturn)
-                scaleReturnProgress = 0
-                onScaleReturnChanged(0)
-                if shouldReturn {
-                    settledZoom = zoom
-                    recoverRenderDetails(after: transitionMotionEnabled ? 0.22 : 0.08)
-                } else if rotationGestureActive {
+                if rotationGestureActive {
                     settledZoom = zoom
                 } else {
                     startScaleInertia(
@@ -700,7 +690,7 @@ struct SkyOverviewView: View {
                 velocity *= SpatialMotion.boundaryVelocityScale(
                     value: Double(zoom),
                     velocity: velocity,
-                    lowerBound: 0.78,
+                    lowerBound: Double(ObservationScale.minimumOverviewZoom),
                     upperBound: Double(ObservationScale.maximumOverviewZoom),
                     slowZone: 0.16
                 )
@@ -711,7 +701,7 @@ struct SkyOverviewView: View {
                 zoom = min(
                     ObservationScale.maximumOverviewZoom,
                     max(
-                        0.78,
+                        ObservationScale.minimumOverviewZoom,
                         zoom * CGFloat(exp(velocity * deltaTime))
                     )
                 )

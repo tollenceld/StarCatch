@@ -268,14 +268,14 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(unsupported.directionWingWidth, unsupported.statusWingWidth)
     }
 
-    func testObservationScaleSeparatesWideFieldFromOverviewThreshold() {
+    func testGlobalEntryGateRequiresOverscrollBeyondTheWideField() {
         let wideField = ObservationScale.localMagnification(
             settled: 1,
             gestureScale: 0.7
         )
         XCTAssertEqual(wideField, 0.7, accuracy: 0.0001)
         XCTAssertEqual(
-            ObservationScale.overviewProgress(settled: 1, gestureScale: 0.7),
+            GlobalEntryGatePolicy.progress(settled: 1, gestureScale: 0.7),
             0,
             accuracy: 0.0001
         )
@@ -284,27 +284,50 @@ final class TimeTests: XCTestCase {
             Projection.verticalFOV(forMagnification: 1)
         )
 
-        let threshold = ObservationScale.overviewProgress(
+        let threshold = GlobalEntryGatePolicy.progress(
             settled: ObservationScale.minimumLocalMagnification,
-            gestureScale: 0.56
+            gestureScale: (
+                ObservationScale.minimumLocalMagnification
+                    - GlobalEntryGatePolicy.revealOverscroll
+            ) / ObservationScale.minimumLocalMagnification
         )
-        XCTAssertTrue(ObservationScale.shouldCommit(threshold))
-    }
-
-    func testObservationScaleRequiresOverviewZoomOvershootToReturn() {
+        XCTAssertEqual(threshold, 1, accuracy: 0.0001)
+        XCTAssertTrue(GlobalEntryGatePolicy.shouldArm(progress: threshold))
         XCTAssertEqual(
-            ObservationScale.overviewReturnProgress(
-                rawZoom: ObservationScale.maximumOverviewZoom
-            ),
-            0,
+            GlobalEntryGatePolicy.elasticScale(progress: threshold),
+            0.98,
             accuracy: 0.0001
         )
-        let returnProgress = ObservationScale.overviewReturnProgress(
-            rawZoom: ObservationScale.maximumOverviewZoom
-                + ObservationScale.overviewReturnTravel
+    }
+
+    func testGlobalEntryGateUsesHysteresisAndGlobalZoomHasIndependentBounds() {
+        XCTAssertFalse(
+            GlobalEntryGatePolicy.shouldDismiss(magnification: 0.59)
         )
-        XCTAssertEqual(returnProgress, 1, accuracy: 0.0001)
-        XCTAssertTrue(ObservationScale.shouldCommit(returnProgress))
+        XCTAssertTrue(
+            GlobalEntryGatePolicy.shouldDismiss(magnification: 0.61)
+        )
+        XCTAssertEqual(ObservationScale.defaultLocalMagnification, 1)
+        XCTAssertEqual(ObservationScale.minimumOverviewZoom, 0.72)
+        XCTAssertEqual(ObservationScale.maximumOverviewZoom, 2.2)
+
+        XCTAssertEqual(
+            SpatialMotion.projectedScale(
+                current: ObservationScale.maximumOverviewZoom,
+                logarithmicVelocity: 1.4,
+                lowerBound: ObservationScale.minimumOverviewZoom,
+                upperBound: ObservationScale.maximumOverviewZoom
+            ),
+            ObservationScale.maximumOverviewZoom
+        )
+    }
+
+    func testSkyPresentationModeKeepsNavigationExplicit() {
+        XCTAssertFalse(SkyPresentationMode.local.presentsOverview)
+        XCTAssertTrue(SkyPresentationMode.enteringGlobal.isTransitioning)
+        XCTAssertTrue(SkyPresentationMode.global.ownsGlobalInteraction)
+        XCTAssertFalse(SkyPresentationMode.exitingGlobal.ownsGlobalInteraction)
+        XCTAssertTrue(SkyPresentationMode.exitingGlobal.presentsOverview)
     }
 
     func testObservationScaleCrossfadeHandsVisualPriorityToGlobe() {
@@ -369,12 +392,6 @@ final class TimeTests: XCTestCase {
             )
             XCTAssertLessThanOrEqual(pair.0.chromePresence, pair.1.chromePresence)
         }
-        XCTAssertEqual(start.transitionCuePresence, 0, accuracy: 0.0001)
-        XCTAssertGreaterThan(
-            ObservationScale.transitionVisuals(progress: 0.35).transitionCuePresence,
-            0.9
-        )
-        XCTAssertEqual(end.transitionCuePresence, 0, accuracy: 0.0001)
     }
 
     func testLeftEdgeBackGestureRequiresDecisiveRightwardMotion() {

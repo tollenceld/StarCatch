@@ -46,10 +46,6 @@ enum Motion {
     static let skyOverviewMode = Animation.timingCurve(0.16, 0.78, 0.16, 1, duration: 0.92)
     static let skyOverviewModeDuration: Double = 0.92
 
-    /// 用户没有越过尺度门槛时，天空穹顶带一点阻力退回最广局部视野。
-    static let scaleThresholdReturn = Animation.timingCurve(0.3, 0, 0.22, 1, duration: 0.34)
-    static let scaleThresholdReturnDuration: Double = 0.34
-
     /// 扫描（进入捕捉态一次性）：2.4s 单次。
     static let scanDuration: Double = 2.4
 
