@@ -12,9 +12,11 @@ struct SkyView: View {
     @ObservedObject var session: SkySession
     @ObservedObject var capture: CaptureStateMachine
     @ObservedObject var clock: SkyClock
+    var isSheetPresented = false
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
     /// 设置与观测档案由上层负责呈现；档案的常驻入口统一收进设置页，
     /// 目标卡仍可按内容直接进入深度档案。
+    var onOpenFilters: () -> Void = {}
     var onOpenInstrument: () -> Void = {}
     var onOpenSystemStatus: () -> Void = {}
     var onOpenArchive: () -> Void = {}
@@ -52,8 +54,7 @@ struct SkyView: View {
     @State private var overviewCelestialFrame: CelestialViewFrame?
     @State private var overviewInteractionActive = false
     @State private var overviewIdleBeganAt: Date?
-    @State private var filterExpanded = false
-    @State private var topPanel: TopPanel?
+    @State private var transientOverlay: SkyTransientOverlay?
     /// 锁定事实与详情可见性相互独立：收起摘要不会释放目标。
     @State private var lockedDetailPresented = true
     /// 阅读面板拥有独立于准星捕获状态的短期记忆。默认识别离开阈值后，状态机可以
@@ -79,11 +80,6 @@ struct SkyView: View {
     @State private var engagedPreciseEphemeris: Ephemeris?
     @State private var engagedInsight: SatelliteInsightSnapshot?
 
-    private enum TopPanel: Equatable {
-        case observation
-        case direction
-    }
-
     private var suppressMotion: Bool { reducedMotion || systemReducedMotion }
     private var fieldVerticalFOV: Double {
         Projection.verticalFOV(forMagnification: fieldMagnification)
@@ -102,9 +98,6 @@ struct SkyView: View {
     }
     private var overviewTransitioning: Bool {
         presentationMode.isTransitioning
-    }
-    private var globalEntryVisible: Bool {
-        presentationMode == .local && globalEntryArmed
     }
     private var localChromePresence: Double {
         let wideReduction = 1 - 0.46 * wideFieldProgress
@@ -125,13 +118,29 @@ struct SkyView: View {
                 progress: globalEntryGateProgress
             )
     }
-    private var scaleResetAvailable: Bool {
-        if overviewCommitted {
-            return overviewScaleModified && !overviewTransitioning
-        }
+    private var localFieldResetAvailable: Bool {
         return !clock.isScrubbing
             && !fieldMagnificationActive
             && abs(fieldMagnification - 1) > 0.015
+    }
+    private var globalFieldResetAvailable: Bool {
+        overviewScaleModified && !overviewTransitioning
+    }
+    private var chromeState: SkyChromeState {
+        SkyChromeState(
+            presentationMode: presentationMode,
+            capturePhase: capture.phase,
+            captureConfirmationEnabled: captureConfirmationEnabled,
+            recognitionReady: capture.recognitionReady,
+            replacementObjectID: capture.replacementObjectId,
+            acquisitionProgress: capture.acquisitionProgress,
+            replacementProgress: capture.replacementProgress,
+            targetSummaryVisible: lockedDetailPresented && retainedDetailObjectID != nil,
+            localFieldResetAvailable: localFieldResetAvailable,
+            globalFieldResetAvailable: globalFieldResetAvailable,
+            isLive: clock.isLive,
+            transientOverlay: transientOverlay
+        )
     }
     /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
     /// 避免按钮先切换、地球随后才出现。
@@ -229,29 +238,23 @@ struct SkyView: View {
             }
             #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
-            if arguments.contains("--previewFocusStage") {
+            if arguments.contains("--previewFocusStage")
+                || arguments.contains("--previewLockedTarget") {
                 captureConfirmationEnabled = true
                 capture.returnToExploring()
-            }
-            if arguments.contains("--openFilter") {
-                // 镜片只属于探索层。模拟器默认指向常常正好落在目标上，
-                // 先让自动识别完成，再展开镜片，避免 acquiring / locked 的
-                // 正常收拢逻辑在调试截图前把它立刻关回去。
+            } else if arguments.contains("--previewSensing") {
+                captureConfirmationEnabled = false
                 capture.returnToExploring()
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(1800))
-                    filterExpanded = true
-                }
             }
             if arguments.contains("--openObservationWing") {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(1600))
-                    topPanel = .observation
+                    transientOverlay = .observationStatus
                 }
             } else if arguments.contains("--openDirectionWing") {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(1600))
-                    topPanel = .direction
+                    transientOverlay = .direction
                 }
             }
             if arguments.contains("--filterObservation") {
@@ -285,6 +288,9 @@ struct SkyView: View {
                 overviewEntryPointing = session.pointing
                 overviewCelestialFrame = makeCelestialViewFrame()
                 overviewIdleBeganAt = Date()
+                if arguments.contains("--openTimePanel") {
+                    transientOverlay = .globalTime
+                }
             } else if arguments.contains("--previewWideField") {
                 fieldMagnification = 0.66
                 settledFieldMagnification = fieldMagnification
@@ -337,7 +343,7 @@ struct SkyView: View {
         .onChange(of: capture.phase) { oldPhase, newPhase in
             switch newPhase {
             case .acquiring:
-                withAnimation(Motion.interfaceCollapse) { topPanel = nil }
+                dismissTransientOverlay()
                 lastAcquisitionPulse = Date()
                 acquisitionEntryHaptic()
             case .locked(let objectId):
@@ -415,6 +421,7 @@ struct SkyView: View {
             }
         }
         .onChange(of: presentationMode) { oldMode, newMode in
+            dismissTransientOverlay()
             session.setOverviewPropagationActive(
                 newMode.presentsOverview || globalEntryArmed
             )
@@ -426,6 +433,11 @@ struct SkyView: View {
             }
             if newMode == .global {
                 overviewIdleBeganAt = Date()
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("--openTimePanel") {
+                    transientOverlay = .globalTime
+                }
+                #endif
             } else if newMode != .enteringGlobal {
                 overviewAmbientTrails.clear()
                 overviewIdleBeganAt = nil
@@ -456,6 +468,9 @@ struct SkyView: View {
                 capture.returnToExploring()
             }
         }
+        .onChange(of: isSheetPresented) { _, presented in
+            if presented { dismissTransientOverlay() }
+        }
     }
 
     /// 帧循环只发布低频状态；Canvas 绘制本身保持无副作用。
@@ -478,12 +493,21 @@ struct SkyView: View {
             )
         }
 
-        guard !clock.isScrubbing,
+        guard !isSheetPresented,
+              !clock.isScrubbing,
               presentationMode == .local,
               frameTime - lastCaptureSample
                 >= CaptureStateMachine.samplingInterval
         else { return }
         lastCaptureSample = frameTime
+        #if DEBUG
+        // 视觉回归的感应态在状态机第一次进入 acquiring 后冻结；普通调试与发布路径
+        // 仍按真实驻留时间推进，不引入第二份捕获事实。
+        if ProcessInfo.processInfo.arguments.contains("--previewSensing"),
+           capture.isAcquiring {
+            return
+        }
+        #endif
         let sample: CaptureSample
         switch session.pointingAvailability {
         case .tracking, .manual:
@@ -558,8 +582,7 @@ struct SkyView: View {
         withAnimation(
             suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceExpand
         ) {
-            filterExpanded = false
-            topPanel = nil
+            transientOverlay = nil
             lockedDetailPresented = true
         }
     }
@@ -641,49 +664,36 @@ struct SkyView: View {
         if archivePresentationReady {
             showLockedDetail()
         } else {
-            toggleTopPanel(.observation)
+            toggleTransientOverlay(.observationStatus)
         }
     }
 
     // MARK: - 底部观测动作 / 全局时间标尺
 
-    /// 主天空与全局星图共享同一个底部槽位，但职责不混合：主天空只表达捕获意图，
-    /// 全局星图才提供时间旅行。这样主页面不会在无全局语境时意外停留于过去/未来。
+    /// 主天空与全局星图使用同一个稳定槽位。常驻入口、捕获主动作和时间控制由
+    /// `SkyChromeState` 决定优先级，避免多个独立按钮在状态切换时互相挤压。
     private var bottomControlBand: some View {
         Group {
-            if globalEntryVisible {
-                GlobalEntryControl(
-                    enabled: !fieldMagnificationActive,
-                    action: enterGlobalOverview
-                )
-                .padding(.bottom, 8)
-                .transition(
-                    .opacity.combined(
-                        with: .scale(scale: 0.96, anchor: .bottom)
-                    )
-                )
-            } else if overviewChromeVisible {
-                overviewControlColumn
-                    .opacity(overviewPresentationProgress)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else if overviewTransitioning {
-                Color.clear
-                    .frame(height: 56)
-                    .accessibilityHidden(true)
-            } else if lockedDetailPresented,
+            if chromeState.dockMode == .targetSummary,
                       let id = retainedDetailObjectID,
                       let object = session.catalog.objectsByID[id] {
                 lockedSummaryCard(object: object, objectID: id)
                     .opacity(localBottomPresence)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             } else {
-                skyControlRow
-                    .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: .bottom)))
+                commandColumn
+                    .opacity(
+                        chromeState.scene == .global
+                            ? overviewPresentationProgress
+                            : localBottomPresence
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .animation(Motion.interfaceCollapse, value: overviewCommitted)
-        .animation(Motion.interfaceExpand, value: globalEntryVisible)
-        .animation(Motion.interfaceExpand, value: archivePresentationReady)
+        .animation(
+            suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand,
+            value: chromeState
+        )
         .zIndex(2)
     }
 
@@ -707,6 +717,7 @@ struct SkyView: View {
             },
             onInteraction: keepDetailVisible,
             onToggleRetention: toggleDetailRetention,
+            onRelease: requestRelease,
             onDismiss: hideLockedDetail,
         )
         .id(objectID)
@@ -714,172 +725,39 @@ struct SkyView: View {
         .padding(.bottom, 8)
     }
 
-    /// 全局星图底部只承担时间旅行、视场操作和设置；返回统一移到左上角。
-    private var overviewControlColumn: some View {
-        VStack(spacing: 0) {
-            timeDial
-
-            ZStack {
-                HStack {
-                    Spacer(minLength: 0)
-                    instrumentEntry
-                }
+    private var commandColumn: some View {
+        VStack(spacing: 10) {
+            if chromeState.showsTimePanel {
+                TimeDial(clock: clock)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
 
                 if !clock.isLive {
                     ReturnToLiveControl(
                         returning: clock.isReturningToLive,
                         action: returnToLiveFromCapsule
                     )
-                } else if scaleResetAvailable {
-                    FieldOfViewResetControl(action: resetActiveFieldOfView)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 }
             }
-            .frame(height: AppChromeMetrics.controlHeight)
-            .padding(.horizontal, AppChromeMetrics.edgeInset)
-            .padding(.top, 7)
-        }
-        .background(Palette.voidBlack.opacity(0.97))
-        .padding(.bottom, 8)
-    }
 
-    /// 探索态只保留筛选和设置；观测记录由设置页的摘要进入。
-    /// 锁定后这一整组退出，由目标摘要接管底部。
-    ///
-    /// 左侧范围、中间主动作和右侧设置永远共用一条基线。中间没有当前动作时保持
-    /// 为空，不再用无效按钮补齐构图。
-    private var skyControlRow: some View {
-        Group {
-            if #available(iOS 26.0, *) {
-                GlassEffectContainer(spacing: AppChromeMetrics.itemSpacing) {
-                    skyControlRowContent
-                }
-            } else {
-                skyControlRowContent
+            if chromeState.resetAction != nil {
+                FieldOfViewResetControl(action: resetActiveFieldOfView)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
+
+            SkyCommandDock(
+                state: chromeState,
+                filtersActive: session.activeCatalogFilterCount > 0,
+                globalEntryEmphasized: globalEntryArmed,
+                onOpenFilters: openFilters,
+                onEnterGlobal: enterGlobalOverview,
+                onToggleTime: toggleTimePanel,
+                onOpenSettings: openInstrument,
+                onPrimaryAction: performPrimaryAction
+            )
         }
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .padding(.bottom, 8)
-        .opacity(filterExpanded ? 1 : localBottomPresence)
-        .animation(Motion.interfaceCollapse, value: filterExpanded)
-        .animation(Motion.interfaceExpand, value: focusActionMode)
-        .animation(Motion.interfaceCollapse, value: scaleResetAvailable)
-    }
-
-    private var skyControlRowContent: some View {
-        HStack(spacing: 0) {
-            filterPort
-
-            Spacer(minLength: AppChromeMetrics.itemSpacing)
-
-            if !filterExpanded {
-                primaryBottomAction
-                    .transition(
-                        .opacity.combined(
-                            with: .scale(scale: 0.94, anchor: .bottom)
-                        )
-                    )
-
-                Spacer(minLength: AppChromeMetrics.itemSpacing)
-
-                instrumentEntry
-                    .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .trailing)))
-            }
-        }
-        .frame(height: AppChromeMetrics.controlHeight, alignment: .bottom)
-    }
-
-    /// 紧凑入口只占一枚横向胶囊；展开内容由同一外壳向上生长。
-    private var filterPort: some View {
-        Color.clear
-            .frame(
-                width: CatalogFilterControl.collapsedSize,
-                height: SkyTopBarMetrics.controlHeight
-            )
-            .overlay(alignment: .bottomLeading) {
-                CatalogFilterControl(
-                    scope: session.catalogScope,
-                    selections: session.catalogFilters,
-                    resultCount: session.visibleObjects.count,
-                    expanded: filterExpanded,
-                    onToggle: { setFilterExpanded(!filterExpanded) },
-                    onSelectScope: session.setCatalogScope,
-                    onToggleFilter: session.toggleCatalogFilter,
-                    onReset: session.resetCatalogFilters,
-                    onClose: { setFilterExpanded(false) },
-                    presence: filterChromeOpacity
-                )
-                .fixedSize()
-                .animation(.easeOut(duration: 0.24), value: filterChromeOpacity)
-            }
-    }
-
-    /// 主天空和全局星图唯一的右下常驻入口。
-    private var instrumentEntry: some View {
-        utilityButton(symbol: "slider.horizontal.3", action: onOpenInstrument)
-        .opacity(observationChromeOpacity)
-        .accessibilityLabel(L10n.text("settings.open.accessibility"))
-        .accessibilityHint(L10n.text("settings.open.hint"))
-    }
-
-    @ViewBuilder
-    private func utilityButton(symbol: String, action: @escaping () -> Void) -> some View {
-        let shape = RoundedRectangle(
-            cornerRadius: AppChromeMetrics.compactCornerRadius,
-            style: .continuous
-        )
-        let button = Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Palette.inkMid.opacity(0.9))
-                .frame(
-                    width: AppChromeMetrics.controlHeight,
-                    height: AppChromeMetrics.controlHeight
-                )
-                .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-
-        if #available(iOS 26.0, *) {
-            button
-                .glassEffect(
-                    .regular
-                        .tint(Palette.voidBlack.opacity(0.1))
-                        .interactive(),
-                    in: .rect(cornerRadius: AppChromeMetrics.compactCornerRadius)
-                )
-                .overlay {
-                    shape.stroke(
-                        Palette.inkFaint.opacity(0.29),
-                        lineWidth: AppChromeMetrics.strokeWidth
-                    )
-                }
-        } else {
-            button
-                .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.72), in: shape)
-                .overlay {
-                    shape.stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.6)
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var primaryBottomAction: some View {
-        if persistentOverviewProgress < 0.05 {
-            if capture.isLocked || isReleasing {
-                CaptureSecondaryControl(
-                    mode: captureSecondaryMode,
-                    action: performSecondaryCaptureAction
-                )
-            } else if captureConfirmationEnabled, focusActionMode.isInteractive {
-                FocusActionControl(
-                    mode: focusActionMode,
-                    action: performFocusAction
-                )
-            } else if scaleResetAvailable {
-                FieldOfViewResetControl(action: resetActiveFieldOfView)
-            }
-        }
     }
 
     private func presentDeepArchive(for object: CatalogObject) {
@@ -895,53 +773,34 @@ struct SkyView: View {
         }
     }
 
-    private var focusActionMode: FocusActionMode {
-        if isReleasing { return .releasing }
-        if capture.isAcquiringReplacement {
-            return .replace(progress: capture.replacementProgress)
-        }
-        if capture.isLocked {
-            return .captured
-        }
-        if capture.isAcquiring {
-            return .confirm(progress: capture.acquisitionProgress)
-        }
-        return .seeking
-    }
-
-    private func performFocusAction() {
-        if capture.isAcquiringReplacement {
+    private func performPrimaryAction(_ action: SkyChromeState.PrimaryAction) {
+        switch action {
+        case .replace:
             _ = capture.confirmReplacement()
-        } else if capture.isAcquiring {
+        case .confirm:
             _ = capture.confirmAcquisition()
-        }
-    }
-
-    private var captureSecondaryMode: CaptureSecondaryMode {
-        isReleasing ? .cancelling : .cancelCapture
-    }
-
-    private func performSecondaryCaptureAction() {
-        if capture.isLocked || capture.recognitionReady {
+        case .release:
             requestRelease()
+        case .releasing:
+            break
         }
     }
 
-    private var timeDial: some View {
-        TimeDial(clock: clock)
-            .overlay {
-                if filterExpanded {
-                    Color.black.opacity(0.001)
-                        .contentShape(Rectangle())
-                        .onTapGesture { setFilterExpanded(false) }
-                        .accessibilityHidden(true)
-                }
-            }
-            .animation(.easeOut(duration: 0.24), value: clock.isLive)
-            .animation(
-                scaleResetAvailable ? Motion.interfaceExpand : Motion.interfaceCollapse,
-                value: scaleResetAvailable
-            )
+    private func openFilters() {
+        dismissTransientOverlay()
+        ObservationHaptics.shared.selectionChanged()
+        onOpenFilters()
+    }
+
+    private func openInstrument() {
+        dismissTransientOverlay()
+        ObservationHaptics.shared.selectionChanged()
+        onOpenInstrument()
+    }
+
+    private func toggleTimePanel() {
+        ObservationHaptics.shared.selectionChanged()
+        toggleTransientOverlay(.globalTime)
     }
 
     private func returnToLiveFromCapsule() {
@@ -974,12 +833,11 @@ struct SkyView: View {
         }
     }
 
-    /// 顶部详情、筛选和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
+    /// 顶部详情、时间面板和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
     /// 这一层之上，因此点击内容仍执行自身动作，点击天空空白则只收起当前浮层。
     @ViewBuilder
     private var transientDismissLayer: some View {
-        if filterExpanded
-            || topPanel != nil
+        if transientOverlay != nil
             || (lockedDetailPresented
                 && retainedDetailObjectID != nil
                 && !overviewChromeVisible) {
@@ -992,45 +850,19 @@ struct SkyView: View {
                        !overviewChromeVisible {
                         hideLockedDetail()
                     }
-                    withAnimation(Motion.interfaceCollapse) {
-                        filterExpanded = false
-                        topPanel = nil
-                    }
+                    dismissTransientOverlay()
                 }
                 .accessibilityHidden(true)
         }
     }
 
-    /// 捕获中镜片仍然可用，但退到背景层：它不与目标身份争夺第一视觉权重。
-    private var filterChromeOpacity: Double {
-        let stateOpacity: Double
-        if capture.isLocked || isReleasing {
-            stateOpacity = 0.4
-        } else if capture.isAcquiring {
-            stateOpacity = 0.58
-        } else {
-            stateOpacity = session.activeCatalogFilterCount == 0 ? 0.88 : 1
+    private func dismissTransientOverlay() {
+        guard transientOverlay != nil else { return }
+        withAnimation(
+            suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceCollapse
+        ) {
+            transientOverlay = nil
         }
-        return stateOpacity * max(0.46, localChromePresence)
-    }
-
-    private func setFilterExpanded(_ expanded: Bool) {
-        let animation: Animation = suppressMotion
-            ? .easeOut(duration: 0.14)
-            : (expanded ? Motion.interfaceExpand : Motion.interfaceCollapse)
-        withAnimation(animation) {
-            if expanded { topPanel = nil }
-            filterExpanded = expanded
-        }
-    }
-
-    /// 两侧入口常驻，但在感应与锁定时主动降到背景层。入口仍可用，不与目标信息
-    /// 争夺第一视觉权重。
-    private var observationChromeOpacity: Double {
-        if overviewCommitted { return 1 }
-        if capture.isLocked || isReleasing { return 0.28 }
-        if capture.isAcquiring { return 0.46 }
-        return max(0.42, localChromePresence)
     }
 
     private func togglePersistentOverview() {
@@ -1053,9 +885,7 @@ struct SkyView: View {
     }
 
     private func enterGlobalOverview() {
-        guard presentationMode == .local,
-              globalEntryArmed
-        else { return }
+        guard presentationMode == .local else { return }
         ObservationHaptics.shared.mediumImpact(intensity: 0.72)
         globalEntryArmed = false
         globalEntryGateProgress = 0
@@ -1066,10 +896,7 @@ struct SkyView: View {
         overviewIdleBeganAt = nil
         persistentOverviewProgress = 0
         presentationMode = .enteringGlobal
-        withAnimation(Motion.interfaceCollapse) {
-            filterExpanded = false
-            topPanel = nil
-        }
+        dismissTransientOverlay()
         DispatchQueue.main.async {
             withAnimation(overviewModeAnimation) {
                 persistentOverviewProgress = 1
@@ -1118,6 +945,7 @@ struct SkyView: View {
 
     private func setOverviewInteractionActive(_ active: Bool) {
         guard overviewInteractionActive != active else { return }
+        if active { dismissTransientOverlay() }
         overviewInteractionActive = active
         overviewAmbientTrails.clear()
         overviewIdleBeganAt = active ? nil : Date()
@@ -1152,24 +980,27 @@ struct SkyView: View {
                     onStatusTap: {
                         handleStatusWingTap()
                     },
-                    onDirectionTap: { toggleTopPanel(.direction) }
+                    onDirectionTap: { toggleTransientOverlay(.direction) }
                 )
                 .frame(
                     width: geo.size.width,
                     height: SkyTopBarMetrics.controlHeight
                 )
 
-                if let topPanel {
-                    let panelWidth = topPanel == .observation
-                        ? islandMetrics.statusWingWidth
-                        : islandMetrics.directionWingWidth
-                    let centerX = topPanelCenterX(
-                        topPanel,
+                if let panel = transientOverlay,
+                   panel != .globalTime {
+                    let panelWidth = min(260, geo.size.width - 36)
+                    let sourceCenterX = topPanelCenterX(
+                        panel,
                         viewportWidth: geo.size.width,
                         metrics: islandMetrics
                     )
+                    let centerX = min(
+                        geo.size.width - AppChromeMetrics.edgeInset - panelWidth / 2,
+                        max(AppChromeMetrics.edgeInset + panelWidth / 2, sourceCenterX)
+                    )
                     topDetailPanel(
-                        topPanel,
+                        panel,
                         width: panelWidth,
                         cornerRadius: islandMetrics.wingCornerRadius
                     )
@@ -1186,24 +1017,24 @@ struct SkyView: View {
             )
             .animation(
                 suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand,
-                value: topPanel
+                value: transientOverlay
             )
         }
     }
 
     private func topPanelCenterX(
-        _ panel: TopPanel,
+        _ panel: SkyTransientOverlay,
         viewportWidth: CGFloat,
         metrics: DynamicIslandWingMetrics
     ) -> CGFloat {
-        let width = panel == .observation
+        let width = panel == .observationStatus
             ? metrics.statusWingWidth
             : metrics.directionWingWidth
         if metrics.usesIslandLayout {
             let offset = metrics.islandGapWidth / 2 + width / 2
-            return viewportWidth / 2 + (panel == .observation ? -offset : offset)
+            return viewportWidth / 2 + (panel == .observationStatus ? -offset : offset)
         }
-        return panel == .observation
+        return panel == .observationStatus
             ? SkyTopBarMetrics.outerMargin + width / 2
             : viewportWidth - SkyTopBarMetrics.outerMargin - width / 2
     }
@@ -1262,18 +1093,24 @@ struct SkyView: View {
         return 0
     }
 
-    private func toggleTopPanel(_ panel: TopPanel) {
+    private func toggleTransientOverlay(_ overlay: SkyTransientOverlay) {
         ObservationHaptics.shared.selectionChanged()
+        let next = SkyTransientOverlay.toggled(
+            from: transientOverlay,
+            requested: overlay
+        )
+        let expanding = next != nil
         withAnimation(
-            suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand
+            suppressMotion
+                ? .easeOut(duration: 0.14)
+                : (expanding ? Motion.interfaceExpand : Motion.interfaceCollapse)
         ) {
-            filterExpanded = false
-            topPanel = topPanel == panel ? nil : panel
+            transientOverlay = next
         }
     }
 
     private func topDetailPanel(
-        _ panel: TopPanel,
+        _ panel: SkyTransientOverlay,
         width: CGFloat,
         cornerRadius: CGFloat
     ) -> some View {
@@ -1281,18 +1118,18 @@ struct SkyView: View {
         return VStack(alignment: .leading, spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(
-                    panel == .observation
+                    panel == .observationStatus
                         ? L10n.text("sky.panel.observation")
                         : L10n.text("sky.panel.direction")
                 )
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.inkHigh.opacity(0.94))
                 Text(
-                    panel == .observation
+                    panel == .observationStatus
                         ? L10n.text("sky.panel.tag.system")
                         : L10n.text("sky.panel.tag.attitude")
                 )
-                    .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .tracking(0.7)
                     .foregroundStyle(Palette.inkLow.opacity(0.68))
             }
@@ -1309,7 +1146,7 @@ struct SkyView: View {
 
             if panel == .direction {
                 Text(directionGuidance)
-                    .font(.system(size: 8, weight: .regular))
+                    .font(.system(size: 10.5, weight: .regular))
                     .foregroundStyle(Palette.inkLow.opacity(0.72))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 8)
@@ -1318,17 +1155,17 @@ struct SkyView: View {
             Button(action: openFullInstrumentStatus) {
                 HStack(spacing: 5) {
                     Text(
-                        panel == .observation
+                        panel == .observationStatus
                             ? L10n.text("sky.panel.status")
                             : L10n.text("sky.panel.calibration")
                     )
-                        .font(.system(size: 8.5, weight: .medium))
+                        .font(.system(size: 10.5, weight: .medium))
                     Spacer(minLength: 2)
                     Image(systemName: "arrow.right")
-                        .font(.system(size: 7.5, weight: .semibold))
+                        .font(.system(size: 9, weight: .semibold))
                 }
                 .foregroundStyle(Palette.inkHigh.opacity(0.86))
-                .frame(height: 30)
+                .frame(height: 40)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -1339,9 +1176,9 @@ struct SkyView: View {
             }
             .padding(.top, 8)
         }
-        .padding(.horizontal, 9)
-        .padding(.top, 10)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 16)
+        .padding(.top, 15)
+        .padding(.bottom, 8)
         .frame(width: width, alignment: .leading)
         .background(
             Palette.voidBlack.opacity(0.12),
@@ -1355,9 +1192,9 @@ struct SkyView: View {
         )
     }
 
-    private func topPanelMetrics(for panel: TopPanel) -> [(String, String)] {
+    private func topPanelMetrics(for panel: SkyTransientOverlay) -> [(String, String)] {
         switch panel {
-        case .observation:
+        case .observationStatus:
             [
                 (L10n.text("sky.metric.attitude"), pointingAvailabilityText),
                 (L10n.text("sky.metric.heading_reference"), headingConfidenceText),
@@ -1372,7 +1209,7 @@ struct SkyView: View {
                     L10n.format("sky.value.days", session.tleAgeDays)
                 ),
             ]
-        case .direction:
+        case .direction, .globalTime:
             [
                 (L10n.text("sky.metric.azimuth"), statusAzimuth.replacingOccurrences(of: "AZ ", with: "")),
                 (L10n.text("sky.metric.altitude"), statusElevation.replacingOccurrences(of: "EL ", with: "")),
@@ -1385,21 +1222,21 @@ struct SkyView: View {
     private func topMetric(_ label: String, _ value: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(label)
-                .font(.system(size: 7.5, weight: .regular))
+                .font(.system(size: 9.5, weight: .regular))
                 .foregroundStyle(Palette.inkLow.opacity(0.72))
                 .lineLimit(1)
             Spacer(minLength: 2)
             Text(value)
-                .font(.system(size: 8.5, weight: .medium, design: .monospaced))
+                .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundStyle(Palette.inkHigh.opacity(0.9))
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
         }
-        .frame(height: 26)
+        .frame(height: 32)
     }
 
     private func openFullInstrumentStatus() {
-        withAnimation(Motion.interfaceCollapse) { topPanel = nil }
+        dismissTransientOverlay()
         onOpenSystemStatus()
     }
 
@@ -2081,7 +1918,6 @@ struct SkyView: View {
     private func targetMicroLabelLayer(observation: Date) -> some View {
         GeometryReader { geo in
             if capture.isAcquiring,
-               !filterExpanded,
                !archivePresentationReady,
                let id = capture.engagedObjectId,
                let object = session.catalog.objectsByID[id],
@@ -2320,6 +2156,9 @@ struct SkyView: View {
                 guard !overviewCommitted else { return }
                 guard !fieldMagnificationActive else { return }
                 guard let manual = session.manualProvider else { return }
+                if lastTranslation == .zero {
+                    dismissTransientOverlay()
+                }
                 let scale = max(
                     ObservationScale.minimumLocalMagnification,
                     fieldMagnification
@@ -2359,12 +2198,7 @@ struct SkyView: View {
                     if !globalEntryArmed {
                         globalEntryHapticSent = false
                     }
-                    if filterExpanded || topPanel != nil {
-                        withAnimation(Motion.interfaceCollapse) {
-                            filterExpanded = false
-                            topPanel = nil
-                        }
-                    }
+                    dismissTransientOverlay()
                     fieldScaleGestureSample = value
                     fieldScaleGestureSampleDate = Date()
                     fieldScaleLogarithmicVelocity = 0

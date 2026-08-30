@@ -27,7 +27,7 @@ struct RootView: View {
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
-    /// 三段流程的枚举，取代原来分散的 booted / panelPresented 布尔。
+    /// 全屏阅读阶段与天空互斥；筛选和设置改由系统 Sheet 覆盖在常驻天空之上。
     private enum Stage {
         case booting
         case manual
@@ -37,11 +37,8 @@ struct RootView: View {
 
     /// 无论首启还是回访都先建立一个可立即绘制的启动层；目录完成后再进入业务页面。
     @State private var stage: Stage = .booting
-    @State private var instrumentPresented = false
-    @State private var instrumentDestination: InstrumentPanel.Destination = .settings
-    @State private var overviewRequested = false
+    @State private var presentedSheet: AppSheetDestination?
     @State private var manualReturnsToInstrument = false
-    @State private var satelliteStoryPresented = false
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     private var sceneAnimation: Animation {
@@ -54,13 +51,20 @@ struct RootView: View {
             removal: .move(edge: .trailing).combined(with: .opacity)
         )
     }
+    private var forceLegacyMaterial: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("--forceLegacyMaterial")
+        #else
+        false
+        #endif
+    }
 
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            // 天空：只在 sky 阶段显示
-            if stage == .sky, !instrumentPresented, let session {
+            // Sheet 出现时天空仍保持同一实例和连续渲染，只暂停捕获采样。
+            if stage == .sky, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
                 } else {
@@ -68,23 +72,19 @@ struct RootView: View {
                         session: session,
                         capture: capture,
                         clock: clock,
-                        onStoryPresentationChanged: { presented in
-                            satelliteStoryPresented = presented
+                        isSheetPresented: presentedSheet != nil,
+                        onOpenFilters: {
+                            presentedSheet = .filters
                         },
                         onOpenInstrument: {
-                            instrumentDestination = .settings
-                            withAnimation(sceneAnimation) { instrumentPresented = true }
+                            presentedSheet = .instrument(initialRoute: nil)
                         },
                         onOpenSystemStatus: {
-                            instrumentDestination = .systemStatus
-                            withAnimation(sceneAnimation) { instrumentPresented = true }
+                            presentedSheet = .instrument(initialRoute: .systemStatus)
                         },
                         onOpenArchive: {
-                            instrumentDestination = .observations
-                            withAnimation(sceneAnimation) { instrumentPresented = true }
-                        },
-                        initialOverviewPresented: overviewRequested,
-                        onInitialOverviewHandled: { overviewRequested = false }
+                            presentedSheet = .instrument(initialRoute: .observations)
+                        }
                     )
                         .transition(.opacity)
                 }
@@ -99,9 +99,11 @@ struct RootView: View {
                     let returnsToInstrument = manualReturnsToInstrument
                     withAnimation(sceneAnimation) {
                         stage = .sky
-                        instrumentPresented = returnsToInstrument
                     }
                     manualReturnsToInstrument = false
+                    if returnsToInstrument {
+                        reopenInstrumentAfterFullScreenReturn()
+                    }
                 }
                 .transition(contentPageTransition)
             }
@@ -124,37 +126,15 @@ struct RootView: View {
                 PrivacyStatementView {
                     withAnimation(sceneAnimation) {
                         stage = .sky
-                        instrumentPresented = true
                     }
+                    reopenInstrumentAfterFullScreenReturn()
                 }
                 .transition(contentPageTransition)
             }
-
-            // 仪器参数面板
-            if stage == .sky, instrumentPresented, let session {
-                InstrumentPanel(
-                    presented: $instrumentPresented,
-                    session: session,
-                    initialDestination: instrumentDestination,
-                    onOpenOverview: {
-                        overviewRequested = true
-                        withAnimation(sceneAnimation) { instrumentPresented = false }
-                    },
-                    onOpenManual: {
-                        withAnimation(sceneAnimation) {
-                            manualReturnsToInstrument = true
-                            instrumentPresented = false
-                            stage = .manual
-                        }
-                    },
-                    onOpenPrivacy: {
-                        withAnimation(sceneAnimation) {
-                            instrumentPresented = false
-                            stage = .privacy
-                        }
-                    }
-                )
-                    .transition(contentPageTransition)
+        }
+        .sheet(item: $presentedSheet) { destination in
+            if let session {
+                appSheet(destination, session: session)
             }
         }
         .task { await prepareSession() }
@@ -164,7 +144,7 @@ struct RootView: View {
                 session.start()
                 session.requestObserverAccess()
             } else {
-                satelliteStoryPresented = false
+                presentedSheet = nil
                 session.stop()
             }
         }
@@ -182,6 +162,57 @@ struct RootView: View {
             @unknown default:
                 break
             }
+        }
+        .environment(\.forceLegacyMaterial, forceLegacyMaterial)
+    }
+
+    @ViewBuilder
+    private func appSheet(
+        _ destination: AppSheetDestination,
+        session: SkySession
+    ) -> some View {
+        switch destination {
+        case .filters:
+            CatalogFilterSheet(session: session)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+                .presentationContentInteraction(.scrolls)
+                .presentationCornerRadius(34)
+                .presentationBackground(Palette.voidBlack)
+
+        case .instrument(let initialRoute):
+            InstrumentPanel(
+                session: session,
+                initialRoute: initialRoute,
+                onOpenManual: openManualFromInstrument,
+                onOpenPrivacy: openPrivacyFromInstrument
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.disabled)
+            .presentationContentInteraction(.scrolls)
+            .presentationCornerRadius(34)
+            .presentationBackground(Palette.voidBlack)
+        }
+    }
+
+    private func openManualFromInstrument() {
+        presentedSheet = nil
+        manualReturnsToInstrument = true
+        withAnimation(sceneAnimation) { stage = .manual }
+    }
+
+    private func openPrivacyFromInstrument() {
+        presentedSheet = nil
+        withAnimation(sceneAnimation) { stage = .privacy }
+    }
+
+    private func reopenInstrumentAfterFullScreenReturn() {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(180))
+            guard stage == .sky else { return }
+            presentedSheet = .instrument(initialRoute: nil)
         }
     }
 
@@ -217,16 +248,19 @@ struct RootView: View {
     }
 
     #if DEBUG
-    /// 调试参数：--skipBoot 跳过启动序列；--openInstrument 直接展开仪器面板；
+    /// 调试参数：--skipBoot 跳过启动序列；--openFilter / --openInstrument 直接展开 Sheet；
+    /// --openStatus / --openObservations 直接进入仪器 Sheet 的指定路由；
     /// --forceManual 强制跳到手册（配合 --manualPage <n>）；
     /// --markManualSeen 强制视为已看过手册，直接进 sky；
     /// --emptySky 把模拟器初始指向移到空域；
     /// --focusVisibleObject 将模拟器准星置于当前观测时刻最高的目标；
+    /// --previewSensing / --previewFocusStage / --previewLockedTarget 固定捕获层级；
     /// --profileFirstFocus 等待首批后台星历到达后再对准目标，用于性能取证且不
     /// 把调试器自己的同步全目录传播混入“第一次对焦”样本；
     /// --previewTimeScrub 持续拨动并保持天空球（仅用于视觉审计）；
     /// --previewOverviewExit 自动拨动后退出天空球；
-    /// --openOverview 直接打开常驻全局星图；
+    /// --openOverview 直接打开常驻全局星图；--openTimePanel 打开时间面板；
+    /// --timeOffset <秒> 固定非 LIVE；--forceLegacyMaterial 强制旧材质回退；
     /// --previewOverviewTransform 以旋转、放大状态打开星图；
     /// --previewOverviewInteraction 固定为交互降级材质，用于确认大陆基础轮廓持续存在；
     /// --previewOverviewMode 自动演示常驻星图进入与退出；
@@ -243,10 +277,16 @@ struct RootView: View {
             }
         }
         if args.contains("--openInstrument") {
-            instrumentPresented = true
+            presentedSheet = .instrument(initialRoute: nil)
+        } else if args.contains("--openStatus") {
+            presentedSheet = .instrument(initialRoute: .systemStatus)
+        } else if args.contains("--openObservations") {
+            presentedSheet = .instrument(initialRoute: .observations)
+        } else if args.contains("--openFilter") {
+            presentedSheet = .filters
         }
         if args.contains("--openPrivacy") {
-            instrumentPresented = false
+            presentedSheet = nil
             stage = .privacy
         }
         if args.contains("--emptySky") {
@@ -258,7 +298,11 @@ struct RootView: View {
            let seconds = Double(args[idx + 1]) {
             clock.scrub(by: seconds)
         }
-        if (args.contains("--focusVisibleObject") || args.contains("--focusFeaturedObject")),
+        if (args.contains("--focusVisibleObject")
+            || args.contains("--focusFeaturedObject")
+            || args.contains("--previewSensing")
+            || args.contains("--previewFocusStage")
+            || args.contains("--previewLockedTarget")),
            let manual = session.manualProvider {
             let observation = clock.observationTime()
             // 与主天空实际参与捕捉的采样集合保持一致，避免调试时对准了被收束的星座节点。

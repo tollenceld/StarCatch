@@ -13,6 +13,15 @@ enum Motion {
     static let interfaceCollapse = Animation.timingCurve(0.28, 0, 0.24, 1, duration: 0.24)
     static let interfaceCollapseDuration: Double = 0.24
 
+    /// 供纯逻辑测试与自定义过渡共享的时长语义。
+    nonisolated static func interfaceDuration(
+        expanding: Bool,
+        reduced: Bool
+    ) -> TimeInterval {
+        if reduced { return 0.14 }
+        return expanding ? 0.36 : interfaceCollapseDuration
+    }
+
     /// 镜头复位保留可读的空间运动，但不使用弹跳。
     static let fieldReset = Animation.timingCurve(0.18, 0.68, 0.2, 1, duration: 0.46)
 
@@ -74,6 +83,19 @@ enum SpatialMotion {
     static let scaleDecay: Double = 5.4
     static let minimumAngularVelocity: Double = 0.01
     static let minimumScaleVelocity: Double = 0.009
+
+    /// Timer / display-link 驱动的惯性使用真实帧间隔。异常暂停会被截断，避免 App
+    /// 从后台恢复时把整段时间一次性积分进镜头。
+    nonisolated static func resolvedDeltaTime(
+        now: TimeInterval,
+        previous: TimeInterval,
+        fallback: TimeInterval = 1.0 / 30.0,
+        maximum: TimeInterval = 0.1
+    ) -> TimeInterval {
+        let measured = now - previous
+        guard measured.isFinite, measured > 0 else { return fallback }
+        return min(maximum, measured)
+    }
 
     nonisolated static func decayFactor(
         rate: Double,

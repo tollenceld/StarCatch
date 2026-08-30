@@ -12,14 +12,17 @@
 RootView
 ├── 后台准备 CatalogStore ──完成后→ SkySession / EphemerisEngine / ObserverLocation
 ├── SkyClock
-└── CaptureStateMachine
+├── CaptureStateMachine
+├── AppSheetDestination ──→ CatalogFilterSheet / InstrumentPanel
+└── SkyView（编排）
      │
-     └── SkyView（编排）
-          ├── Projection（纯几何）
-          ├── SkyRenderer（Canvas 绘制）
-          ├── TrailStore（短生命周期轨迹）
-          ├── BrightStarStore / BrightStarProjector（离线恒星与缓存投影）
-          └── 独立 SwiftUI 控件
+     ├── SkyChromeState（纯值解释）
+     ├── SkyCommandDock（纯 UI）
+     ├── Projection（纯几何）
+     ├── SkyRenderer（Canvas 绘制）
+     ├── TrailStore（短生命周期轨迹）
+     ├── BrightStarStore / BrightStarProjector（离线恒星与缓存投影）
+     └── 独立 SwiftUI 控件
 ```
 
 依赖只能沿图向下。轨道层不知道 SwiftUI 页面，绘制层不拥有业务状态，视图不自行
@@ -30,11 +33,12 @@ RootView
 
 | 状态 | 唯一所有者 | 说明 |
 | --- | --- | --- |
-| 启动准备、手册与设置页呈现 | `RootView` | APP 级页面编排；目录不得在首帧前同步解析，启动电影时间由 `OrbitalBootView` 局部持有 |
+| 启动准备、全屏阅读与当前 Sheet | `RootView` | APP 级页面编排；`AppSheetDestination` 互斥表达筛选/仪器 Sheet，目录不得在首帧前同步解析 |
 | 设备指向、观察者、目录筛选、星历 | `SkySession` | 天空会话的共享事实源 |
 | 当前/过去/未来观测时刻 | `SkyClock` | 时间轴唯一事实源 |
 | 瞬时识别、候选、明确锁定、明确换锁、释放 | `CaptureStateMachine` | 感应档案可自动呈现；持续捕获仍需明确意图 |
-| 主天空局部动画、缩放、面板测量 | `SkyView` | 只影响当前视图生命周期 |
+| 主天空局部动画、缩放、面板测量与短时 Overlay | `SkyView` | `SkyTransientOverlay?` 保证状态/方向/时间面板互斥，只影响当前视图生命周期 |
+| 当前控制层解释 | `SkyChromeState` | 从场景、捕获和时间事实推导的纯值快照，不保存业务状态 |
 | 时间/全景拖尾 | `TrailStore` | 由所属视图创建和销毁 |
 | 亮星目录与天球投影 | `BrightStarStore` / `CelestialViewFrame` | 只读离线资源；进入全局时固定相机，后台解码和投影 |
 | 观测记录 | `ObservationLog` | 本地持久化，不依赖页面是否打开 |
@@ -72,14 +76,18 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 
 ## 天空渲染边界
 
-`SkyView` 是编排层：收集当前姿态、观测时刻和捕获阶段，并把稳定输入交给纯几何与
-绘制函数。可复用控件已经拆到：
+`SkyView` 是编排层：收集当前姿态、观测时刻和捕获阶段，并把稳定输入交给纯几何、
+绘制函数和纯值 Chrome 解释。可复用控件已经拆到：
 
-- `CatalogFilterControl.swift`
+- `SkyChromeState.swift`
+- `SkyCommandDock.swift`
+- `CatalogFilterControl.swift`（系统 Sheet 内容）
 - `SkyActionControls.swift`
 - `TimeDial.swift`
 
-`TimeDial` 只由全局星图的底部槽位呈现；主天空同一槽位使用 `FocusActionControl`。
+底部 Dock 在探索态和全局态都只显示三个 52pt 等权入口；捕获状态由 `SkyChromeState`
+提高中央主动作的优先级。`TimeDial` 只在全局星图明确打开时间面板时浮于 Dock 上方，
+非 LIVE 时再显示“返回此刻”。
 感应态档案可以由准星自动呈现，并在设置项“确认捕获”关闭时使用更短退出迟滞；稳定锁定与换锁
 仍必须调用 `CaptureStateMachine` 的确认动作，不能由驻留进度或 View 手势直接改写阶段。
 捕获阈值由状态机统一持有（进入 2.5°、核心 1.25°、离开 4°），页面不重复角距判断。
@@ -109,6 +117,8 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
    必须批量绘制。慢加载只能降速巡航，不能扩容。
 10. 地球大陆轮廓不能因拖动、缩放或惯性而消失。交互期间使用编译期基础轮廓，静止后可替换为
     后台准备的高精度海岸线；两者使用相同暗底与冷色细描边，不把琥珀交互色用作大陆主色。
+11. Sheet 覆盖时天空继续绘制可见帧，但暂停新的捕获采样；筛选 Sheet 只修改 `SkySession` 的
+    现有筛选事实并实时刷新，Chrome 和 Sheet 不得触发目录 IO 或逐帧传播。
 
 ## 本地化与资料边界
 
@@ -165,9 +175,9 @@ xcodegen generate
 1. `SkyView.swift` 同时编排 30fps Canvas、捕获关系、空间档案、缩放和全局星图，
    文件较大。拆分前需要为姿态变化、锁定/离屏/回归和时间轴建立可重复的视觉基线；
    不能通过放宽 `private` 或跨文件共享可变状态来追求行数下降。
-2. `InstrumentPanel.swift` 包含设置、系统状态、观测列表和观测详情四个页面。
-   下一次专项可把后三页提取为显式子视图，但必须先补齐导航、清空记录、动态字体
-   和“目录中已不存在的历史对象”回退测试。
+2. `InstrumentPanel.swift` 已由 `InstrumentRoute` 和 `NavigationStack` 统一导航，但设置、系统状态、
+   观测列表和详情子视图仍保存在同一文件。下一次仅在有明确维护收益时拆文件，并保持路由、
+   清空记录、动态字体和“目录中已不存在的历史对象”回退测试。
 3. 离线轨道快照的长期更新方式属于产品决策：随 App 版本更新、增加受控联网刷新，
    或建设自有数据服务会改变隐私、审核和运维边界，本轮不替用户选择。
 

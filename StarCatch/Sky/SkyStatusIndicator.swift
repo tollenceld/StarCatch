@@ -9,10 +9,13 @@ struct SkyWingSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
     var interactive = true
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
     @ViewBuilder
     func body(content: Content) -> some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        if #available(iOS 26.0, *) {
+        if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
             content
                 .glassEffect(
                     .regular
@@ -27,12 +30,19 @@ struct SkyWingSurfaceModifier: ViewModifier {
                     )
                 }
         } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.58), in: shape)
+            Group {
+                if reduceTransparency {
+                    content
+                        .background(Palette.voidBlack.opacity(0.96), in: shape)
+                } else {
+                    content
+                        .background(.ultraThinMaterial, in: shape)
+                        .background(Palette.voidBlack.opacity(0.66), in: shape)
+                }
+            }
                 .overlay {
                     shape.stroke(
-                        Palette.inkFaint.opacity(0.24),
+                        Palette.inkFaint.opacity(reduceTransparency ? 0.5 : 0.28),
                         lineWidth: AppChromeMetrics.strokeWidth
                     )
                 }

@@ -9,6 +9,8 @@ struct TimeDial: View {
     @ObservedObject var clock: SkyClock
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     /// 每 pt 对应的秒数。12s/pt：满屏一拖约 ±80 分钟，配合惯性可达数小时。
@@ -24,35 +26,27 @@ struct TimeDial: View {
     @State private var lastDragX: CGFloat = 0
 
     var body: some View {
-        VStack(spacing: 3) {
-            readout
-            ruler
-                .frame(height: 48)
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 9)
-        .padding(.bottom, 4)
-        .background {
-            LinearGradient(
-                colors: [
-                    Palette.voidBlack.opacity(0.84),
-                    Palette.voidBlack.opacity(0.98)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .bottom)
-        }
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(
-                    Palette.inkFaint.opacity(
-                        dragging || !clock.isLive ? 0.54 : Palette.Level.functionalDivider
+        Group {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
+                dialContent
+                    .glassEffect(
+                        .regular
+                            .tint(Palette.voidBlack.opacity(0.1))
+                            .interactive(),
+                        in: .rect(cornerRadius: 24)
                     )
-                )
-                .frame(height: 0.5)
+            } else {
+                fallbackContent
+            }
         }
-        .contentShape(Rectangle())
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .stroke(
+                    Palette.inkFaint.opacity(reduceTransparency ? 0.5 : 0.34),
+                    lineWidth: 0.6
+                )
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         // 时间轴位于天空拖拽层之上，优先接收横向手势，避免被“移动准星”吞掉。
         .highPriorityGesture(dragGesture)
         .accessibilityElement(children: .ignore)
@@ -75,6 +69,33 @@ struct TimeDial: View {
         }
         .animation(.easeOut(duration: 0.8), value: clock.isLive)
         .animation(.easeOut(duration: 0.8), value: hasInteracted)
+    }
+
+    private var dialContent: some View {
+        VStack(spacing: 3) {
+            readout
+            ruler
+                .frame(height: 48)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 8)
+    }
+
+    @ViewBuilder
+    private var fallbackContent: some View {
+        if reduceTransparency {
+            dialContent
+                .background(Palette.voidBlack.opacity(0.97), in: timeShape)
+        } else {
+            dialContent
+                .background(.ultraThinMaterial, in: timeShape)
+                .background(Palette.voidBlack.opacity(0.76), in: timeShape)
+        }
+    }
+
+    private var timeShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
     }
 
     // MARK: - 紧凑读数

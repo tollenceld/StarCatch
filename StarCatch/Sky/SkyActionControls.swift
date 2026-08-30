@@ -5,9 +5,12 @@ struct GlobalEntryControl: View {
     let enabled: Bool
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
                 button
                     .glassEffect(
                         .regular.tint(Palette.signal.opacity(0.12)).interactive(),
@@ -103,6 +106,8 @@ struct FocusActionControl: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var feedbackPulse = false
 
@@ -110,7 +115,7 @@ struct FocusActionControl: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
                 actionButton
                     .glassEffect(
                         .regular
@@ -162,7 +167,7 @@ struct FocusActionControl: View {
                     .fill(Palette.signal.opacity(mode.isReleasing ? 0.68 : 0.4 + 0.26 * mode.readiness))
                     .frame(width: 14 + 8 * CGFloat(mode.readiness), height: 0.65)
             }
-            .frame(width: mode.width, height: AppChromeMetrics.controlHeight)
+            .frame(width: mode.width, height: AppChromeMetrics.commandControlSize)
             .contentShape(Capsule())
             .overlay {
                 Capsule()
@@ -226,9 +231,12 @@ struct CaptureSecondaryControl: View {
     let mode: CaptureSecondaryMode
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
                 button
                     .glassEffect(
                         .regular.tint(Palette.inkLow.opacity(0.08)).interactive(),
@@ -258,7 +266,10 @@ struct CaptureSecondaryControl: View {
                     .tracking(0.9)
             }
             .foregroundStyle(Palette.inkMid.opacity(mode == .cancelling ? 0.48 : 0.82))
-            .frame(width: 108, height: AppChromeMetrics.controlHeight)
+            .frame(
+                width: AppChromeMetrics.mainActionWidth,
+                height: AppChromeMetrics.commandControlSize
+            )
             .contentShape(Capsule())
         }
         .buttonStyle(SkyCapsulePressStyle())
@@ -273,6 +284,8 @@ struct ReturnToLiveControl: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var feedbackPulse = false
 
@@ -280,7 +293,7 @@ struct ReturnToLiveControl: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
                 actionButton
                     .glassEffect(
                         .regular
@@ -357,8 +370,8 @@ struct ReturnToLiveControl: View {
 struct SkyCapsulePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.955 : 1)
-            .brightness(configuration.isPressed ? 0.08 : 0)
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .brightness(configuration.isPressed ? 0.065 : 0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
@@ -367,9 +380,12 @@ struct SkyCapsulePressStyle: ButtonStyle {
 struct FieldOfViewResetControl: View {
     let action: () -> Void
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
     var body: some View {
         Group {
-            if #available(iOS 26.0, *) {
+            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
                 actionButton
                     .glassEffect(
                         .regular

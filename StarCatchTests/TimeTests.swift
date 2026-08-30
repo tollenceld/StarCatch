@@ -311,7 +311,7 @@ final class TimeTests: XCTestCase {
         )
         XCTAssertEqual(regular.family, .regular)
         XCTAssertEqual(regular.topPadding, 9)
-        XCTAssertEqual(regular.wingHeight, 30)
+        XCTAssertEqual(regular.wingHeight, 32)
         XCTAssertEqual(regular.directionWingWidth, regular.statusWingWidth)
         XCTAssertEqual(regular.islandCenterY, 31)
 
@@ -1511,6 +1511,179 @@ final class TimeTests: XCTestCase {
             deadline.timeIntervalSince(now),
             TargetDetailRetentionPolicy.graceDuration,
             accuracy: 0.0001
+        )
+    }
+
+    func testSkyChromeExplorationKeepsThreeControlsAndLocalReset() {
+        let chrome = makeChrome(
+            localReset: true,
+            phase: .exploring
+        )
+
+        XCTAssertEqual(chrome.scene, .local)
+        XCTAssertEqual(chrome.dockMode, .exploration)
+        XCTAssertEqual(chrome.resetAction, .localField)
+        XCTAssertFalse(chrome.showsTimePanel)
+    }
+
+    func testSkyChromeCapturePriorityHidesExplorationDock() {
+        let sensing = makeChrome(
+            phase: .acquiring(objectId: "iss"),
+            captureConfirmation: false,
+            acquisitionProgress: 0.42
+        )
+        XCTAssertEqual(sensing.dockMode, .sensing)
+
+        let confirmation = makeChrome(
+            phase: .acquiring(objectId: "iss"),
+            captureConfirmation: true,
+            acquisitionProgress: 1.4
+        )
+        XCTAssertEqual(confirmation.dockMode, .capture(.confirm(progress: 1)))
+        XCTAssertNil(confirmation.resetAction)
+
+        let replacement = makeChrome(
+            phase: .locked(objectId: "iss"),
+            replacementObjectID: "hst",
+            replacementProgress: 0.63,
+            targetSummaryVisible: false
+        )
+        XCTAssertEqual(replacement.dockMode, .capture(.replace(progress: 0.63)))
+    }
+
+    func testSkyChromeTargetSummaryAndGlobalTimeTakePriority() {
+        let target = makeChrome(
+            phase: .locked(objectId: "iss"),
+            replacementObjectID: "hst",
+            replacementProgress: 1,
+            targetSummaryVisible: true
+        )
+        XCTAssertEqual(target.dockMode, .targetSummary)
+
+        let global = makeChrome(
+            presentation: .global,
+            globalReset: true,
+            isLive: false,
+            overlay: .globalTime
+        )
+        XCTAssertEqual(global.scene, .global)
+        XCTAssertEqual(global.dockMode, .global)
+        XCTAssertEqual(global.resetAction, .globalField)
+        XCTAssertTrue(global.showsTimePanel)
+        XCTAssertFalse(global.isLive)
+
+        let transition = makeChrome(presentation: .enteringGlobal)
+        XCTAssertEqual(transition.scene, .transitioning)
+        XCTAssertEqual(transition.dockMode, .hidden)
+    }
+
+    func testTransientOverlayIsMutuallyExclusiveAndToggleable() {
+        var overlay: SkyTransientOverlay?
+        overlay = SkyTransientOverlay.toggled(
+            from: overlay,
+            requested: .observationStatus
+        )
+        XCTAssertEqual(overlay, .observationStatus)
+
+        overlay = SkyTransientOverlay.toggled(from: overlay, requested: .direction)
+        XCTAssertEqual(overlay, .direction)
+
+        overlay = SkyTransientOverlay.toggled(from: overlay, requested: .direction)
+        XCTAssertNil(overlay)
+    }
+
+    func testSheetAndInstrumentRoutesRemainLightweightAndStable() {
+        XCTAssertEqual(AppSheetDestination.filters.id, "filters")
+        XCTAssertEqual(
+            AppSheetDestination.instrument(initialRoute: .systemStatus).id,
+            "instrument"
+        )
+        XCTAssertEqual(
+            InstrumentRoute.observationDetail("iss"),
+            InstrumentRoute.observationDetail("iss")
+        )
+    }
+
+    func testSpatialMotionResolvesRealTimerDeltaAndCapsLongPauses() {
+        XCTAssertEqual(
+            SpatialMotion.resolvedDeltaTime(now: 10.034, previous: 10),
+            0.034,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            SpatialMotion.resolvedDeltaTime(now: 12, previous: 10),
+            0.1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            SpatialMotion.resolvedDeltaTime(now: 9, previous: 10),
+            1.0 / 30.0,
+            accuracy: 0.000_001
+        )
+    }
+
+    func testReducedMotionUsesShorterNonBouncingInterfaceTiming() {
+        XCTAssertEqual(
+            Motion.interfaceDuration(expanding: true, reduced: false),
+            0.36,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            Motion.interfaceDuration(expanding: false, reduced: false),
+            0.24,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            Motion.interfaceDuration(expanding: true, reduced: true),
+            0.14,
+            accuracy: 0.0001
+        )
+    }
+
+    func testFrequentLensReplacesPreviousFilterCombinationLive() {
+        let session = SkySession(catalog: Self.store)
+        session.setCatalogScope(.mediumAndHigh)
+        session.toggleCatalogFilter(.communications)
+        session.setFrequentLens(.featured)
+
+        XCTAssertEqual(session.catalogScope, .all)
+        XCTAssertEqual(session.catalogFilters, [.featured])
+        XCTAssertFalse(session.visibleObjects.isEmpty)
+        XCTAssertTrue(session.visibleObjects.allSatisfy(\.hasIndividualReadableProfile))
+
+        session.setFrequentLens(.all)
+        XCTAssertEqual(session.catalogScope, .all)
+        XCTAssertTrue(session.catalogFilters.isEmpty)
+        XCTAssertEqual(session.visibleObjects.count, Self.store.objects.count)
+    }
+
+    private func makeChrome(
+        presentation: SkyPresentationMode = .local,
+        localReset: Bool = false,
+        globalReset: Bool = false,
+        phase: CaptureStateMachine.Phase = .exploring,
+        captureConfirmation: Bool = false,
+        recognitionReady: Bool = false,
+        replacementObjectID: String? = nil,
+        acquisitionProgress: Double = 0,
+        replacementProgress: Double = 0,
+        targetSummaryVisible: Bool = false,
+        isLive: Bool = true,
+        overlay: SkyTransientOverlay? = nil
+    ) -> SkyChromeState {
+        SkyChromeState(
+            presentationMode: presentation,
+            capturePhase: phase,
+            captureConfirmationEnabled: captureConfirmation,
+            recognitionReady: recognitionReady,
+            replacementObjectID: replacementObjectID,
+            acquisitionProgress: acquisitionProgress,
+            replacementProgress: replacementProgress,
+            targetSummaryVisible: targetSummaryVisible,
+            localFieldResetAvailable: localReset,
+            globalFieldResetAvailable: globalReset,
+            isLive: isLive,
+            transientOverlay: overlay
         )
     }
 }

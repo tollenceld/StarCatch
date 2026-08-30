@@ -6,20 +6,6 @@ import UIKit
 /// 日常设置页。只保留会影响观测的偏好、观测进度与必要帮助。
 /// 标准字号下一屏完成；极小设备或放大字体时才降级为滚动，保证可访问性。
 struct InstrumentPanel: View {
-    enum Destination {
-        case settings
-        case systemStatus
-        case observations
-    }
-
-    private enum Page: Equatable {
-        case settings
-        case systemStatus
-        case observations
-        case observationDetail(String)
-    }
-
-    @Binding var presented: Bool
     /// 内容页只读取会话的目录与低频状态快照；不要观察整颗 SkySession。
     /// 否则主天空的高频 pointing 发布会让设置和长记录列表整页失效重算。
     let session: SkySession
@@ -27,22 +13,19 @@ struct InstrumentPanel: View {
     @ObservedObject private var log: ObservationLog
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
 
     let onOpenManual: () -> Void
     let onOpenPrivacy: () -> Void
-    let onOpenOverview: () -> Void
 
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
     @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
 
-    @State private var revealed = false
-    @State private var dismissRequested = false
     @State private var confirmClearLog = false
-    @State private var page: Page = .settings
+    @State private var path: [InstrumentRoute]
     @State private var historyScrollPosition: String?
-    @State private var navigationForward = true
 
     private struct HistorySection: Identifiable {
         let day: Date
@@ -53,104 +36,58 @@ struct InstrumentPanel: View {
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
     private var language: SupportedLanguage { .current }
     private func copy(_ key: String) -> String { L10n.text(key, language: language) }
-    private var navigationAnimation: Animation {
-        suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceExpand
-    }
-    private var pageKey: String {
-        switch page {
-        case .settings: "settings"
-        case .systemStatus: "status"
-        case .observations: "observations"
-        case .observationDetail(let objectId): "observation-\(objectId)"
-        }
-    }
-    private var pageTransition: AnyTransition {
-        let insertionEdge: Edge = navigationForward ? .trailing : .leading
-        let removalEdge: Edge = navigationForward ? .leading : .trailing
-        return .asymmetric(
-            insertion: .move(edge: insertionEdge).combined(with: .opacity),
-            removal: .move(edge: removalEdge).combined(with: .opacity)
-        )
-    }
-
     init(
-        presented: Binding<Bool>,
         session: SkySession,
-        initialDestination: Destination = .settings,
-        onOpenOverview: @escaping () -> Void = {},
+        initialRoute: InstrumentRoute? = nil,
         onOpenManual: @escaping () -> Void = {},
         onOpenPrivacy: @escaping () -> Void = {}
     ) {
-        _presented = presented
         self.session = session
         _observer = ObservedObject(wrappedValue: session.observer)
         _log = ObservedObject(wrappedValue: session.log)
-        let initialPage: Page = switch initialDestination {
-        case .settings: .settings
-        case .systemStatus: .systemStatus
-        case .observations: .observations
-        }
-        _page = State(initialValue: initialPage)
-        self.onOpenOverview = onOpenOverview
+        _path = State(initialValue: initialRoute.map { [$0] } ?? [])
         self.onOpenManual = onOpenManual
         self.onOpenPrivacy = onOpenPrivacy
     }
 
     var body: some View {
-        ZStack {
-            Palette.voidBlack.ignoresSafeArea()
-            StaticDustBackdrop()
-                .ignoresSafeArea()
-                .opacity(0.28)
-                // 颗粒即时预览只处理背景。对整个 ScrollView 做 Metal 离屏渲染
-                // 会让部分系统版本漏绘 LazyVStack 的记录行。
-                .colorEffect(
-                    ShaderLibrary.grain(
-                        .float(0),
-                        .float(grainEnabled ? 0.024 : 0)
-                    )
-                )
-
-            Group {
-                switch page {
-                case .settings:
-                    ScrollView(showsIndicators: false) {
-                        panelContent
+        NavigationStack(path: $path) {
+            ZStack {
+                instrumentBackdrop
+                ScrollView(showsIndicators: false) {
+                    panelContent
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            .navigationTitle(copy("navigation.settings"))
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: InstrumentRoute.self) { route in
+                routeDestination(route)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: dismiss.callAsFunction) {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
                     }
-                    .scrollBounceBehavior(.basedOnSize)
-
-                case .systemStatus:
-                    systemStatus
-
-                case .observations:
-                    observationHistory
-
-                case .observationDetail(let objectId):
-                    observationDetail(objectId: objectId)
+                    .accessibilityLabel(copy("filter.close.accessibility"))
                 }
             }
-            .id(pageKey)
-            .transition(pageTransition)
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbarBackground(Palette.voidBlack.opacity(0.96), for: .navigationBar)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            topNavigationBar
-        }
-        .appEdgeBackGesture(action: navigateBack)
-        .opacity(revealed ? 1 : 0)
+        .preferredColorScheme(.dark)
         .onAppear {
             #if DEBUG
             let args = ProcessInfo.processInfo.arguments
             if args.contains("--openObservationDetail"), let first = log.entries.first {
-                page = .observationDetail(first.objectId)
+                path = [.observations, .observationDetail(first.objectId)]
             } else if args.contains("--openStatus") {
-                page = .systemStatus
+                path = [.systemStatus]
             } else if args.contains("--openObservations") {
-                page = .observations
+                path = [.observations]
             }
             #endif
-            withAnimation(navigationAnimation) {
-                revealed = true
-            }
         }
         .confirmationDialog(
             copy("observations.clear.confirmation"),
@@ -162,6 +99,65 @@ struct InstrumentPanel: View {
         } message: {
             Text(copy("observations.clear.note"))
         }
+    }
+
+    private var instrumentBackdrop: some View {
+        ZStack {
+            Palette.voidBlack.ignoresSafeArea()
+            StaticDustBackdrop()
+                .ignoresSafeArea()
+                .opacity(0.2)
+                // 颗粒即时预览只处理背景。对整个 ScrollView 做 Metal 离屏渲染
+                // 会让部分系统版本漏绘 LazyVStack 的记录行。
+                .colorEffect(
+                    ShaderLibrary.grain(
+                        .float(0),
+                        .float(grainEnabled ? 0.024 : 0)
+                    )
+                )
+        }
+    }
+
+    @ViewBuilder
+    private func routeDestination(_ route: InstrumentRoute) -> some View {
+        ZStack {
+            instrumentBackdrop
+            switch route {
+            case .systemStatus:
+                systemStatus
+                    .navigationTitle(copy("navigation.instrument_status"))
+
+            case .observations:
+                observationHistory
+                    .navigationTitle(copy("navigation.observations"))
+                    .toolbar {
+                        if !log.entries.isEmpty {
+                            ToolbarItem(placement: .primaryAction) {
+                                Menu {
+                                    Button(
+                                        copy("observations.clear_all"),
+                                        systemImage: "trash",
+                                        role: .destructive
+                                    ) {
+                                        confirmClearLog = true
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .frame(width: 44, height: 44)
+                                }
+                                .accessibilityLabel(copy("observations.more.accessibility"))
+                            }
+                        }
+                    }
+
+            case .observationDetail(let objectID):
+                observationDetail(objectId: objectID)
+                    .navigationTitle(copy("navigation.observation_detail"))
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbarBackground(Palette.voidBlack.opacity(0.96), for: .navigationBar)
     }
 
     // MARK: - 单屏信息架构
@@ -190,12 +186,12 @@ struct InstrumentPanel: View {
             actionRow(
                 eyebrow: copy("settings.manual.eyebrow"),
                 title: copy("settings.manual.title"),
-                action: onOpenManual
+                action: openManual
             )
             actionRow(
                 eyebrow: copy("settings.privacy.eyebrow"),
                 title: copy("settings.privacy.title"),
-                action: onOpenPrivacy
+                action: openPrivacy
             )
             if observer.isDeniedOrRestricted {
                 openSettingsButton
@@ -938,50 +934,6 @@ struct InstrumentPanel: View {
             .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
     }
 
-    // MARK: - 统一顶部导航
-
-    @ViewBuilder
-    private var topNavigationBar: some View {
-        switch page {
-        case .settings:
-            ArchiveTopBar(
-                backTitle: copy("navigation.sky"),
-                title: copy("navigation.settings"),
-                onBack: dismiss
-            )
-        case .systemStatus:
-            ArchiveTopBar(
-                backTitle: copy("navigation.settings"),
-                title: copy("navigation.instrument_status"),
-                onBack: returnToSettings
-            )
-        case .observations:
-            if !log.entries.isEmpty {
-                ArchiveTopBar(
-                    backTitle: copy("navigation.settings"),
-                    title: copy("navigation.observations"),
-                    trailingTitle: copy("action.more"),
-                    trailingIcon: "ellipsis",
-                    onBack: returnToSettings,
-                    destructiveMenuTitle: copy("observations.clear_all"),
-                    onDestructiveMenuAction: { confirmClearLog = true }
-                )
-            } else {
-                ArchiveTopBar(
-                    backTitle: copy("navigation.settings"),
-                    title: copy("navigation.observations"),
-                    onBack: returnToSettings
-                )
-            }
-        case .observationDetail(_):
-            ArchiveTopBar(
-                backTitle: copy("navigation.observations"),
-                title: copy("navigation.observation_detail"),
-                onBack: returnToObservations
-            )
-        }
-    }
-
     private var versionText: String {
         let version = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleShortVersionString"
@@ -989,48 +941,18 @@ struct InstrumentPanel: View {
         return "V\(version)"
     }
 
-    private func returnToSettings() {
-        navigationForward = false
-        withAnimation(suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceCollapse) {
-            page = .settings
-        }
+    private func push(_ destination: InstrumentRoute) {
+        path.append(destination)
     }
 
-    private func returnToObservations() {
-        navigationForward = false
-        withAnimation(suppressMotion ? .easeOut(duration: 0.16) : Motion.interfaceCollapse) {
-            page = .observations
-        }
+    private func openManual() {
+        dismiss()
+        onOpenManual()
     }
 
-    private func push(_ destination: Page) {
-        navigationForward = true
-        withAnimation(navigationAnimation) {
-            page = destination
-        }
-    }
-
-    private func navigateBack() {
-        switch page {
-        case .settings:
-            dismiss()
-        case .systemStatus, .observations:
-            returnToSettings()
-        case .observationDetail:
-            returnToObservations()
-        }
-    }
-
-    private func dismiss() {
-        guard !dismissRequested else { return }
-        dismissRequested = true
-        let duration = suppressMotion ? 0.16 : Motion.interfaceCollapseDuration
-        withAnimation(suppressMotion ? .easeIn(duration: duration) : Motion.interfaceCollapse) {
-            revealed = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
-            presented = false
-        }
+    private func openPrivacy() {
+        dismiss()
+        onOpenPrivacy()
     }
 }
 

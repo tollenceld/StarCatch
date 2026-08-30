@@ -197,10 +197,25 @@ final class SkySession: ObservableObject {
 
     /// 任务、运营方和轨道网络可多选。同组取并集，不同组取交集。
     func toggleCatalogFilter(_ filter: CatalogFilter) {
-        guard filter.group != .overview else { return }
+        guard filter != .all else {
+            resetCatalogFilters()
+            return
+        }
         if catalogFilters.contains(filter) {
             catalogFilters.remove(filter)
         } else {
+            catalogFilters.insert(filter)
+        }
+        applyCatalogSelection()
+    }
+
+    /// 常用镜片是一个快速起点：选择后清空上一组组合条件，再建立单一镜片。
+    /// 完整筛选区仍保留同组并集、跨组交集的原有语义。
+    func setFrequentLens(_ filter: CatalogFilter) {
+        guard CatalogFilter.frequentLenses.contains(filter) else { return }
+        catalogScope = .all
+        catalogFilters.removeAll()
+        if filter != .all {
             catalogFilters.insert(filter)
         }
         applyCatalogSelection()
@@ -226,6 +241,7 @@ final class SkySession: ObservableObject {
         let objects = catalog.objects.filter { object in
             guard catalogScope.includes(object) else { return false }
             for group in [
+                CatalogFilterGroup.overview,
                 CatalogFilterGroup.mission,
                 CatalogFilterGroup.authority,
                 CatalogFilterGroup.constellation,

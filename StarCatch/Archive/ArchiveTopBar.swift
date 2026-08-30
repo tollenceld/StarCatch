@@ -4,15 +4,16 @@ import SwiftUI
 /// 页面可以有不同内容宽度，但不再各自定义高度、圆角、间距和描边重量。
 enum AppChromeMetrics {
     static let controlHeight: CGFloat = 44
-    static let wingVisualHeight: CGFloat = 30
+    static let wingVisualHeight: CGFloat = 32
     /// 沉浸式页面返回翼只包裹图标与短标题，不继承状态翼的固定信息宽度。
     static let compactBackWingWidth: CGFloat = 72
     static let compactCornerRadius: CGFloat = 16
-    static let wingCornerRadius: CGFloat = 14
-    static let edgeInset: CGFloat = 16
-    static let topEdgeInset: CGFloat = 20
-    static let itemSpacing: CGFloat = 8
-    static let mainActionWidth: CGFloat = 148
+    static let wingCornerRadius: CGFloat = 16
+    static let edgeInset: CGFloat = 18
+    static let topEdgeInset: CGFloat = 18
+    static let itemSpacing: CGFloat = 10
+    static let commandControlSize: CGFloat = 52
+    static let mainActionWidth: CGFloat = 168
     static let strokeWidth: CGFloat = 0.55
 }
 

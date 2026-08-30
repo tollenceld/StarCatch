@@ -1,6 +1,7 @@
 import Combine
 import CoreGraphics
 import Foundation
+import QuartzCore
 
 /// 模拟器/无传感器指向源：拖拽驱动，带惯性衰减。
 /// 水平拖 = 方位角，竖直拖 = 仰角。roll 恒为 0。
@@ -35,9 +36,15 @@ final class ManualPointingProvider: PointingProvider {
     func endDrag(velocity v: CGSize) {
         velocity = CGVector(dx: v.width, dy: v.height)
         decayTimer?.invalidate()
+        var previousTick = CACurrentMediaTime()
         decayTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] timer in
             guard let self else { timer.invalidate(); return }
-            let dt = SpatialMotion.frameInterval
+            let now = CACurrentMediaTime()
+            let dt = SpatialMotion.resolvedDeltaTime(
+                now: now,
+                previous: previousTick
+            )
+            previousTick = now
             let elevationVelocity = Double(self.velocity.dy) * self.radiansPerPoint
             let boundaryScale = SpatialMotion.boundaryVelocityScale(
                 value: self.pointing.elevation,

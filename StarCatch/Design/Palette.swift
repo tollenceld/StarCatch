@@ -1,5 +1,17 @@
 import SwiftUI
 
+private struct ForceLegacyMaterialKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    /// 只用于确定性视觉审计；正式运行由系统版本和 Reduce Transparency 决定材质。
+    var forceLegacyMaterial: Bool {
+        get { self[ForceLegacyMaterialKey.self] }
+        set { self[ForceLegacyMaterialKey.self] = newValue }
+    }
+}
+
 /// StarCatch 色彩系统。
 ///
 /// 原则：暖灰阶负责信息层级，暗琥珀负责交互信号；轨道类别只在星体光晕、

@@ -61,6 +61,7 @@ struct ArchiveOverlay: View {
     var onOpenArchive: () -> Void = {}
     var onInteraction: () -> Void = {}
     var onToggleRetention: () -> Void = {}
+    var onRelease: () -> Void = {}
     var onDismiss: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -235,7 +236,7 @@ struct ArchiveOverlay: View {
         }
         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
         .tracking(0.7)
-        .padding(.trailing, 104)
+        .padding(.trailing, 156)
     }
 
     private var headerControls: some View {
@@ -277,8 +278,32 @@ struct ArchiveOverlay: View {
                     : copy("accessibility.pin_detail.hint")
             )
 
+            releaseControl
             collapseControl
         }
+    }
+
+    /// 摘要接管底部 Dock 时仍保留明确释放，不要求用户先收起卡片再寻找动作。
+    private var releaseControl: some View {
+        Button(action: onRelease) {
+            Image(systemName: "xmark")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Palette.inkMid.opacity(0.82))
+                .frame(width: 34, height: 34)
+                .background(
+                    Palette.voidBlack.opacity(0.2),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(Palette.inkFaint.opacity(0.26), lineWidth: 0.5)
+                }
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.text("capture.cancel"))
+        .accessibilityHint(L10n.text("capture.cancel.hint"))
     }
 
     /// 收起只隐藏资料卡，不解除卫星锁定。图标和文字组合提高可发现性，
