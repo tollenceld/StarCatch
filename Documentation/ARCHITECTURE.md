@@ -3,6 +3,9 @@
 这份文档描述当前代码的职责边界与改动约束。它不是产品说明；产品体验见
 `../README.md`，离线目录发布流程见 `../Scripts/README.md`。
 
+这是按需技术事实源，不是新对话的启动必读材料。新任务先读取 `../PROJECT_CONTEXT.md`，再用
+`rg -n '^##' Documentation/ARCHITECTURE.md` 定位状态所有权、渲染、并发或验证等相关章节。
+
 ## 运行时依赖方向
 
 ```text
