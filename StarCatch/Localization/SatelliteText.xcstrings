@@ -1,256 +1,2386 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "accessibility.collapse_detail" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Collapse object details" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "收起目标详情" } } } },
-    "accessibility.collapse_detail.hint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The object remains locked and the panel can be reopened" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标仍保持锁定，可再次展开" } } } },
-    "accessibility.micro_label" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@, range %2$@, %3$@ orbit" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%1$@，距离 %2$@，%3$@ 轨道" } } } },
-    "accessibility.pass_window" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Rise %1$@, maximum elevation %2$.0f degrees, set %3$@" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ 升起，最高仰角 %2$.0f 度，%3$@ 落下" } } } },
-    "accessibility.pin_detail" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Pin object details" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "固定目标详情" } } } },
-    "accessibility.pin_detail.hint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Details remain visible if the reticle moves away or another object is sensed" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "准星移开或转向其他目标时，详情仍保持显示" } } } },
-    "accessibility.retain_detail" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Keep object details" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保持目标详情" } } } },
-    "accessibility.unpin_detail" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Unpin object details" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消固定目标详情" } } } },
-    "accessibility.unpin_detail.hint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Details will collapse after the normal grace period when the reticle moves away" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "准星移开后，详情将按正常宽限时间收起" } } } },
-    "action.collapse" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Collapse" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "收起" } } } },
-    "action.view_archive" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "View Archive" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看档案" } } } },
-    "action.view_archive.hint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Open complete mission and orbital information for the object" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开目标的完整任务与轨道资料" } } } },
-    "action.view_archive.subtitle" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Mission, orbit, and sources" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务、轨道与来源" } } } },
-    "archive.open" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Archive" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "深入档案" } } } },
-    "archive.open.hint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Open the offline archive for this satellite or its constellation" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开当前卫星或所属星座的离线任务档案" } } } },
-    "axis.next_rise" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "NEXT RISE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下次升起" } } } },
-    "axis.peak" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "PEAK %+.0f°" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最高 %+.0f°" } } } },
-    "axis.rise" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "RISE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "升起" } } } },
-    "axis.set" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SET" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "落下" } } } },
-    "accessibility.external_browser" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Opens an external website in the browser" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将在浏览器中打开外部网站" } } } },
-    "accessibility.open_official" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Open the official %@ mission page" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开 %@ 官方任务页面" } } } },
-    "accessibility.pass.approaching" : {
+    "accessibility.collapse_detail" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Predicted path for the object's next pass" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标下一次过境的预测轨迹" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapse object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.collapse_detail.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The object remains locked and the panel can be reopened"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标仍保持锁定，可再次展开"
+          }
+        }
+      }
+    },
+    "accessibility.external_browser" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opens an external website in the browser"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将在浏览器中打开外部网站"
+          }
+        }
+      }
+    },
+    "accessibility.micro_label" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@, range %2$@, %3$@ orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@，距离 %2$@，%3$@ 轨道"
+          }
+        }
+      }
+    },
+    "accessibility.open_official" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the official %@ mission page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开 %@ 官方任务页面"
+          }
+        }
+      }
+    },
+    "accessibility.pass_window" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rise %1$@, maximum elevation %2$.0f degrees, set %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 升起，最高仰角 %2$.0f 度，%3$@ 落下"
+          }
+        }
+      }
+    },
+    "accessibility.pass.approaching" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Predicted path for the object's next pass"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标下一次过境的预测轨迹"
+          }
+        }
       }
     },
     "accessibility.pass.stationary" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The object's apparent direction remains nearly stable" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标的相对方向在短时间内基本稳定" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The object's apparent direction remains nearly stable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标的相对方向在短时间内基本稳定"
+          }
+        }
       }
     },
     "accessibility.pass.visible" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Object in pass, approximately %d percent complete" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标正在过境，已完成约百分之 %d" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Object in pass, approximately %d percent complete"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标正在过境，已完成约百分之 %d"
+          }
+        }
       }
     },
-    "archive.field.altitude" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ALTITUDE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "高度" } } } },
-    "archive.field.apsides" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Perigee / apogee" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近 / 远地点" } } } },
-    "archive.field.eccentricity" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Eccentricity" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "离心率" } } } },
-    "archive.field.family_position" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Family position" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列位置" } } } },
-    "archive.field.inclination" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Inclination" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "倾角" } } } },
-    "archive.field.launch" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Launch" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "发射" } } } },
-    "archive.field.launch_cohort" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Launch cohort" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "同次发射" } } } },
-    "archive.field.orbit" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBIT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道" } } } },
-    "archive.field.period" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Period" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "周期" } } } },
-    "archive.field.range" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "RANGE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "距离" } } } },
-    "archive.field.speed" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SPEED" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "速度" } } } },
-    "archive.field.subpoint" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Subpoint" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "星下点" } } } },
-    "archive.history.count" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%d key events" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%d 个关键节点" } } } },
-    "archive.history.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Mission history" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务历程" } } } },
-    "archive.observation.sentence" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The object is currently toward the %1$@ and is %2$@. Naked-eye visibility also depends on illumination, phase, weather, and object attitude." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此刻目标在%1$@方向，%2$@。肉眼可见性还取决于日照、相位、天气与目标姿态。" } } } },
-    "archive.section.current_object" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CURRENT OBJECT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前目标" } } } },
-    "archive.section.facts" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "MISSION AND CATALOG FACTS" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务与目录事实" } } } },
-    "archive.section.family" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "FAMILY BACKGROUND" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列背景" } } } },
-    "archive.section.mission" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "MISSION IN VIEW" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前任务" } } } },
-    "archive.section.notes" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "MISSION NOTES" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务说明" } } } },
-    "archive.section.orbit_parameters" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBIT PARAMETERS" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道参数" } } } },
-    "archive.section.future_24h" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "NEXT 24 HOURS" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未来 24 小时" } } } },
-    "archive.sources.calculation_note" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Historical notes are reviewed with each release. Position and velocity are calculated on device from the bundled CelesTrak GP/OMM elements." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "历史叙述随版本校订；位置与速度由 App 内置 CelesTrak GP/OMM 元素在设备上推算。" } } } },
-    "archive.sources.count" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%d offline sources" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%d 个离线来源" } } } },
-    "archive.sources.offline_edition" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SOURCES · OFFLINE EDITION" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "资料来源 · 离线版本" } } } },
-    "archive.sources.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Sources and calculations" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "资料与计算说明" } } } },
-    "archive.value.family_position" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ · altitude median delta %2$+.0f KM" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ · 高度中位差 %2$+.0f KM" } } } },
-    "direction.east" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "east" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正东" } } } },
-    "direction.north" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "north" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正北" } } } },
-    "direction.northeast" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "northeast" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "东北" } } } },
-    "direction.northwest" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "northwest" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "西北" } } } },
-    "direction.south" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "south" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正南" } } } },
-    "direction.southeast" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "southeast" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "东南" } } } },
-    "direction.southwest" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "southwest" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "西南" } } } },
-    "direction.west" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "west" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正西" } } } },
-    "navigation.object_archive" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Object Archive" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标档案" } } } },
-    "navigation.sky" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Sky" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "天空" } } } },
-    "visibility.above_horizon" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "above the geometric horizon" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "位于地平线上方" } } } },
-    "visibility.below_horizon" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "below the geometric horizon" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前处于几何地平线下" } } } },
-    "insight.family.higher" : {
+    "accessibility.pin_detail" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "About %2$.0f KM above the %1$@ family median" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "比 %@ 系列中位轨道约高 %.0f KM" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pin object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.pin_detail.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details remain visible if the reticle moves away or another object is sensed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准星移开或转向其他目标时，详情仍保持显示"
+          }
+        }
+      }
+    },
+    "accessibility.retain_detail" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.unpin_detail" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unpin object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.unpin_detail.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Details will collapse after the normal grace period when the reticle moves away"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "准星移开后，详情将按正常宽限时间收起"
+          }
+        }
+      }
+    },
+    "action.collapse" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Collapse"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "收起"
+          }
+        }
+      }
+    },
+    "action.view_archive" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看档案"
+          }
+        }
+      }
+    },
+    "action.view_archive.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open complete mission and orbital information for the object"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开目标的完整任务与轨道资料"
+          }
+        }
+      }
+    },
+    "action.view_archive.subtitle" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mission, orbit, and sources"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务、轨道与来源"
+          }
+        }
+      }
+    },
+    "archive.badge.series" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SERIES CONTEXT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列资料"
+          }
+        }
+      }
+    },
+    "archive.curated.family" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VERIFIED SERIES"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列资料"
+          }
+        }
+      }
+    },
+    "archive.curated.object" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VERIFIED OBJECT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单星资料"
+          }
+        }
+      }
+    },
+    "archive.field.altitude" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ALTITUDE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高度"
+          }
+        }
+      }
+    },
+    "archive.field.apsides" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perigee / apogee"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近 / 远地点"
+          }
+        }
+      }
+    },
+    "archive.field.apsides_compact" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "APSIS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近 / 远地点"
+          }
+        }
+      }
+    },
+    "archive.field.eccentricity" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eccentricity"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "离心率"
+          }
+        }
+      }
+    },
+    "archive.field.family_position" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Family position"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列位置"
+          }
+        }
+      }
+    },
+    "archive.field.inclination" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclination"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倾角"
+          }
+        }
+      }
+    },
+    "archive.field.launch" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发射"
+          }
+        }
+      }
+    },
+    "archive.field.launch_cohort" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launch cohort"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同次发射"
+          }
+        }
+      }
+    },
+    "archive.field.orbit" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ORBIT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道"
+          }
+        }
+      }
+    },
+    "archive.field.period" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Period"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周期"
+          }
+        }
+      }
+    },
+    "archive.field.range" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RANGE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "距离"
+          }
+        }
+      }
+    },
+    "archive.field.speed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SPEED"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "速度"
+          }
+        }
+      }
+    },
+    "archive.field.subpoint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subpoint"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星下点"
+          }
+        }
+      }
+    },
+    "archive.forecast.above_horizon" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ABOVE HORIZON"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地平线上方过境"
+          }
+        }
+      }
+    },
+    "archive.forecast.current_event" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SETS IN"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "距离落下"
+          }
+        }
+      }
+    },
+    "archive.forecast.duration" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DURATION"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "过境时长"
+          }
+        }
+      }
+    },
+    "archive.forecast.loading" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Calculating the next 24 hours on this device…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在本机推算未来 24 小时…"
+          }
+        }
+      }
+    },
+    "archive.forecast.maximum_elevation" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MAX EL"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高仰角"
+          }
+        }
+      }
+    },
+    "archive.forecast.minutes" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d MIN"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 分钟"
+          }
+        }
+      }
+    },
+    "archive.forecast.next_event" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NEXT RISE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次升起"
+          }
+        }
+      }
+    },
+    "archive.forecast.no_pass" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No above-horizon pass in the next 24 hours."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未来 24 小时没有地平线上方过境。"
+          }
+        }
+      }
+    },
+    "archive.forecast.peak" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PEAK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高点"
+          }
+        }
+      }
+    },
+    "archive.forecast.rise" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RISE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "升起"
+          }
+        }
+      }
+    },
+    "archive.forecast.set" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SET"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "落下"
+          }
+        }
+      }
+    },
+    "archive.forecast.stationary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Near-stationary target · no artificial rise/set curve"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近静止目标 · 不生成虚假的升落曲线"
+          }
+        }
+      }
+    },
+    "archive.generated.eyebrow" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CATALOGED OBJECT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目录目标"
+          }
+        }
+      }
+    },
+    "archive.generated.fact.apsides" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Perigee / apogee"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近地点 / 远地点"
+          }
+        }
+      }
+    },
+    "archive.generated.fact.inclination" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inclination"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倾角"
+          }
+        }
+      }
+    },
+    "archive.generated.fact.orbit" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道"
+          }
+        }
+      }
+    },
+    "archive.generated.fact.period" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Period"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周期"
+          }
+        }
+      }
+    },
+    "archive.generated.fact.type" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "类型"
+          }
+        }
+      }
+    },
+    "archive.generated.identity.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The international designator %1$@ links this object to its launch record. NORAD N%2$lld is the stable identity StarCatch uses for calculations and observation history."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国际编号 %1$@ 将当前目标关联到对应发射记录；NORAD N%2$lld 是 StarCatch 用于轨道计算与观测记录的稳定身份。"
+          }
+        }
+      }
+    },
+    "archive.generated.identity.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Identity and launch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "身份与发射"
+          }
+        }
+      }
+    },
+    "archive.generated.lead" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is cataloged as %2$@ / N%3$lld. Its %4$@ orbit is calculated on device from the bundled GP/OMM snapshot; no unverified mission purpose or operating state is inferred."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 以 %2$@ / N%3$lld 收录于公开目录。其 %4$@ 轨道由设备使用随包 GP/OMM 快照推算；资料不足时不推测任务用途或运行状态。"
+          }
+        }
+      }
+    },
+    "archive.generated.milestone" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ entered the public orbital catalog"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 进入公开轨道目录"
+          }
+        }
+      }
+    },
+    "archive.generated.orbit.body" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bundled elements describe a %1$.1f-minute orbit inclined %2$.2f degrees, with estimated perigee and apogee of %3$.0f and %4$.0f KM. These are propagated catalog elements, not live operator telemetry."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随包轨道根数描述了一条周期约 %1$.1f 分钟、倾角 %2$.2f° 的轨道，估算近地点与远地点分别为 %3$.0f 和 %4$.0f KM。这是目录根数推算值，不是运营方实时遥测。"
+          }
+        }
+      }
+    },
+    "archive.generated.orbit.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbital character"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道特征"
+          }
+        }
+      }
+    },
+    "archive.generated.organization" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OBJECT ARCHIVE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标档案"
+          }
+        }
+      }
+    },
+    "archive.generated.review" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SOURCE-BOUNDED"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "来源限定"
+          }
+        }
+      }
+    },
+    "archive.generated.source" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CelesTrak GP/OMM snapshot"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CelesTrak GP/OMM 离线快照"
+          }
+        }
+      }
+    },
+    "archive.history.count" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d key events"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 个关键节点"
+          }
+        }
+      }
+    },
+    "archive.history.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mission history"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务历程"
+          }
+        }
+      }
+    },
+    "archive.observation.sentence" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The object is currently toward the %1$@ and is %2$@. Naked-eye visibility also depends on illumination, phase, weather, and object attitude."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此刻目标在%1$@方向，%2$@。肉眼可见性还取决于日照、相位、天气与目标姿态。"
+          }
+        }
+      }
+    },
+    "archive.observation.unavailable" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Live pointing data is not available for this frame."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前画面暂时没有可用的实时指向数据。"
+          }
+        }
+      }
+    },
+    "archive.official_reference" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official mission reference"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "官方任务资料"
+          }
+        }
+      }
+    },
+    "archive.open" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "深入档案"
+          }
+        }
+      }
+    },
+    "archive.open.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open the offline archive for this satellite or its constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开当前卫星或所属星座的离线任务档案"
+          }
+        }
+      }
+    },
+    "archive.role.communications.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relays voice, data, or broadcast signals through orbital links."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通过轨道链路中继语音、数据或广播信号。"
+          }
+        }
+      }
+    },
+    "archive.role.communications.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Communications satellite"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信卫星"
+          }
+        }
+      }
+    },
+    "archive.role.navigation.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Provides positioning, navigation, or precision timing signals."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "提供定位、导航或精密授时信号。"
+          }
+        }
+      }
+    },
+    "archive.role.navigation.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Navigation and timing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "导航与授时"
+          }
+        }
+      }
+    },
+    "archive.role.orbital_remnant.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A non-operational object that remains part of the tracked orbital environment."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再承担任务，但仍属于持续追踪的轨道环境。"
+          }
+        }
+      }
+    },
+    "archive.role.orbital_remnant.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbital remnant"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道遗留物"
+          }
+        }
+      }
+    },
+    "archive.role.science.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carries instruments or experiments for scientific investigation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搭载科学仪器或实验设备开展研究。"
+          }
+        }
+      }
+    },
+    "archive.role.science.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scientific spacecraft"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "科学航天器"
+          }
+        }
+      }
+    },
+    "archive.role.station.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supports human presence, research, and operations in orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "支持人类在轨驻留、科研与空间作业。"
+          }
+        }
+      }
+    },
+    "archive.role.station.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crewed orbital station"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "载人轨道空间站"
+          }
+        }
+      }
+    },
+    "archive.role.telescope.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observes the universe above the atmosphere with space-based instruments."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在大气层之外使用空间仪器观测宇宙。"
+          }
+        }
+      }
+    },
+    "archive.role.telescope.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Space telescope"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间望远镜"
+          }
+        }
+      }
+    },
+    "archive.role.weather.summary" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Monitors weather, atmosphere, or Earth systems from orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从轨道持续观测天气、大气或地球系统。"
+          }
+        }
+      }
+    },
+    "archive.role.weather.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weather and Earth observation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "气象与地球观测"
+          }
+        }
+      }
+    },
+    "archive.section.current_object" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CURRENT OBJECT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前目标"
+          }
+        }
+      }
+    },
+    "archive.section.facts" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MISSION AND CATALOG FACTS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务与目录事实"
+          }
+        }
+      }
+    },
+    "archive.section.family" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "FAMILY BACKGROUND"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列背景"
+          }
+        }
+      }
+    },
+    "archive.section.future_24h" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NEXT 24 HOURS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未来 24 小时"
+          }
+        }
+      }
+    },
+    "archive.section.mission" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MISSION IN VIEW"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前任务"
+          }
+        }
+      }
+    },
+    "archive.section.mission_brief" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MISSION BRIEF"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务概览"
+          }
+        }
+      }
+    },
+    "archive.section.notes" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MISSION NOTES"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务说明"
+          }
+        }
+      }
+    },
+    "archive.section.observe_now" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IN YOUR SKY NOW"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此刻的天空"
+          }
+        }
+      }
+    },
+    "archive.section.orbit_parameters" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ORBIT PARAMETERS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道参数"
+          }
+        }
+      }
+    },
+    "archive.sources.calculation_note" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Historical notes are reviewed with each release. Position and velocity are calculated on device from the bundled CelesTrak GP/OMM elements."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "历史叙述随版本校订；位置与速度由 App 内置 CelesTrak GP/OMM 元素在设备上推算。"
+          }
+        }
+      }
+    },
+    "archive.sources.count" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d offline sources"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 个离线来源"
+          }
+        }
+      }
+    },
+    "archive.sources.offline_edition" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SOURCES · OFFLINE EDITION"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料来源 · 离线版本"
+          }
+        }
+      }
+    },
+    "archive.sources.title" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sources and calculations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料与计算说明"
+          }
+        }
+      }
+    },
+    "archive.tab.data" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "数据"
+          }
+        }
+      }
+    },
+    "archive.tab.mission" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务"
+          }
+        }
+      }
+    },
+    "archive.tab.observation" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此刻"
+          }
+        }
+      }
+    },
+    "archive.value.family_position" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · altitude median delta %2$+.0f KM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ · 高度中位差 %2$+.0f KM"
+          }
+        }
+      }
+    },
+    "axis.next_rise" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NEXT RISE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次升起"
+          }
+        }
+      }
+    },
+    "axis.peak" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "PEAK %+.0f°"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最高 %+.0f°"
+          }
+        }
+      }
+    },
+    "axis.rise" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RISE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "升起"
+          }
+        }
+      }
+    },
+    "axis.set" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SET"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "落下"
+          }
+        }
+      }
+    },
+    "direction.east" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "east"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正东"
+          }
+        }
+      }
+    },
+    "direction.north" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "north"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正北"
+          }
+        }
+      }
+    },
+    "direction.northeast" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "northeast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "东北"
+          }
+        }
+      }
+    },
+    "direction.northwest" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "northwest"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西北"
+          }
+        }
+      }
+    },
+    "direction.south" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "south"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正南"
+          }
+        }
+      }
+    },
+    "direction.southeast" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "southeast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "东南"
+          }
+        }
+      }
+    },
+    "direction.southwest" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "southwest"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "西南"
+          }
+        }
+      }
+    },
+    "direction.west" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "west"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正西"
+          }
+        }
+      }
+    },
+    "insight.family.higher" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About %2$.0f KM above the %1$@ family median"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比 %@ 系列中位轨道约高 %.0f KM"
+          }
+        }
       }
     },
     "insight.family.lower" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "About %2$.0f KM below the %1$@ family median" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "比 %@ 系列中位轨道约低 %.0f KM" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About %2$.0f KM below the %1$@ family median"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "比 %@ 系列中位轨道约低 %.0f KM"
+          }
+        }
       }
     },
     "insight.launch.cohort" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cataloged object %d of %d from the same launch" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "同次发射的第 %d / %d 个在列对象" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cataloged object %d of %d from the same launch"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同次发射的第 %d / %d 个在列对象"
+          }
+        }
       }
     },
     "insight.orbit.elliptical" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Elliptical orbit · %.0f KM between perigee and apogee" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "椭圆轨道 · 近远地点相差 %.0f KM" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elliptical orbit · %.0f KM between perigee and apogee"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "椭圆轨道 · 近远地点相差 %.0f KM"
+          }
+        }
       }
     },
     "insight.orbit.period" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "One orbit every %.1f minutes" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%.1f 分钟完成一周轨道" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One orbit every %.1f minutes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.1f 分钟完成一周轨道"
+          }
+        }
       }
     },
-    "insight.orbit.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%.1f-minute orbit · %.1f° inclination" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%.1f 分钟一周 · 倾角 %.1f°" } } } },
-    "insight.pass.next_rise" : {
+    "insight.orbit.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next rise above the horizon in %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一次进入地平线 %@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.1f-minute orbit · %.1f° inclination"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.1f 分钟一周 · 倾角 %.1f°"
+          }
+        }
+      }
+    },
+    "insight.pass.next_rise" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next rise above the horizon in %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次进入地平线 %@"
+          }
+        }
       }
     },
     "insight.pass.stationary" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Apparent direction remains stable over short intervals" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "相对地面方向在短时间内保持稳定" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apparent direction remains stable over short intervals"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "相对地面方向在短时间内保持稳定"
+          }
+        }
       }
     },
     "insight.pass.visible" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remains above the horizon for %@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仍将在地平线上停留 %@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remains above the horizon for %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍将在地平线上停留 %@"
+          }
+        }
       }
     },
     "insight.range.approaching" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Approaching · %.2f KM/S" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在接近 · %.2f KM/S" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Approaching · %.2f KM/S"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在接近 · %.2f KM/S"
+          }
+        }
       }
     },
     "insight.range.receding" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Receding · %.2f KM/S" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在远离 · %.2f KM/S" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Receding · %.2f KM/S"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在远离 · %.2f KM/S"
+          }
+        }
       }
     },
     "insight.range.stable" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Range to observer is nearly stable" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "与观测者距离基本稳定" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Range to observer is nearly stable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与观测者距离基本稳定"
+          }
+        }
       }
     },
     "insight.subpoint" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Subpoint · %.1f°%@  %.1f°%@" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "星下点 · %.1f°%@  %.1f°%@" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subpoint · %.1f°%@  %.1f°%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "星下点 · %.1f°%@  %.1f°%@"
+          }
+        }
+      }
+    },
+    "navigation.object_archive" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Object Archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目标档案"
+          }
+        }
+      }
+    },
+    "navigation.sky" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sky"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天空"
+          }
+        }
       }
     },
     "provenance.catalog" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Catalog fact" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录事实" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalog fact"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "目录事实"
+          }
+        }
       }
     },
     "provenance.classification" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "StarCatch classification" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "StarCatch 分类" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StarCatch classification"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "StarCatch 分类"
+          }
+        }
       }
     },
     "provenance.computed" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "On-device calculation" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本机推算" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "On-device calculation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本机推算"
+          }
+        }
       }
     },
     "provenance.verified_family" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Official family source" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列官方资料" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official family source"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列官方资料"
+          }
+        }
       }
     },
     "provenance.verified_object" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Official object source" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本星官方资料" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Official object source"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本星官方资料"
+          }
+        }
       }
     },
     "scope.family" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Family background" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列背景" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Family background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列背景"
+          }
+        }
       }
     },
     "scope.object" : {
+      "extractionState" : "stale",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Current object" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前目标" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Current object"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前目标"
+          }
+        }
       }
     },
-    "archive.generated.eyebrow" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CATALOGED OBJECT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录目标" } } } },
-    "archive.curated.object" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "VERIFIED OBJECT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "单星资料" } } } },
-    "archive.curated.family" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "VERIFIED SERIES" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列资料" } } } },
-    "archive.generated.organization" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "OBJECT ARCHIVE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标档案" } } } },
-    "archive.generated.review" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SOURCE-BOUNDED" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "来源限定" } } } },
-    "archive.generated.lead" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ is cataloged as %2$@ / N%3$lld. Its %4$@ orbit is calculated on device from the bundled GP/OMM snapshot; no unverified mission purpose or operating state is inferred." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ 以 %2$@ / N%3$lld 收录于公开目录。其 %4$@ 轨道由设备使用随包 GP/OMM 快照推算；资料不足时不推测任务用途或运行状态。" } } } },
-    "archive.generated.identity.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Identity and launch" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "身份与发射" } } } },
-    "archive.generated.identity.body" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The international designator %1$@ links this object to its launch record. NORAD N%2$lld is the stable identity StarCatch uses for calculations and observation history." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "国际编号 %1$@ 将当前目标关联到对应发射记录；NORAD N%2$lld 是 StarCatch 用于轨道计算与观测记录的稳定身份。" } } } },
-    "archive.generated.orbit.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Orbital character" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道特征" } } } },
-    "archive.generated.orbit.body" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "The bundled elements describe a %1$.1f-minute orbit inclined %2$.2f degrees, with estimated perigee and apogee of %3$.0f and %4$.0f KM. These are propagated catalog elements, not live operator telemetry." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "随包轨道根数描述了一条周期约 %1$.1f 分钟、倾角 %2$.2f° 的轨道，估算近地点与远地点分别为 %3$.0f 和 %4$.0f KM。这是目录根数推算值，不是运营方实时遥测。" } } } },
-    "archive.generated.fact.type" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } } } },
-    "archive.generated.fact.orbit" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Orbit" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道" } } } },
-    "archive.generated.fact.period" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Period" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "周期" } } } },
-    "archive.generated.fact.inclination" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Inclination" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "倾角" } } } },
-    "archive.generated.fact.apsides" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Perigee / apogee" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近地点 / 远地点" } } } },
-    "archive.generated.milestone" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ entered the public orbital catalog" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%1$@ 进入公开轨道目录" } } } },
-    "archive.generated.source" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CelesTrak GP/OMM snapshot" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CelesTrak GP/OMM 离线快照" } } } },
-    "status.cataloged" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "CATALOGED" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道在列" } } } },
-    "status.debris" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ORBITAL REMNANT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道残留" } } } },
-    "status.derelict" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "DERELICT RECORD" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "失效记录" } } } },
-    "status.silent" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SILENT RECORD" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "静默记录" } } } },
-    "value.unknown" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "unknown" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知" } } } },
-    "archive.badge.series" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SERIES CONTEXT" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系列资料" } } } },
-    "archive.field.apsides_compact" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "APSIS" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近 / 远地点" } } } },
-    "archive.role.communications.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Relays voice, data, or broadcast signals through orbital links." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通过轨道链路中继语音、数据或广播信号。" } } } },
-    "archive.role.communications.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Communications satellite" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通信卫星" } } } },
-    "archive.role.navigation.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Provides positioning, navigation, or precision timing signals." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "提供定位、导航或精密授时信号。" } } } },
-    "archive.role.navigation.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Navigation and timing" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导航与授时" } } } },
-    "archive.role.orbital_remnant.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "A non-operational object that remains part of the tracked orbital environment." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "不再承担任务，但仍属于持续追踪的轨道环境。" } } } },
-    "archive.role.orbital_remnant.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Orbital remnant" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道遗留物" } } } },
-    "archive.role.science.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Carries instruments or experiments for scientific investigation." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搭载科学仪器或实验设备开展研究。" } } } },
-    "archive.role.science.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Scientific spacecraft" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "科学航天器" } } } },
-    "archive.role.station.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Supports human presence, research, and operations in orbit." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "支持人类在轨驻留、科研与空间作业。" } } } },
-    "archive.role.station.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Crewed orbital station" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "载人轨道空间站" } } } },
-    "archive.role.telescope.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Observes the universe above the atmosphere with space-based instruments." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在大气层之外使用空间仪器观测宇宙。" } } } },
-    "archive.role.telescope.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Space telescope" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "空间望远镜" } } } },
-    "archive.role.weather.summary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Monitors weather, atmosphere, or Earth systems from orbit." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从轨道持续观测天气、大气或地球系统。" } } } },
-    "archive.role.weather.title" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Weather and Earth observation" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "气象与地球观测" } } } },
-    "archive.observation.unavailable" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Live pointing data is not available for this frame." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当前画面暂时没有可用的实时指向数据。" } } } },
-    "archive.forecast.current_event" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SETS IN" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "距离落下" } } } },
-    "archive.forecast.above_horizon" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "ABOVE HORIZON" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "地平线上方过境" } } } },
-    "archive.forecast.duration" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "DURATION" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "过境时长" } } } },
-    "archive.forecast.loading" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Calculating the next 24 hours on this device…" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在本机推算未来 24 小时…" } } } },
-    "archive.forecast.maximum_elevation" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "MAX EL" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最高仰角" } } } },
-    "archive.forecast.minutes" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "%d MIN" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "%d 分钟" } } } },
-    "archive.forecast.next_event" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "NEXT RISE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下次升起" } } } },
-    "archive.forecast.no_pass" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "No above-horizon pass in the next 24 hours." } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未来 24 小时没有地平线上方过境。" } } } },
-    "archive.forecast.peak" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "PEAK" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "最高点" } } } },
-    "archive.forecast.rise" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "RISE" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "升起" } } } },
-    "archive.forecast.set" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "SET" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "落下" } } } },
-    "archive.forecast.stationary" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Near-stationary target · no artificial rise/set curve" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "近静止目标 · 不生成虚假的升落曲线" } } } },
-    "archive.official_reference" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Official mission reference" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "官方任务资料" } } } },
-    "archive.section.mission_brief" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "MISSION BRIEF" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务概览" } } } },
-    "archive.section.observe_now" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "IN YOUR SKY NOW" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此刻的天空" } } } },
-    "archive.tab.data" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Data" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据" } } } },
-    "archive.tab.mission" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Mission" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "任务" } } } },
-    "archive.tab.observation" : { "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Now" } }, "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此刻" } } } }
+    "status.cataloged" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CATALOGED"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道在列"
+          }
+        }
+      }
+    },
+    "status.debris" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ORBITAL REMNANT"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道残留"
+          }
+        }
+      }
+    },
+    "status.derelict" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "DERELICT RECORD"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失效记录"
+          }
+        }
+      }
+    },
+    "status.silent" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SILENT RECORD"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "静默记录"
+          }
+        }
+      }
+    },
+    "value.unknown" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "unknown"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未知"
+          }
+        }
+      }
+    },
+    "visibility.above_horizon" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "above the geometric horizon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "位于地平线上方"
+          }
+        }
+      }
+    },
+    "visibility.below_horizon" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "below the geometric horizon"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前处于几何地平线下"
+          }
+        }
+      }
+    }
   },
   "version" : "1.0"
 }
