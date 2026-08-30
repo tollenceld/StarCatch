@@ -1,7 +1,8 @@
 import SwiftUI
+import simd
 
-/// 启动页只展示真实完成的准备节点。三个布尔值按顺序由 `RootView`
-/// 在目录、轨道引擎和捕获管线真正可用后更新。
+/// Three real preparation milestones owned by `RootView`. The boot film reads
+/// only the aggregate readiness flag; it never touches the services doing the work.
 struct BootPreparationState: Equatable, Sendable {
     var catalogReady = false
     var orbitEngineReady = false
@@ -17,428 +18,734 @@ struct BootPreparationState: Equatable, Sendable {
     var isReady: Bool {
         catalogReady && orbitEngineReady && observationModelReady
     }
-
-    func isModuleReady(at index: Int) -> Bool {
-        switch index {
-        case 0: catalogReady
-        case 1: orbitEngineReady
-        case 2: observationModelReady
-        default: false
-        }
-    }
-
-    var activeModuleIndex: Int? {
-        (0 ..< 3).first { !isModuleReady(at: $0) }
-    }
 }
 
-/// 启动文字系统的纯值时间轴。
-///
-/// 字形注册只执行一次。数据等待时间超过 3.2 秒后保持稳定终帧，
-/// 不循环、不重新黑场，也不重置已经建立的星场。
-struct BootVisualTimeline: Equatable {
-    enum SystemPhase: String, Equatable {
-        case initializing = "INITIALIZING"
-        case catalogSync = "CATALOG SYNC"
-        case calibrating = "CALIBRATING"
-        case ready = "READY"
-
-        var localizedLabel: String {
-            switch self {
-            case .initializing: L10n.text("boot.phase.initializing")
-            case .catalogSync: L10n.text("boot.phase.catalog_sync")
-            case .calibrating: L10n.text("boot.phase.calibrating")
-            case .ready: L10n.text("boot.phase.ready")
-            }
-        }
-    }
-
+/// Pure-value clock for the deterministic orbital boot film.
+struct BootOrbitalTimeline: Equatable, Sendable {
     static let minimumPresentationDuration: TimeInterval = 3.2
-    static let fullDuration: TimeInterval = 3.6
-    static let registrationStart: TimeInterval = 0.4
-    static let registrationEnd: TimeInterval = 1.8
+    static let revealDuration: TimeInterval = 0.35
+    static let accelerationEnd: TimeInterval = 2.65
+    static let cruiseTransitionDuration: TimeInterval = 0.55
 
     let elapsed: TimeInterval
-    let preparation: BootPreparationState
-    let handoffProgress: Double
+    let reducedMotion: Bool
 
-    var registrationProgress: Double {
-        Self.smoothstep(
-            (elapsed - Self.registrationStart)
-                / (Self.registrationEnd - Self.registrationStart)
+    init(elapsed: TimeInterval, reducedMotion: Bool = false) {
+        self.elapsed = max(0, elapsed)
+        self.reducedMotion = reducedMotion
+    }
+
+    var revealProgress: Double {
+        Self.smoothstep(elapsed / Self.revealDuration)
+    }
+
+    var sceneOpacity: Double {
+        reducedMotion ? 1 : revealProgress
+    }
+
+    var globeScale: CGFloat {
+        reducedMotion ? 1 : 0.82 + CGFloat(revealProgress) * 0.18
+    }
+
+    var trailPresence: Double {
+        guard !reducedMotion else { return 0 }
+        return Self.smoothstep((elapsed - 0.48) / 0.72)
+    }
+
+    var brandOpacity: Double {
+        let arrival = Self.smoothstep((elapsed - 0.45) / 0.6)
+        let quieting = Self.smoothstep(
+            (elapsed - Self.accelerationEnd)
+                / (Self.minimumPresentationDuration - Self.accelerationEnd)
         )
+        return reducedMotion ? 0.2 : (0.28 - quieting * 0.12) * arrival
     }
 
-    var systemPhase: SystemPhase {
-        if preparation.isReady { return .ready }
-        if preparation.orbitEngineReady { return .calibrating }
-        if preparation.catalogReady { return .catalogSync }
-        return .initializing
-    }
-
-    var readyEmphasis: Double {
-        preparation.isReady ? 1 : 0
-    }
-
-    var finalFrame: Double {
-        min(1, max(0, handoffProgress))
-    }
-
-    var wordmarkOpacity: Double {
-        1 - Self.smoothstep(finalFrame)
-    }
-
-    func letterActivation(at index: Int) -> Double {
-        let position = Double(index) / 9
-        return Self.smoothstep(
-            (registrationProgress - position * 0.72) / 0.2
+    /// Multiplier applied to each preset satellite's individual turns-per-second.
+    var satelliteSpeedMultiplier: Double {
+        guard !reducedMotion else { return 0 }
+        if elapsed <= Self.revealDuration { return 0.25 }
+        if elapsed <= Self.accelerationEnd {
+            let progress = (elapsed - Self.revealDuration)
+                / (Self.accelerationEnd - Self.revealDuration)
+            return 0.25 + progress * 0.75
+        }
+        if elapsed <= Self.minimumPresentationDuration { return 1 }
+        let slowing = min(
+            1,
+            (elapsed - Self.minimumPresentationDuration)
+                / Self.cruiseTransitionDuration
         )
+        return 1 - slowing * 0.56
     }
 
-    func registrationOffset(at index: Int) -> CGFloat {
-        CGFloat(0.95 * (1 - letterActivation(at: index)))
+    /// Integrated speed multiplier. Positions remain continuous when the film
+    /// leaves its high-speed ending and settles into an indefinite slow cruise.
+    var satellitePhaseTime: TimeInterval {
+        guard !reducedMotion else { return 1.08 }
+        let revealEnd = Self.revealDuration * 0.25
+        guard elapsed > Self.revealDuration else { return elapsed * 0.25 }
+
+        let accelerationDuration = Self.accelerationEnd - Self.revealDuration
+        let accelerationSlope = 0.75 / accelerationDuration
+        let accelerated = revealEnd
+            + 0.25 * accelerationDuration
+            + 0.5 * accelerationSlope * accelerationDuration * accelerationDuration
+        if elapsed <= Self.accelerationEnd {
+            let delta = elapsed - Self.revealDuration
+            return revealEnd + 0.25 * delta + 0.5 * accelerationSlope * delta * delta
+        }
+
+        let highSpeedDuration = Self.minimumPresentationDuration - Self.accelerationEnd
+        let cinematicEnd = accelerated + highSpeedDuration
+        if elapsed <= Self.minimumPresentationDuration {
+            return accelerated + elapsed - Self.accelerationEnd
+        }
+
+        let slowdownDelta = min(
+            Self.cruiseTransitionDuration,
+            elapsed - Self.minimumPresentationDuration
+        )
+        let slowdownSlope = -0.56 / Self.cruiseTransitionDuration
+        let slowdownTravel = slowdownDelta
+            + 0.5 * slowdownSlope * slowdownDelta * slowdownDelta
+        let cruiseDelta = max(
+            0,
+            elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
+        )
+        return cinematicEnd + slowdownTravel + cruiseDelta * 0.44
     }
 
-    func moduleActivation(at index: Int) -> Double {
-        preparation.isModuleReady(at: index) ? 1 : 0
+    var earthAngularVelocityDegrees: Double {
+        guard !reducedMotion else { return 0 }
+        if elapsed <= Self.revealDuration { return 4 }
+        if elapsed <= Self.accelerationEnd {
+            let progress = (elapsed - Self.revealDuration)
+                / (Self.accelerationEnd - Self.revealDuration)
+            return 4 + progress * 24
+        }
+        if elapsed <= Self.minimumPresentationDuration { return 28 }
+        let slowing = min(
+            1,
+            (elapsed - Self.minimumPresentationDuration)
+                / Self.cruiseTransitionDuration
+        )
+        return 28 - slowing * 23
+    }
+
+    /// About 53° during the 3.2-second film, followed by a continuous 5°/s cruise.
+    var earthRotationRadians: Double {
+        guard !reducedMotion else { return 0.32 }
+        let initial = -0.5
+        let revealTravel = min(elapsed, Self.revealDuration) * 4
+        guard elapsed > Self.revealDuration else {
+            return initial + revealTravel * .pi / 180
+        }
+
+        let accelerationDuration = Self.accelerationEnd - Self.revealDuration
+        let accelerationSlope = 24 / accelerationDuration
+        let accelerationDelta = min(
+            accelerationDuration,
+            elapsed - Self.revealDuration
+        )
+        var degrees = revealTravel
+            + 4 * accelerationDelta
+            + 0.5 * accelerationSlope * accelerationDelta * accelerationDelta
+        guard elapsed > Self.accelerationEnd else {
+            return initial + degrees * .pi / 180
+        }
+
+        let highSpeedDelta = min(
+            Self.minimumPresentationDuration - Self.accelerationEnd,
+            elapsed - Self.accelerationEnd
+        )
+        degrees += highSpeedDelta * 28
+        guard elapsed > Self.minimumPresentationDuration else {
+            return initial + degrees * .pi / 180
+        }
+
+        let slowdownDelta = min(
+            Self.cruiseTransitionDuration,
+            elapsed - Self.minimumPresentationDuration
+        )
+        let slowdownSlope = -23 / Self.cruiseTransitionDuration
+        degrees += 28 * slowdownDelta
+            + 0.5 * slowdownSlope * slowdownDelta * slowdownDelta
+        degrees += max(
+            0,
+            elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
+        ) * 5
+        return initial + degrees * .pi / 180
+    }
+
+    var isCruising: Bool {
+        elapsed > Self.minimumPresentationDuration + Self.cruiseTransitionDuration
     }
 
     private static func smoothstep(_ value: Double) -> Double {
-        let t = min(1, max(0, value))
-        return t * t * (3 - 2 * t)
+        let value = min(1, max(0, value))
+        return value * value * (3 - 2 * value)
     }
 }
 
-/// 与主天空共用同一枚确定性星尘种子。加载页不再绘制轨道环、目标或准星；
-/// 标题退场时这片星场保持不动，主页的目录目标和仪器控件在其上自然出现。
-struct BootFieldView: View {
-    let timeline: BootVisualTimeline
+enum BootCompletionPolicy {
+    /// Nil means preparation is still in progress. Reduced Motion never adds a
+    /// decorative delay; the animated film otherwise owns a 3.2-second minimum.
+    nonisolated static func remainingDelay(
+        elapsed: TimeInterval,
+        isReady: Bool,
+        reducedMotion: Bool
+    ) -> TimeInterval? {
+        guard isReady else { return nil }
+        guard !reducedMotion else { return 0 }
+        return max(0, BootOrbitalTimeline.minimumPresentationDuration - elapsed)
+    }
+}
+
+/// Immutable analytic orbit set. It is intentionally unrelated to CatalogObject,
+/// SatelliteKit, the real star catalogue, location, or observation time.
+struct BootOrbitalScenePreset: Equatable, Sendable {
+    struct Satellite: Identifiable, Equatable, Sendable {
+        let id: Int
+        let inclination: Double
+        let ascendingNode: Double
+        let initialPhase: Double
+        let displayRadius: Double
+        let turnsPerSecond: Double
+        let direction: Double
+        let tintIndex: Int
+        let hasTrail: Bool
+        let orbitBasisX: SIMD3<Double>
+        let orbitBasisY: SIMD3<Double>
+    }
+
+    static let standard = BootOrbitalScenePreset()
+    static let satelliteCount = 4_600
+    static let trailSatelliteCount = 24
+    static let trailSampleCount = 8
+
+    let satellites: [Satellite]
+
+    init(
+        count: Int = satelliteCount,
+        trailCount: Int = trailSatelliteCount,
+        seed: UInt64 = 0xB007_0B17_A15
+    ) {
+        var random = SplitMix64(seed: seed)
+        let inclinationBands = [18.0, 42.0, 53.0, 63.4, 82.0, 98.0]
+        satellites = (0 ..< max(0, count)).map { index in
+            let band = inclinationBands[index % inclinationBands.count]
+            let jitter = (Double(random.nextUnit()) - 0.5) * 8
+            let inclination = (band + jitter) * .pi / 180
+            let ascendingNode = Double(random.nextUnit()) * 2 * .pi
+            let nodeCosine = cos(ascendingNode)
+            let nodeSine = sin(ascendingNode)
+            let inclinationCosine = cos(inclination)
+            let inclinationSine = sin(inclination)
+            return Satellite(
+                id: index,
+                inclination: inclination,
+                ascendingNode: ascendingNode,
+                initialPhase: Double(random.nextUnit()) * 2 * .pi,
+                displayRadius: 0.68 + Double(random.nextUnit()) * 0.27,
+                turnsPerSecond: 0.18 + Double(random.nextUnit()) * 0.14,
+                direction: index.isMultiple(of: 7) ? -1 : 1,
+                tintIndex: index % 4,
+                hasTrail: index < min(trailCount, count),
+                orbitBasisX: SIMD3(nodeCosine, nodeSine, 0),
+                orbitBasisY: SIMD3(
+                    -nodeSine * inclinationCosine,
+                    nodeCosine * inclinationCosine,
+                    inclinationSine
+                )
+            )
+        }
+    }
+
+    func position(
+        of satellite: Satellite,
+        phaseTime: TimeInterval
+    ) -> SIMD3<Double> {
+        let angle = satellite.initialPhase
+            + satellite.direction
+                * phaseTime
+                * satellite.turnsPerSecond
+                * 2 * .pi
+        return (
+            satellite.orbitBasisX * cos(angle)
+                + satellite.orbitBasisY * sin(angle)
+        ) * satellite.displayRadius
+    }
+}
+
+/// Lightweight boot-only globe. The 30fps path evaluates a bounded analytic
+/// preset and compiled coordinate constants; it performs no IO or propagation.
+struct BootOrbitalFieldView: View {
+    let timeline: BootOrbitalTimeline
 
     private let dust = StarDust()
+    private let preset = BootOrbitalScenePreset.standard
+
+    private struct Geometry {
+        let center: CGPoint
+        let sceneRadius: CGFloat
+        let earthRadius: CGFloat
+    }
+
+    private struct ProjectedPoint {
+        let point: CGPoint
+        let depth: Double
+    }
 
     var body: some View {
-        Canvas { context, size in
+        Canvas(
+            opaque: true,
+            colorMode: .linear,
+            rendersAsynchronously: false
+        ) { context, size in
             context.fill(
                 Path(CGRect(origin: .zero, size: size)),
                 with: .color(Palette.voidBlack)
             )
 
-            SkyRenderer.drawDust(
-                context,
-                dust: dust,
-                size: size,
-                transform: StarDust.skyTransform(
-                    pointing: .initial,
-                    canvasSize: size,
-                    verticalFOV: Projection.baseVerticalFOV
+            context.drawLayer { stars in
+                stars.opacity = timeline.sceneOpacity
+                SkyRenderer.drawDust(
+                    stars,
+                    dust: dust,
+                    size: size,
+                    transform: StarDust.skyTransform(
+                        pointing: .initial,
+                        canvasSize: size,
+                        verticalFOV: Projection.baseVerticalFOV
+                    )
                 )
+            }
+
+            let geometry = Self.geometry(
+                in: size,
+                scale: timeline.globeScale
             )
+            let viewOrientation = Self.viewOrientation
+            context.drawLayer { back in
+                back.opacity = timeline.sceneOpacity
+                drawSatellites(
+                    back,
+                    geometry: geometry,
+                    viewOrientation: viewOrientation,
+                    front: false
+                )
+            }
+            context.drawLayer { earth in
+                earth.opacity = timeline.sceneOpacity
+                drawEarth(
+                    earth,
+                    geometry: geometry,
+                    viewOrientation: viewOrientation
+                )
+            }
+            context.drawLayer { front in
+                front.opacity = timeline.sceneOpacity
+                drawSatellites(
+                    front,
+                    geometry: geometry,
+                    viewOrientation: viewOrientation,
+                    front: true
+                )
+            }
 
             SkyRenderer.drawVignette(context, size: size)
         }
+        .overlay(alignment: .bottom) {
+            Text("STARCATCH")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .tracking(3.2)
+                .foregroundStyle(Palette.inkMid.opacity(timeline.brandOpacity))
+                .padding(.bottom, 48)
+                .accessibilityHidden(true)
+        }
         .accessibilityHidden(true)
     }
-}
 
-/// 固定在画面中央的品牌唤醒层。字号、字距和位置始终不变；只有字母注册进度
-/// 与模块验证状态参与加载过程。
-struct SystemWakeView: View {
-    let preparation: BootPreparationState
-    let handoffProgress: Double
-    let suppressMotion: Bool
-
-    @State private var startedAt = Date()
-
-    var body: some View {
-        #if DEBUG
-        if let previewElapsed {
-            wakeContent(
-                BootVisualTimeline(
-                    elapsed: previewElapsed,
-                    preparation: preparation,
-                    handoffProgress: handoffProgress
-                )
-            )
-        } else if suppressMotion {
-            staticWakeContent
-        } else {
-            animatedWakeContent
-        }
-        #else
-        if suppressMotion {
-            staticWakeContent
-        } else {
-            animatedWakeContent
-        }
-        #endif
-    }
-
-    private var staticWakeContent: some View {
-        wakeContent(
-            BootVisualTimeline(
-                elapsed: BootVisualTimeline.minimumPresentationDuration,
-                preparation: preparation,
-                handoffProgress: handoffProgress
-            )
-        )
-    }
-
-    private var animatedWakeContent: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { frame in
-            wakeContent(
-                BootVisualTimeline(
-                    elapsed: frame.date.timeIntervalSince(startedAt),
-                    preparation: preparation,
-                    handoffProgress: handoffProgress
-                )
-            )
-        }
-    }
-
-    private func wakeContent(_ timeline: BootVisualTimeline) -> some View {
-        ZStack {
-            BootFieldView(timeline: timeline)
-                .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                wordmark(timeline)
-                    .padding(.bottom, 27)
-                BootModuleLedger(
-                    preparation: preparation,
-                    timeline: timeline
-                )
-                .padding(.bottom, 21)
-                BootStatusText(
-                    phase: timeline.systemPhase,
-                    readyEmphasis: timeline.readyEmphasis
+    private func drawSatellites(
+        _ context: GraphicsContext,
+        geometry: Geometry,
+        viewOrientation: simd_quatd,
+        front: Bool
+    ) {
+        if timeline.trailPresence > 0.01 {
+            for satellite in preset.satellites where satellite.hasTrail {
+                drawTrail(
+                    context,
+                    satellite: satellite,
+                    geometry: geometry,
+                    viewOrientation: viewOrientation,
+                    front: front
                 )
             }
-            .opacity(timeline.wordmarkOpacity)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-    }
 
-    private func wordmark(_ timeline: BootVisualTimeline) -> some View {
-        let letters = Array("STARCATCH")
-        let titleWidth: CGFloat = 216
-        let cellWidth = titleWidth / CGFloat(letters.count)
-
-        return ZStack(alignment: .topLeading) {
-            HStack(spacing: 0) {
-                ForEach(Array(letters.enumerated()), id: \.offset) { index, letter in
-                    registeredGlyph(
-                        String(letter),
-                        activation: timeline.letterActivation(at: index),
-                        offset: timeline.registrationOffset(at: index)
-                    )
-                    .frame(width: cellWidth, height: 31)
-                }
-            }
-
-            HStack(spacing: 0) {
-                ForEach(0 ..< letters.count, id: \.self) { index in
-                    Rectangle()
-                        .fill(Palette.inkFaint.opacity(0.24 + 0.28 * timeline.letterActivation(at: index)))
-                        .frame(width: cellWidth, height: 0.5)
-                        .overlay(alignment: .center) {
-                            Rectangle()
-                                .fill(Palette.signal.opacity(0.38 * timeline.letterActivation(at: index)))
-                                .frame(width: 0.5, height: 5)
-                        }
-                }
-            }
-            .frame(width: titleWidth)
-            .offset(y: 36)
-
-            calibrationBracket(leading: true)
-                .offset(x: -13, y: 7)
-            calibrationBracket(leading: false)
-                .offset(x: titleWidth + 7, y: 7)
-        }
-        .frame(width: titleWidth, height: 42, alignment: .topLeading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("StarCatch")
-    }
-
-    private func registeredGlyph(
-        _ glyph: String,
-        activation: Double,
-        offset: CGFloat
-    ) -> some View {
-        let font = Font.system(size: 21, weight: .semibold, design: .monospaced)
-        return ZStack {
-            Text(glyph)
-                .font(font)
-                .foregroundStyle(Palette.inkHigh.opacity(0.12 + 0.84 * activation))
-
-            Text(glyph)
-                .font(font)
-                .foregroundStyle(Palette.signal.opacity(0.24 * (1 - activation)))
-                .offset(x: -offset, y: -0.35)
-                .mask(alignment: .top) {
-                    VStack(spacing: 5) {
-                        Rectangle().frame(height: 0.8)
-                        Rectangle().frame(height: 0.6)
-                        Rectangle().frame(height: 0.8)
-                    }
-                }
-
-            Text(glyph)
-                .font(font)
-                .foregroundStyle(Palette.inkMid.opacity(0.2 * (1 - activation)))
-                .offset(x: offset, y: 0.45)
-                .mask(alignment: .bottom) {
-                    VStack(spacing: 6) {
-                        Rectangle().frame(height: 0.7)
-                        Rectangle().frame(height: 0.55)
-                        Rectangle().frame(height: 0.7)
-                    }
-                }
-        }
-    }
-
-    private func calibrationBracket(leading: Bool) -> some View {
-        Path { path in
-            if leading {
-                path.move(to: CGPoint(x: 5, y: 0))
-                path.addLine(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: 0, y: 17))
-                path.addLine(to: CGPoint(x: 5, y: 17))
+        var ordinary = Path()
+        var cool = Path()
+        var pale = Path()
+        var highlighted = Path()
+        for satellite in preset.satellites {
+            let projected = project(
+                preset.position(
+                    of: satellite,
+                    phaseTime: timeline.satellitePhaseTime
+                ),
+                geometry: geometry,
+                orientation: viewOrientation
+            )
+            guard (projected.depth >= 0) == front else { continue }
+            let radius: CGFloat = satellite.hasTrail ? 0.96 : (front ? 0.43 : 0.32)
+            let rect = CGRect(
+                x: projected.point.x - radius,
+                y: projected.point.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+            if satellite.hasTrail {
+                highlighted.addEllipse(in: rect)
             } else {
-                path.move(to: CGPoint(x: 0, y: 0))
-                path.addLine(to: CGPoint(x: 5, y: 0))
-                path.addLine(to: CGPoint(x: 5, y: 17))
-                path.addLine(to: CGPoint(x: 0, y: 17))
-            }
-        }
-        .stroke(Palette.inkFaint.opacity(0.42), lineWidth: 0.55)
-        .frame(width: 5, height: 17)
-    }
-
-    #if DEBUG
-    private var previewElapsed: TimeInterval? {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "--previewBootTime"),
-              index + 1 < arguments.count else {
-            return nil
-        }
-        return TimeInterval(arguments[index + 1])
-    }
-    #endif
-}
-
-private struct BootModuleLedger: View {
-    let preparation: BootPreparationState
-    let timeline: BootVisualTimeline
-
-    private let modules = [
-        ("boot.module.catalog", "books.vertical"),
-        ("boot.module.orbit_solver", "circle.dotted.and.circle"),
-        ("boot.module.observation_model", "viewfinder"),
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            ForEach(Array(modules.enumerated()), id: \.offset) { index, module in
-                HStack(spacing: 11) {
-                    Image(systemName: module.1)
-                        .font(.system(size: 10, weight: .light))
-                        .frame(width: 16)
-                    Text(L10n.text(module.0))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text(statusKey(for: index))
-                        .foregroundStyle(
-                            preparation.isModuleReady(at: index)
-                                ? Palette.signal.opacity(0.78)
-                                : Palette.inkLow.opacity(0.48)
-                        )
-                    Image(systemName: preparation.isModuleReady(at: index) ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 8, weight: .medium))
-                        .frame(width: 10)
-                        .foregroundStyle(
-                            preparation.isModuleReady(at: index)
-                                ? Palette.signal.opacity(0.82)
-                                : Palette.inkFaint.opacity(0.44)
-                        )
-                }
-                .font(.system(size: 9, weight: .medium, design: .monospaced))
-                .tracking(SupportedLanguage.current == .english ? 0.55 : 0.12)
-                .foregroundStyle(Palette.inkMid.opacity(0.54 + 0.26 * timeline.moduleActivation(at: index)))
-                .frame(height: 35)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Palette.inkFaint.opacity(0.22))
-                        .frame(height: 0.5)
+                switch satellite.tintIndex {
+                case 1: cool.addEllipse(in: rect)
+                case 2: pale.addEllipse(in: rect)
+                default: ordinary.addEllipse(in: rect)
                 }
             }
         }
-        .frame(width: 238)
-        .accessibilityHidden(true)
-    }
 
-    private func statusKey(for index: Int) -> String {
-        if preparation.isModuleReady(at: index) {
-            return L10n.text("boot.module.verified")
-        }
-        return L10n.text(
-            preparation.activeModuleIndex == index
-                ? "boot.module.working"
-                : "boot.module.waiting"
+        let depthOpacity = front ? 1.0 : 0.22
+        context.fill(
+            ordinary,
+            with: .color(Palette.inkHigh.opacity(0.44 * depthOpacity))
+        )
+        context.fill(
+            cool,
+            with: .color(Palette.observationTint.opacity(0.46 * depthOpacity))
+        )
+        context.fill(
+            pale,
+            with: .color(Palette.inkMid.opacity(0.48 * depthOpacity))
+        )
+        context.fill(
+            highlighted,
+            with: .color(Palette.inkHigh.opacity(0.92 * depthOpacity))
         )
     }
-}
 
-private struct BootStatusText: View {
-    let phase: BootVisualTimeline.SystemPhase
-    let readyEmphasis: Double
-
-    @State private var displayedPhase: BootVisualTimeline.SystemPhase = .initializing
-    @State private var phaseVisible = true
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 7) {
-            Circle()
-                .fill(
-                    displayedPhase == .ready
-                        ? Palette.signal.opacity(0.76 + 0.18 * readyEmphasis)
-                        : Palette.inkLow.opacity(0.54)
-                )
-                .frame(width: 3.5, height: 3.5)
-                .alignmentGuide(.firstTextBaseline) { dimensions in
-                    dimensions[VerticalAlignment.center] + 2
-                }
-            Text(L10n.text("boot.system.title"))
-            Text("·")
-                .foregroundStyle(Palette.inkFaint.opacity(0.62))
-            Text(displayedPhase.localizedLabel)
-                .opacity(phaseVisible ? 1 : 0)
-                .offset(y: phaseVisible ? 0 : 1)
+    private func drawTrail(
+        _ context: GraphicsContext,
+        satellite: BootOrbitalScenePreset.Satellite,
+        geometry: Geometry,
+        viewOrientation: simd_quatd,
+        front: Bool
+    ) {
+        let sampleCount = BootOrbitalScenePreset.trailSampleCount
+        let sampleInterval = 0.012
+        let projected = (0 ..< sampleCount).map { index in
+            let age = Double(sampleCount - 1 - index) * sampleInterval
+            return project(
+                preset.position(
+                    of: satellite,
+                    phaseTime: timeline.satellitePhaseTime - age
+                ),
+                geometry: geometry,
+                orientation: viewOrientation
+            )
         }
-        .font(.system(size: 9, weight: .medium, design: .monospaced))
-        .tracking(SupportedLanguage.current == .english ? 0.72 : 0.18)
-        .foregroundStyle(
-            Palette.inkLow.opacity(
-                displayedPhase == .ready
-                    ? 0.58 + 0.26 * readyEmphasis
-                    : 0.52
+        guard projected.count > 1 else { return }
+        let tint: Color = switch satellite.tintIndex {
+        case 1: Palette.observationTint
+        case 2: Palette.inkMid
+        default: Palette.inkHigh
+        }
+
+        for index in 1 ..< projected.count {
+            let start = projected[index - 1]
+            let end = projected[index]
+            guard (start.depth >= 0) == front,
+                  (end.depth >= 0) == front
+            else { continue }
+            var segment = Path()
+            segment.move(to: start.point)
+            segment.addLine(to: end.point)
+            let ageProgress = Double(index) / Double(projected.count - 1)
+            let opacity = timeline.trailPresence
+                * pow(ageProgress, 1.7)
+                * (front ? 0.52 : 0.1)
+            context.stroke(
+                segment,
+                with: .color(tint.opacity(opacity)),
+                style: StrokeStyle(
+                    lineWidth: front ? 0.72 : 0.46,
+                    lineCap: .round
+                )
+            )
+        }
+    }
+
+    private func drawEarth(
+        _ context: GraphicsContext,
+        geometry: Geometry,
+        viewOrientation: simd_quatd
+    ) {
+        let earthRect = CGRect(
+            x: geometry.center.x - geometry.earthRadius,
+            y: geometry.center.y - geometry.earthRadius,
+            width: geometry.earthRadius * 2,
+            height: geometry.earthRadius * 2
+        )
+        let earth = Path(ellipseIn: earthRect)
+
+        // Atmosphere without blur: three restrained shells keep the render path cheap.
+        context.stroke(
+            Path(ellipseIn: earthRect.insetBy(dx: -3, dy: -3)),
+            with: .color(Palette.observationTint.opacity(0.055)),
+            style: StrokeStyle(lineWidth: 3)
+        )
+        context.stroke(
+            Path(ellipseIn: earthRect.insetBy(dx: -1.35, dy: -1.35)),
+            with: .color(Palette.observationTint.opacity(0.16)),
+            style: StrokeStyle(lineWidth: 0.5)
+        )
+
+        context.fill(
+            earth,
+            with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: Palette.observationTint.opacity(0.105), location: 0),
+                    .init(color: Palette.dust.opacity(0.42), location: 0.42),
+                    .init(color: Palette.voidBlack.opacity(0.96), location: 1),
+                ]),
+                center: CGPoint(
+                    x: earthRect.minX + geometry.earthRadius * 0.64,
+                    y: earthRect.minY + geometry.earthRadius * 0.56
+                ),
+                startRadius: 0,
+                endRadius: geometry.earthRadius * 1.4
             )
         )
-        .frame(minWidth: 220, minHeight: 18, alignment: .center)
-        .onAppear { displayedPhase = phase }
-        .onChange(of: phase) { _, next in
-            guard next != displayedPhase else { return }
-            withAnimation(.easeOut(duration: 0.1)) {
-                phaseVisible = false
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                displayedPhase = next
-                withAnimation(.easeOut(duration: 0.14)) {
-                    phaseVisible = true
-                }
-            }
+
+        context.drawLayer { night in
+            night.clip(to: earth)
+            night.fill(
+                earth,
+                with: .linearGradient(
+                    Gradient(stops: [
+                        .init(color: .clear, location: 0.24),
+                        .init(color: Palette.voidBlack.opacity(0.08), location: 0.52),
+                        .init(color: Palette.voidBlack.opacity(0.5), location: 1),
+                    ]),
+                    startPoint: CGPoint(x: earthRect.minX, y: earthRect.minY),
+                    endPoint: CGPoint(x: earthRect.maxX, y: earthRect.maxY)
+                )
+            )
         }
-        .accessibilityLabel(
-            L10n.format("boot.system.accessibility", phase.localizedLabel)
+
+        let earthOrientation = simd_normalize(
+            viewOrientation
+                * simd_quatd(
+                    angle: timeline.earthRotationRadians,
+                    axis: SIMD3(0, 1, 0)
+                )
+        )
+        drawEarthGrid(
+            context,
+            geometry: geometry,
+            orientation: earthOrientation
+        )
+        drawCoastlines(
+            context,
+            geometry: geometry,
+            orientation: earthOrientation
+        )
+
+        context.stroke(
+            earth,
+            with: .color(Palette.inkMid.opacity(0.56)),
+            style: StrokeStyle(lineWidth: 0.8)
+        )
+        var illuminatedLimb = Path()
+        illuminatedLimb.addArc(
+            center: geometry.center,
+            radius: geometry.earthRadius - 0.4,
+            startAngle: .degrees(142),
+            endAngle: .degrees(303),
+            clockwise: false
+        )
+        context.stroke(
+            illuminatedLimb,
+            with: .color(Palette.inkHigh.opacity(0.25)),
+            style: StrokeStyle(lineWidth: 0.72, lineCap: .round)
         )
     }
+
+    private func drawEarthGrid(
+        _ context: GraphicsContext,
+        geometry: Geometry,
+        orientation: simd_quatd
+    ) {
+        let sampleStep = Double.pi / 28
+        for latitudeDegrees in stride(from: -60.0, through: 60.0, by: 30.0) {
+            let latitude = latitudeDegrees * .pi / 180
+            let points = stride(
+                from: 0.0,
+                through: Double.pi * 2,
+                by: sampleStep
+            ).map { longitude in
+                projectSurface(
+                    SIMD3(
+                        cos(latitude) * cos(longitude),
+                        cos(latitude) * sin(longitude),
+                        sin(latitude)
+                    ),
+                    geometry: geometry,
+                    orientation: orientation
+                )
+            }
+            strokeSurface(
+                context,
+                points: points,
+                color: Palette.inkLow.opacity(0.1)
+            )
+        }
+        for longitude in stride(from: 0.0, to: Double.pi * 2, by: Double.pi / 6) {
+            let points = stride(
+                from: -Double.pi / 2,
+                through: Double.pi / 2,
+                by: sampleStep
+            ).map { latitude in
+                projectSurface(
+                    SIMD3(
+                        cos(latitude) * cos(longitude),
+                        cos(latitude) * sin(longitude),
+                        sin(latitude)
+                    ),
+                    geometry: geometry,
+                    orientation: orientation
+                )
+            }
+            strokeSurface(
+                context,
+                points: points,
+                color: Palette.inkLow.opacity(0.1)
+            )
+        }
+    }
+
+    private func drawCoastlines(
+        _ context: GraphicsContext,
+        geometry: Geometry,
+        orientation: simd_quatd
+    ) {
+        for coastline in SkyOverviewView.coastlineSamples {
+            let points = stride(
+                from: 0,
+                to: max(0, coastline.count - 1),
+                by: 2
+            ).map { index in
+                let latitude = Double(coastline[index]) * .pi / 180
+                let longitude = Double(coastline[index + 1]) * .pi / 180
+                return projectSurface(
+                    SIMD3(
+                        cos(latitude) * cos(longitude),
+                        cos(latitude) * sin(longitude),
+                        sin(latitude)
+                    ),
+                    geometry: geometry,
+                    orientation: orientation
+                )
+            }
+            strokeSurface(
+                context,
+                points: points,
+                color: Palette.voidBlack.opacity(0.48),
+                lineWidth: 1.15
+            )
+            strokeSurface(
+                context,
+                points: points,
+                color: Palette.observationTint.opacity(0.34),
+                lineWidth: 0.5,
+                minimumDepth: 0.08
+            )
+        }
+    }
+
+    private func strokeSurface(
+        _ context: GraphicsContext,
+        points: [ProjectedPoint],
+        color: Color,
+        lineWidth: CGFloat = 0.42,
+        minimumDepth: Double = 0
+    ) {
+        var path = Path()
+        var drawing = false
+        for point in points {
+            if point.depth >= minimumDepth {
+                if drawing {
+                    path.addLine(to: point.point)
+                } else {
+                    path.move(to: point.point)
+                    drawing = true
+                }
+            } else {
+                drawing = false
+            }
+        }
+        context.stroke(
+            path,
+            with: .color(color),
+            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+        )
+    }
+
+    private func project(
+        _ position: SIMD3<Double>,
+        geometry: Geometry,
+        orientation: simd_quatd
+    ) -> ProjectedPoint {
+        let transformed = orientation.act(position)
+        return ProjectedPoint(
+            point: CGPoint(
+                x: geometry.center.x + transformed.x * Double(geometry.sceneRadius),
+                y: geometry.center.y - transformed.y * Double(geometry.sceneRadius)
+            ),
+            depth: transformed.z
+        )
+    }
+
+    private func projectSurface(
+        _ direction: SIMD3<Double>,
+        geometry: Geometry,
+        orientation: simd_quatd
+    ) -> ProjectedPoint {
+        let transformed = orientation.act(direction)
+        return ProjectedPoint(
+            point: CGPoint(
+                x: geometry.center.x + transformed.x * Double(geometry.earthRadius),
+                y: geometry.center.y - transformed.y * Double(geometry.earthRadius)
+            ),
+            depth: transformed.z
+        )
+    }
+
+    private static func geometry(in size: CGSize, scale: CGFloat) -> Geometry {
+        let sceneRadius = min(size.width * 0.47, size.height * 0.29) * scale
+        return Geometry(
+            center: CGPoint(x: size.width / 2, y: size.height * 0.43),
+            sceneRadius: sceneRadius,
+            earthRadius: sceneRadius * 0.59
+        )
+    }
+
+    private static let viewOrientation = simd_normalize(
+        simd_quatd(angle: 0.24, axis: SIMD3(1, 0, 0))
+            * simd_quatd(angle: -0.34, axis: SIMD3(0, 1, 0))
+            * simd_quatd(angle: -0.08, axis: SIMD3(0, 0, 1))
+    )
+
 }

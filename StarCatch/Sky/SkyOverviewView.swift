@@ -9,7 +9,7 @@ struct SkyOverviewView: View {
     nonisolated private static let maximumOrbitDisplayRadius: Double = 0.88
     /// Natural Earth 1:110m 海岸线经过约 2° 视觉简化后的坐标。
     /// 每条数组按 `[纬度, 经度, …]` 存储，避免运行时解析地图资源。
-    nonisolated private static let coastlineSamples: [[Float]] = [
+    nonisolated static let coastlineSamples: [[Float]] = [
         [-78.60, -163.71, -79.50, -159.21, -78.60, -163.71],
         [53.87, -6.20, 51.82, -9.98, 53.87, -6.20],
         [-2.60, 141.00, -10.58, 150.69, -8.41, 137.61, -5.39, 137.93, -0.94, 130.52, -2.60, 141.00],
@@ -399,6 +399,9 @@ struct SkyOverviewView: View {
                     settledOrientation = orientation
                     zoom = 1.26
                     settledZoom = zoom
+                }
+                if arguments.contains("--previewOverviewInteraction") {
+                    renderDetailsSettled = false
                 }
                 #endif
                 scaleModified = abs(zoom - 1) > 0.015
@@ -1789,13 +1792,15 @@ struct SkyOverviewView: View {
             julianDate: observation.julianDate
         ) * .pi / 180
 
-        if !coastlineStore.coastlines.isEmpty {
-            let pointStride = simplified ? 3 : 1
+        if Self.usesDetailedCoastlines(
+            renderingSimplified: simplified,
+            resourceAvailable: !coastlineStore.coastlines.isEmpty
+        ) {
             for coastline in coastlineStore.coastlines {
                 let projected = stride(
                     from: 0,
                     to: coastline.count,
-                    by: pointStride
+                    by: 1
                 ).map { index in
                     let coordinate = coastline[index]
                     let direction = Self.sphericalSurfaceDirection(
@@ -1815,19 +1820,19 @@ struct SkyOverviewView: View {
                 strokeCoastline(
                     context,
                     projected: projected,
-                    simplified: simplified
+                    simplified: false
                 )
             }
             return
         }
 
-        // 资源尚在后台准备时使用极轻的内嵌轮廓，避免转场首帧出现空白地球。
-        let coordinateStride = simplified ? 4 : 2
+        // 交互时持续绘制完整的编译期基础轮廓；静止后才替换为资源中的高精度海岸线。
+        // 这样缩放、Arcball 与惯性期间不会出现“无大陆”的空白球体。
         for coastline in Self.coastlineSamples {
             let projected = stride(
                 from: 0,
                 to: coastline.count - 1,
-                by: coordinateStride
+                by: 2
             ).map { index in
                 let direction = Self.sphericalSurfaceDirection(
                     latitude: Double(coastline[index]),
@@ -1846,9 +1851,16 @@ struct SkyOverviewView: View {
             strokeCoastline(
                 context,
                 projected: projected,
-                simplified: simplified
+                simplified: false
             )
         }
+    }
+
+    nonisolated static func usesDetailedCoastlines(
+        renderingSimplified: Bool,
+        resourceAvailable: Bool
+    ) -> Bool {
+        !renderingSimplified && resourceAvailable
     }
 
     private func strokeCoastline(

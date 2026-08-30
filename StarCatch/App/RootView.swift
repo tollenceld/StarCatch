@@ -12,11 +12,11 @@ enum SkyTopBarMetrics {
 
 /// 顶层视图。核心流程：
 ///
-///   1. BootSequenceView —— 仅首次启动的简短产品说明与明确进入动作
+///   1. OrbitalBootView —— 首次与回访共用的轻量预设轨道电影
 ///   2. SkyView —— 主观测视图
 ///   3. ManualBookView —— 从设置按需打开的五页观测手册
 ///
-/// 首启由用户明确进入天空；回访用户由极简品牌准备层直接进入 Sky。
+/// 准备完成后统一交叉淡入 Sky；观测手册继续从设置中按需打开。
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -42,7 +42,6 @@ struct RootView: View {
     @State private var overviewRequested = false
     @State private var manualReturnsToInstrument = false
     @State private var satelliteStoryPresented = false
-    @AppStorage("manualSeen") private var manualSeen = false
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     private var sceneAnimation: Animation {
@@ -97,7 +96,6 @@ struct RootView: View {
                     session: session,
                     revisiting: manualReturnsToInstrument
                 ) {
-                    manualSeen = true
                     let returnsToInstrument = manualReturnsToInstrument
                     withAnimation(sceneAnimation) {
                         stage = .sky
@@ -110,30 +108,16 @@ struct RootView: View {
 
             // 启动序列
             if stage == .booting {
-                if manualSeen {
-                    StartupLoadingView(preparation: bootPreparation) {
-                        withAnimation(
-                            reducedMotion || systemReducedMotion
-                                ? .easeOut(duration: 0.16)
-                                : Motion.bootHandoff
-                        ) {
-                            stage = .sky
-                        }
+                OrbitalBootView(preparation: bootPreparation) {
+                    withAnimation(
+                        reducedMotion || systemReducedMotion
+                            ? .easeOut(duration: 0.16)
+                            : Motion.bootHandoff
+                    ) {
+                        stage = .sky
                     }
-                        .transition(.opacity)
-                } else {
-                    BootSequenceView(preparation: bootPreparation) { interrupted in
-                        withAnimation(sceneAnimation) {
-                            if interrupted {
-                                manualSeen = true
-                                stage = .sky
-                            } else {
-                                stage = .manual
-                            }
-                        }
-                    }
-                    .transition(.opacity)
                 }
+                    .transition(.opacity)
             }
 
             if stage == .privacy {
@@ -244,18 +228,18 @@ struct RootView: View {
     /// --previewOverviewExit 自动拨动后退出天空球；
     /// --openOverview 直接打开常驻全局星图；
     /// --previewOverviewTransform 以旋转、放大状态打开星图；
+    /// --previewOverviewInteraction 固定为交互降级材质，用于确认大陆基础轮廓持续存在；
     /// --previewOverviewMode 自动演示常驻星图进入与退出；
     /// --previewReturnToLive 自动从一小时偏移回归 LIVE；
     /// --autoReleaseAfter <秒> 用于验证完整锁定/释放动画。
     private func applyDebugArgs() {
         guard let session else { return }
         let args = ProcessInfo.processInfo.arguments
-        if args.contains("--markManualSeen") { manualSeen = true }
         if args.contains("--skipBoot") {
             if args.contains("--forceManual") {
                 stage = .manual
             } else {
-                stage = manualSeen ? .sky : .manual
+                stage = .sky
             }
         }
         if args.contains("--openInstrument") {

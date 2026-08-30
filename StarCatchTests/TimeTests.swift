@@ -54,66 +54,34 @@ final class TimeTests: XCTestCase {
         XCTAssertLessThan(Motion.releaseDuration, 1.2, "主动释放应清晰但不拖延")
     }
 
-    func testBootTimelineWakesLettersAndReportsRealSystemState() {
-        let silent = BootVisualTimeline(
-            elapsed: 0,
-            preparation: .initial,
-            handoffProgress: 0
-        )
-        XCTAssertEqual(silent.registrationProgress, 0, accuracy: 0.0001)
-        XCTAssertEqual(silent.systemPhase, .initializing)
-        XCTAssertLessThan(silent.letterActivation(at: 8), 0.25)
-        XCTAssertLessThan(silent.moduleActivation(at: 2), 0.05)
+    func testBootOrbitalTimelineBuildsAndAcceleratesIntoTheFilm() {
+        let initial = BootOrbitalTimeline(elapsed: 0)
+        let revealed = BootOrbitalTimeline(elapsed: 0.35)
+        let middle = BootOrbitalTimeline(elapsed: 1.5)
+        let peak = BootOrbitalTimeline(elapsed: 2.8)
 
-        let syncing = BootVisualTimeline(
-            elapsed: 1.0,
-            preparation: BootPreparationState(catalogReady: true),
-            handoffProgress: 0
+        XCTAssertEqual(initial.revealProgress, 0, accuracy: 0.0001)
+        XCTAssertEqual(initial.globeScale, 0.82, accuracy: 0.0001)
+        XCTAssertEqual(revealed.globeScale, 1, accuracy: 0.0001)
+        XCTAssertGreaterThan(middle.trailPresence, 0.95)
+        XCTAssertLessThan(
+            revealed.satelliteSpeedMultiplier,
+            middle.satelliteSpeedMultiplier
         )
-        XCTAssertEqual(syncing.systemPhase, .catalogSync)
-        XCTAssertGreaterThan(syncing.registrationProgress, 0)
-        XCTAssertGreaterThan(
-            syncing.letterActivation(at: 0),
-            syncing.letterActivation(at: 8)
+        XCTAssertLessThan(
+            middle.satelliteSpeedMultiplier,
+            peak.satelliteSpeedMultiplier
         )
-        XCTAssertGreaterThan(
-            syncing.moduleActivation(at: 0),
-            syncing.moduleActivation(at: 2)
+        XCTAssertLessThan(
+            revealed.earthAngularVelocityDegrees,
+            middle.earthAngularVelocityDegrees
         )
-
-        let fastReady = BootVisualTimeline(
-            elapsed: 1.6,
-            preparation: .ready,
-            handoffProgress: 0
+        XCTAssertLessThan(
+            middle.earthAngularVelocityDegrees,
+            peak.earthAngularVelocityDegrees
         )
-        XCTAssertEqual(fastReady.systemPhase, .ready)
-
-        let calibrating = BootVisualTimeline(
-            elapsed: 2.5,
-            preparation: BootPreparationState(
-                catalogReady: true,
-                orbitEngineReady: true
-            ),
-            handoffProgress: 0
-        )
-        XCTAssertEqual(calibrating.systemPhase, .calibrating)
-
-        let ready = BootVisualTimeline(
-            elapsed: 3.2,
-            preparation: .ready,
-            handoffProgress: 0
-        )
-        XCTAssertEqual(ready.systemPhase, .ready)
-        XCTAssertGreaterThan(ready.readyEmphasis, 0.7)
-        XCTAssertEqual(ready.moduleActivation(at: 2), 1, accuracy: 0.0001)
-
-        let final = BootVisualTimeline(
-            elapsed: 3.5,
-            preparation: .ready,
-            handoffProgress: 1
-        )
-        XCTAssertEqual(final.finalFrame, 1, accuracy: 0.0001)
-        XCTAssertEqual(final.wordmarkOpacity, 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(peak.earthRotationRadians, initial.earthRotationRadians)
+        XCTAssertTrue(peak.brandOpacity.isFinite)
     }
 
     func testSupportedLanguageUsesEnglishFallbackAndSimplifiedChinese() {
@@ -200,22 +168,127 @@ final class TimeTests: XCTestCase {
         XCTAssertNotEqual(quarter, .pi / 2, accuracy: 0.05)
     }
 
-    func testBootTimelineSettlesWithoutLooping() {
-        let preparation = BootPreparationState(catalogReady: true)
-        let settled = BootVisualTimeline(
-            elapsed: 6.95,
-            preparation: preparation,
-            handoffProgress: 0
+    func testBootOrbitalTimelineCruisesContinuouslyWhenPreparationIsSlow() {
+        let cinematicEnd = BootOrbitalTimeline(elapsed: 3.2)
+        let slowing = BootOrbitalTimeline(elapsed: 3.45)
+        let cruising = BootOrbitalTimeline(elapsed: 5)
+        let later = BootOrbitalTimeline(elapsed: 6)
+
+        XCTAssertGreaterThan(slowing.satellitePhaseTime, cinematicEnd.satellitePhaseTime)
+        XCTAssertGreaterThan(cruising.satellitePhaseTime, slowing.satellitePhaseTime)
+        XCTAssertEqual(cruising.satelliteSpeedMultiplier, 0.44, accuracy: 0.0001)
+        XCTAssertEqual(cruising.earthAngularVelocityDegrees, 5, accuracy: 0.0001)
+        XCTAssertTrue(cruising.isCruising)
+        XCTAssertEqual(
+            later.earthRotationRadians - cruising.earthRotationRadians,
+            5 * .pi / 180,
+            accuracy: 0.0001
         )
-        let muchLater = BootVisualTimeline(
-            elapsed: 60,
-            preparation: preparation,
-            handoffProgress: 0
+    }
+
+    func testBootOrbitalTimelineReducedMotionIsStaticAndTrailFree() {
+        let early = BootOrbitalTimeline(elapsed: 0, reducedMotion: true)
+        let late = BootOrbitalTimeline(elapsed: 30, reducedMotion: true)
+        XCTAssertEqual(early.globeScale, 1)
+        XCTAssertEqual(early.trailPresence, 0)
+        XCTAssertEqual(early.satelliteSpeedMultiplier, 0)
+        XCTAssertEqual(early.satellitePhaseTime, late.satellitePhaseTime)
+        XCTAssertEqual(early.earthRotationRadians, late.earthRotationRadians)
+    }
+
+    func testBootCompletionPolicyWaitsForReadinessAndMinimumFilmDuration() {
+        XCTAssertNil(BootCompletionPolicy.remainingDelay(
+            elapsed: 8,
+            isReady: false,
+            reducedMotion: false
+        ))
+        XCTAssertEqual(
+            BootCompletionPolicy.remainingDelay(
+                elapsed: 1.2,
+                isReady: true,
+                reducedMotion: false
+            ) ?? -1,
+            2,
+            accuracy: 0.0001
         )
-        XCTAssertEqual(settled.registrationProgress, 1, accuracy: 0.0001)
-        XCTAssertEqual(muchLater.registrationProgress, 1, accuracy: 0.0001)
-        XCTAssertEqual(settled.letterActivation(at: 8), muchLater.letterActivation(at: 8))
-        XCTAssertEqual(settled.wordmarkOpacity, 1, accuracy: 0.0001)
+        XCTAssertEqual(
+            BootCompletionPolicy.remainingDelay(
+                elapsed: 4,
+                isReady: true,
+                reducedMotion: false
+            ) ?? -1,
+            0
+        )
+        XCTAssertEqual(
+            BootCompletionPolicy.remainingDelay(
+                elapsed: 0,
+                isReady: true,
+                reducedMotion: true
+            ) ?? -1,
+            0
+        )
+    }
+
+    func testBootOrbitalPresetIsDeterministicBoundedAndDiverse() {
+        let first = BootOrbitalScenePreset()
+        let second = BootOrbitalScenePreset()
+        XCTAssertEqual(first, second)
+        XCTAssertEqual(BootOrbitalScenePreset.satelliteCount, 4_600)
+        XCTAssertEqual(first.satellites.count, BootOrbitalScenePreset.satelliteCount)
+        XCTAssertEqual(
+            first.satellites.filter(\.hasTrail).count,
+            BootOrbitalScenePreset.trailSatelliteCount
+        )
+        XCTAssertGreaterThan(Set(first.satellites.map(\.inclination)).count, 12)
+        XCTAssertTrue(first.satellites.contains { $0.direction < 0 })
+        XCTAssertTrue(first.satellites.contains { $0.direction > 0 })
+
+        let positions = first.satellites.map {
+            first.position(of: $0, phaseTime: 2.4)
+        }
+        XCTAssertTrue(positions.contains { $0.z < 0 })
+        XCTAssertTrue(positions.contains { $0.z > 0 })
+        XCTAssertEqual(BootOrbitalScenePreset.trailSampleCount, 8)
+
+        for satellite in first.satellites {
+            let position = first.position(of: satellite, phaseTime: 2.4)
+            XCTAssertTrue(position.x.isFinite)
+            XCTAssertTrue(position.y.isFinite)
+            XCTAssertTrue(position.z.isFinite)
+            XCTAssertEqual(simd_length(position), satellite.displayRadius, accuracy: 0.0001)
+            XCTAssertEqual(simd_length(satellite.orbitBasisX), 1, accuracy: 0.0001)
+            XCTAssertEqual(simd_length(satellite.orbitBasisY), 1, accuracy: 0.0001)
+            XCTAssertEqual(
+                simd_dot(satellite.orbitBasisX, satellite.orbitBasisY),
+                0,
+                accuracy: 0.0001
+            )
+            XCTAssertTrue(0.68 ... 0.95 ~= satellite.displayRadius)
+            XCTAssertTrue(0.18 ... 0.32 ~= satellite.turnsPerSecond)
+        }
+    }
+
+    func testOverviewCoastlinesRemainAvailableDuringInteraction() {
+        XCTAssertFalse(
+            SkyOverviewView.usesDetailedCoastlines(
+                renderingSimplified: true,
+                resourceAvailable: true
+            )
+        )
+        XCTAssertFalse(
+            SkyOverviewView.usesDetailedCoastlines(
+                renderingSimplified: true,
+                resourceAvailable: false
+            )
+        )
+        XCTAssertTrue(
+            SkyOverviewView.usesDetailedCoastlines(
+                renderingSimplified: false,
+                resourceAvailable: true
+            )
+        )
+        XCTAssertGreaterThan(SkyOverviewView.coastlineSamples.count, 20)
+        XCTAssertTrue(SkyOverviewView.coastlineSamples.allSatisfy { $0.count.isMultiple(of: 2) })
     }
 
     func testSatelliteVisualTreatmentIsStableForTargetID() {
