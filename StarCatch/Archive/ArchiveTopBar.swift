@@ -13,8 +13,116 @@ enum AppChromeMetrics {
     static let topEdgeInset: CGFloat = 18
     static let itemSpacing: CGFloat = 10
     static let commandControlSize: CGFloat = 52
+    static let commandRailHeight: CGFloat = 64
+    static let globalConsoleHeight: CGFloat = 104
+    static let commandRailCornerRadius: CGFloat = 24
     static let mainActionWidth: CGFloat = 168
     static let strokeWidth: CGFloat = 0.55
+}
+
+/// 控件材质选择的纯值结果，让系统透明度偏好、旧系统回退与 iOS 26 玻璃增强
+/// 遵循同一优先级，也便于不启动 SwiftUI 视图就验证无障碍分支。
+enum AppChromeSurfaceMode: Equatable {
+    case liquidGlass
+    case translucentMaterial
+    case opaque
+
+    nonisolated static func resolve(
+        liquidGlassAvailable: Bool,
+        reduceTransparency: Bool,
+        forceLegacyMaterial: Bool
+    ) -> AppChromeSurfaceMode {
+        if reduceTransparency { return .opaque }
+        if liquidGlassAvailable, !forceLegacyMaterial { return .liquidGlass }
+        return .translucentMaterial
+    }
+}
+
+/// 系统 Sheet 的内容层。它与天空基底保持同一暖黑色相，但用稳定的明度差和
+/// 顶缘高光明确前后景；Reduce Transparency 下不依赖模糊也能读出边界。
+struct AppSheetChromeBackground: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Palette.sheetBackground
+                .ignoresSafeArea()
+
+            if !reduceTransparency {
+                LinearGradient(
+                    colors: [
+                        Palette.inkFaint.opacity(0.07),
+                        Palette.sheetBackground.opacity(0),
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 96)
+                .allowsHitTesting(false)
+            }
+
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(reduceTransparency ? 0.62 : 0.38))
+                .frame(height: 0.5)
+                .allowsHitTesting(false)
+        }
+    }
+}
+
+/// 筛选和设置根页共用的 Sheet 标题栏。系统抓手负责拖拽，标题栏只承担当前
+/// 页面身份和清晰的文字动作，避免在暗色 Sheet 上再悬浮一枚过重的圆形关闭键。
+struct AppSheetHeader: View {
+    let title: String
+    var leadingTitle: String? = nil
+    var onLeadingAction: (() -> Void)? = nil
+    let trailingTitle: String
+    let onTrailingAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            headerSlot(alignment: .leading) {
+                if let leadingTitle, let onLeadingAction {
+                    Button(leadingTitle, action: onLeadingAction)
+                        .foregroundStyle(Palette.signal.opacity(0.9))
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                }
+            }
+
+            Text(title)
+                .font(Typography.guide)
+                .tracking(Typography.guideTracking)
+                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity)
+
+            headerSlot(alignment: .trailing) {
+                Button(trailingTitle, action: onTrailingAction)
+                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.full))
+                    .buttonStyle(.plain)
+                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+            }
+        }
+        .font(Typography.guide)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .frame(height: 56)
+        .background(Palette.sheetBackground.opacity(0.96))
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(Palette.Level.functionalDivider))
+                .frame(height: 0.5)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func headerSlot<Content: View>(
+        alignment: Alignment,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .frame(maxWidth: .infinity, alignment: alignment)
+    }
 }
 
 /// 内容页顶部导航的唯一几何规范。安全区由 `safeAreaInset` 统一提供，

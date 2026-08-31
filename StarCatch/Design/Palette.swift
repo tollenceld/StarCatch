@@ -26,6 +26,12 @@ enum Palette {
     /// 四周径向 vignette 渐入的终点。
     static let voidEdge = Color(hex: 0x000000)
 
+    /// 系统 Sheet 的抬升基底。仍属于 StarCatch 的暖黑谱系，但能从天空中读出轮廓。
+    static let sheetBackground = Color(hex: 0x11110F)
+
+    /// Sheet 内摘要、范围和设置分组使用的二级表面。
+    static let sheetSurface = Color(hex: 0x181815)
+
     // MARK: - 灰阶（全部暖灰）
 
     /// 星尘底噪 —— 背景假星点，最暗层。

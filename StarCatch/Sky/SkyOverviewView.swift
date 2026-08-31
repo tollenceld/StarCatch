@@ -357,11 +357,9 @@ struct SkyOverviewView: View {
                     )
                 }
 
-                drawLegend(
+                drawGestureHint(
                     context,
                     geometry: baseGeometry,
-                    displayed: samples.count,
-                    total: session.visibleObjects.count,
                     presence: transitionVisuals.chromePresence,
                     showGestureHint: interactive
                         && !gestureHintsSeen
@@ -2279,40 +2277,23 @@ struct SkyOverviewView: View {
         context.stroke(path, with: .color(color), style: style)
     }
 
-    private func drawLegend(
+    private func drawGestureHint(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
-        displayed: Int,
-        total: Int,
         presence: Double,
         showGestureHint: Bool
     ) {
-        guard presence > 0.01 else { return }
+        guard presence > 0.01, showGestureHint else { return }
         context.draw(
-            Text(L10n.format("overview.counts", displayed, total))
+            Text(L10n.text("overview.gesture_hint"))
                 .font(Typography.statusTag)
-                .tracking(Typography.statusTagTracking)
-                .foregroundStyle(
-                    Palette.inkLow.opacity(Palette.Level.readableSecondary * presence)
-                ),
+                .tracking(0.7)
+                .foregroundStyle(Palette.inkLow.opacity(0.68 * presence)),
             at: CGPoint(
                 x: geometry.center.x,
-                y: geometry.rect.maxY + 28
+                y: geometry.rect.maxY + 31
             ),
             anchor: .center
         )
-        if showGestureHint {
-            context.draw(
-                Text(L10n.text("overview.gesture_hint"))
-                    .font(Typography.statusTag)
-                    .tracking(0.7)
-                    .foregroundStyle(Palette.inkLow.opacity(0.68 * presence)),
-                at: CGPoint(
-                    x: geometry.center.x,
-                    y: geometry.rect.maxY + 47
-                ),
-                anchor: .center
-            )
-        }
     }
 }

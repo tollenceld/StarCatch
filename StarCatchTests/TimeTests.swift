@@ -1577,6 +1577,116 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(transition.dockMode, .hidden)
     }
 
+    func testSkyCommandConfigurationUsesStableFourSlotLayouts() throws {
+        let localState = makeChrome(phase: .exploring)
+        let local = try XCTUnwrap(
+            SkyCommandConfiguration.resolve(
+                state: localState,
+                filtersActive: true,
+                globalEntryEmphasized: true,
+                displayedCount: 4_595,
+                catalogCount: 16_395
+            )
+        )
+        XCTAssertEqual(
+            local.items,
+            [.filters, .observations, .global, .settings]
+        )
+        XCTAssertEqual(local.activeItems, [.filters, .global])
+        XCTAssertFalse(local.isGlobal)
+        XCTAssertNil(local.displayedCount)
+        XCTAssertNil(local.catalogCount)
+
+        let globalState = makeChrome(
+            presentation: .global,
+            globalReset: true,
+            isLive: false,
+            overlay: .globalTime
+        )
+        let global = try XCTUnwrap(
+            SkyCommandConfiguration.resolve(
+                state: globalState,
+                filtersActive: false,
+                globalEntryEmphasized: false,
+                displayedCount: 4_595,
+                catalogCount: 16_395
+            )
+        )
+        XCTAssertEqual(
+            global.items,
+            [.filters, .observations, .time, .settings]
+        )
+        XCTAssertEqual(global.activeItems, [.time])
+        XCTAssertTrue(global.isGlobal)
+        XCTAssertEqual(global.displayedCount, 4_595)
+        XCTAssertEqual(global.catalogCount, 16_395)
+        XCTAssertTrue(global.showsGlobalReset)
+        XCTAssertTrue(global.showsReturnToLive)
+    }
+
+    func testSkyCommandConfigurationDefersToCaptureAndTransitionPriority() {
+        let captureState = makeChrome(
+            phase: .acquiring(objectId: "iss"),
+            captureConfirmation: true,
+            acquisitionProgress: 0.7
+        )
+        XCTAssertNil(
+            SkyCommandConfiguration.resolve(
+                state: captureState,
+                filtersActive: false,
+                globalEntryEmphasized: false,
+                displayedCount: 100,
+                catalogCount: 200
+            )
+        )
+
+        let transitionState = makeChrome(presentation: .enteringGlobal)
+        XCTAssertNil(
+            SkyCommandConfiguration.resolve(
+                state: transitionState,
+                filtersActive: false,
+                globalEntryEmphasized: false,
+                displayedCount: 100,
+                catalogCount: 200
+            )
+        )
+    }
+
+    func testAppChromeSurfaceModeHonorsAccessibilityAndLegacyFallback() {
+        XCTAssertEqual(
+            AppChromeSurfaceMode.resolve(
+                liquidGlassAvailable: true,
+                reduceTransparency: false,
+                forceLegacyMaterial: false
+            ),
+            .liquidGlass
+        )
+        XCTAssertEqual(
+            AppChromeSurfaceMode.resolve(
+                liquidGlassAvailable: true,
+                reduceTransparency: false,
+                forceLegacyMaterial: true
+            ),
+            .translucentMaterial
+        )
+        XCTAssertEqual(
+            AppChromeSurfaceMode.resolve(
+                liquidGlassAvailable: true,
+                reduceTransparency: true,
+                forceLegacyMaterial: false
+            ),
+            .opaque
+        )
+        XCTAssertEqual(
+            AppChromeSurfaceMode.resolve(
+                liquidGlassAvailable: false,
+                reduceTransparency: false,
+                forceLegacyMaterial: false
+            ),
+            .translucentMaterial
+        )
+    }
+
     func testTransientOverlayIsMutuallyExclusiveAndToggleable() {
         var overlay: SkyTransientOverlay?
         overlay = SkyTransientOverlay.toggled(

@@ -178,8 +178,8 @@ struct RootView: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
                 .presentationContentInteraction(.scrolls)
-                .presentationCornerRadius(34)
-                .presentationBackground(Palette.voidBlack)
+                .presentationCornerRadius(32)
+                .presentationBackground(Palette.sheetBackground)
 
         case .instrument(let initialRoute):
             InstrumentPanel(
@@ -192,8 +192,8 @@ struct RootView: View {
             .presentationDragIndicator(.visible)
             .presentationBackgroundInteraction(.disabled)
             .presentationContentInteraction(.scrolls)
-            .presentationCornerRadius(34)
-            .presentationBackground(Palette.voidBlack)
+            .presentationCornerRadius(32)
+            .presentationBackground(Palette.sheetBackground)
         }
     }
 

@@ -50,6 +50,100 @@ struct SkyWingSurfaceModifier: ViewModifier {
     }
 }
 
+/// 全球轨道页的专属模式栏。它位于系统安全区下方，以整条仪器栏明确二级场景，
+/// 不再复用主天空围绕灵动岛的状态翼与 AZ / EL 姿态读数。
+struct GlobalOrbitHeader: View {
+    let timeLabel: String
+    let onBack: () -> Void
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
+    private var surfaceMode: AppChromeSurfaceMode {
+        if #available(iOS 26.0, *) {
+            return .resolve(
+                liquidGlassAvailable: true,
+                reduceTransparency: reduceTransparency,
+                forceLegacyMaterial: forceLegacyMaterial
+            )
+        }
+        return .resolve(
+            liquidGlassAvailable: false,
+            reduceTransparency: reduceTransparency,
+            forceLegacyMaterial: forceLegacyMaterial
+        )
+    }
+
+    var body: some View {
+        Group {
+            if #available(iOS 26.0, *), surfaceMode == .liquidGlass {
+                headerContent
+                    .glassEffect(
+                        .regular
+                            .tint(Palette.voidBlack.opacity(0.1))
+                            .interactive(),
+                        in: headerShape
+                    )
+            } else if surfaceMode == .opaque {
+                headerContent
+                    .background(Palette.voidBlack.opacity(0.97), in: headerShape)
+            } else {
+                headerContent
+                    .background(.ultraThinMaterial, in: headerShape)
+                    .background(Palette.voidBlack.opacity(0.76), in: headerShape)
+            }
+        }
+        .overlay {
+            headerShape.stroke(
+                Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34),
+                lineWidth: AppChromeMetrics.strokeWidth
+            )
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var headerContent: some View {
+        HStack(spacing: 10) {
+            AppBackControl(title: L10n.text("navigation.sky"), action: onBack)
+                .fixedSize(horizontal: true, vertical: false)
+
+            Rectangle()
+                .fill(Palette.inkFaint.opacity(0.34))
+                .frame(width: 0.5, height: 18)
+                .accessibilityHidden(true)
+
+            Text(L10n.text("overview.header.title"))
+                .font(Typography.guide)
+                .tracking(Typography.guideTracking)
+                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+
+            Spacer(minLength: 6)
+
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Palette.signal.opacity(0.78))
+                    .frame(width: 4, height: 4)
+                Text(timeLabel)
+                    .font(Typography.statusTag)
+                    .tracking(0.7)
+                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            .accessibilityElement(children: .combine)
+        }
+        .padding(.horizontal, 10)
+        .frame(height: AppChromeMetrics.controlHeight)
+        .contentShape(headerShape)
+    }
+
+    private var headerShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+    }
+}
+
 /// iPhone 17 系列顶部构图参数。
 ///
 /// Apple 不向普通 App 暴露灵动岛的实时 frame，因此这里不按机型名称判断，而用

@@ -33,41 +33,32 @@ struct CatalogFilterSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView(showsIndicators: false) {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    liveSummary
-                    frequentLenses
-                    scopeSection
-                    ForEach(Self.detailedSections) { section in
-                        filterSection(section.group)
+        ZStack {
+            AppSheetChromeBackground()
+
+            VStack(spacing: 0) {
+                AppSheetHeader(
+                    title: L10n.text("filter.title"),
+                    leadingTitle: hasSelection ? L10n.text("action.reset") : nil,
+                    onLeadingAction: hasSelection ? { reset() } : nil,
+                    trailingTitle: L10n.text("action.done"),
+                    onTrailingAction: dismiss.callAsFunction
+                )
+
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        liveSummary
+                        frequentLenses
+                        scopeSection
+                        ForEach(Self.detailedSections) { section in
+                            filterSection(section.group)
+                        }
                     }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 36)
-            }
-            .background(Palette.voidBlack)
-            .navigationTitle(L10n.text("filter.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if hasSelection {
-                        Button(L10n.text("action.reset"), action: reset)
-                            .foregroundStyle(Palette.signal)
-                            .accessibilityLabel(L10n.text("filter.reset.accessibility"))
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: dismiss.callAsFunction) {
-                        Image(systemName: "xmark")
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(L10n.text("filter.close.accessibility"))
+                    .padding(.horizontal, AppChromeMetrics.edgeInset)
+                    .padding(.top, 12)
+                    .padding(.bottom, 36)
                 }
             }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Palette.voidBlack.opacity(0.96), for: .navigationBar)
         }
         .preferredColorScheme(.dark)
     }
@@ -247,7 +238,7 @@ struct CatalogFilterSheet: View {
             .padding(.horizontal, 13)
             .frame(minHeight: 58)
             .background(
-                selected ? filter.tint.opacity(0.105) : Palette.voidBlack.opacity(0.48),
+                selected ? filter.tint.opacity(0.105) : Palette.sheetSurface.opacity(0.72),
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay {
@@ -267,7 +258,7 @@ struct CatalogFilterSheet: View {
     }
 
     private var sheetSurface: some ShapeStyle {
-        Palette.inkFaint.opacity(0.11)
+        Palette.sheetSurface
     }
 
     private var divider: some View {

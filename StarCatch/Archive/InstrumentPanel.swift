@@ -54,27 +54,24 @@ struct InstrumentPanel: View {
         NavigationStack(path: $path) {
             ZStack {
                 instrumentBackdrop
-                ScrollView(showsIndicators: false) {
-                    panelContent
+
+                VStack(spacing: 0) {
+                    AppSheetHeader(
+                        title: copy("navigation.settings"),
+                        trailingTitle: copy("action.done"),
+                        onTrailingAction: dismiss.callAsFunction
+                    )
+
+                    ScrollView(showsIndicators: false) {
+                        panelContent
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
                 }
-                .scrollBounceBehavior(.basedOnSize)
             }
-            .navigationTitle(copy("navigation.settings"))
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: InstrumentRoute.self) { route in
                 routeDestination(route)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: dismiss.callAsFunction) {
-                        Image(systemName: "xmark")
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel(copy("filter.close.accessibility"))
-                }
-            }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbarBackground(Palette.voidBlack.opacity(0.96), for: .navigationBar)
         }
         .preferredColorScheme(.dark)
         .onAppear {
@@ -103,10 +100,10 @@ struct InstrumentPanel: View {
 
     private var instrumentBackdrop: some View {
         ZStack {
-            Palette.voidBlack.ignoresSafeArea()
+            AppSheetChromeBackground()
             StaticDustBackdrop()
                 .ignoresSafeArea()
-                .opacity(0.2)
+                .opacity(0.14)
                 // 颗粒即时预览只处理背景。对整个 ScrollView 做 Metal 离屏渲染
                 // 会让部分系统版本漏绘 LazyVStack 的记录行。
                 .colorEffect(
@@ -156,8 +153,9 @@ struct InstrumentPanel: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbarBackground(Palette.voidBlack.opacity(0.96), for: .navigationBar)
+        .toolbarBackground(Palette.sheetBackground.opacity(0.98), for: .navigationBar)
     }
 
     // MARK: - 单屏信息架构
@@ -495,7 +493,7 @@ struct InstrumentPanel: View {
             .padding(.top, isFirst ? 16 : 14)
             .padding(.bottom, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.voidBlack.opacity(0.985))
+            .background(Palette.sheetSurface.opacity(0.98))
     }
 
     private var historyMetrics: some View {
@@ -988,7 +986,7 @@ private struct ObservationSwipeRow<Content: View>: View {
             .background(Color.red.opacity(0.22))
 
             content
-                .background(Palette.voidBlack.opacity(0.985))
+                .background(Palette.sheetSurface.opacity(0.98))
                 .offset(x: offset)
         }
         .clipped()

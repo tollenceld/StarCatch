@@ -14,7 +14,7 @@ struct SkyView: View {
     @ObservedObject var clock: SkyClock
     var isSheetPresented = false
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
-    /// 设置与观测档案由上层负责呈现；档案的常驻入口统一收进设置页，
+    /// 设置与观测档案由上层负责呈现；观测记录同时作为底部控制栏的稳定入口，
     /// 目标卡仍可按内容直接进入深度档案。
     var onOpenFilters: () -> Void = {}
     var onOpenInstrument: () -> Void = {}
@@ -730,17 +730,9 @@ struct SkyView: View {
             if chromeState.showsTimePanel {
                 TimeDial(clock: clock)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
-
-                if !clock.isLive {
-                    ReturnToLiveControl(
-                        returning: clock.isReturningToLive,
-                        action: returnToLiveFromCapsule
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                }
             }
 
-            if chromeState.resetAction != nil {
+            if chromeState.resetAction == .localField {
                 FieldOfViewResetControl(action: resetActiveFieldOfView)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
@@ -749,10 +741,15 @@ struct SkyView: View {
                 state: chromeState,
                 filtersActive: session.activeCatalogFilterCount > 0,
                 globalEntryEmphasized: globalEntryArmed,
+                overviewDisplayedCount: session.overviewObjects.count,
+                overviewCatalogCount: session.visibleObjects.count,
                 onOpenFilters: openFilters,
+                onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
                 onToggleTime: toggleTimePanel,
                 onOpenSettings: openInstrument,
+                onResetGlobal: resetActiveFieldOfView,
+                onReturnToLive: returnToLiveFromCapsule,
                 onPrimaryAction: performPrimaryAction
             )
         }
@@ -796,6 +793,12 @@ struct SkyView: View {
         dismissTransientOverlay()
         ObservationHaptics.shared.selectionChanged()
         onOpenInstrument()
+    }
+
+    private func openObservations() {
+        dismissTransientOverlay()
+        ObservationHaptics.shared.selectionChanged()
+        onOpenArchive()
     }
 
     private func toggleTimePanel() {
@@ -957,8 +960,41 @@ struct SkyView: View {
 
     // MARK: - 指向读数
 
-    /// 顶部信息围绕灵动岛分成状态翼与姿态翼；展开内容仍留在观测空间内。
+    /// 本地天空继续围绕灵动岛显示状态翼；全球轨道改用安全区下方的整条模式栏。
+    @ViewBuilder
     private var pointingReadout: some View {
+        if overviewChromeVisible {
+            globalOrbitReadout
+                .transition(.opacity.combined(with: .move(edge: .top)))
+        } else {
+            localPointingReadout
+                .transition(.opacity)
+        }
+    }
+
+    private var globalOrbitReadout: some View {
+        GeometryReader { geo in
+            let islandMetrics = DynamicIslandWingMetrics(viewportSize: geo.size)
+            let safeTop = islandMetrics.usesIslandLayout
+                ? islandMetrics.islandCenterY
+                    + SkyTopBarMetrics.controlHeight / 2
+                    + 10
+                : max(8, geo.safeAreaInsets.top + 8)
+            GlobalOrbitHeader(
+                timeLabel: clock.isLive ? "LIVE" : clock.offsetLabel,
+                onBack: exitOverviewToLocal
+            )
+            .padding(.horizontal, AppChromeMetrics.edgeInset)
+            .padding(.top, safeTop)
+        }
+        .animation(
+            suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand,
+            value: clock.isLive
+        )
+    }
+
+    /// 顶部信息围绕灵动岛分成状态翼与姿态翼；展开内容仍留在观测空间内。
+    private var localPointingReadout: some View {
         GeometryReader { geo in
             let islandMetrics = DynamicIslandWingMetrics(viewportSize: geo.size)
             let islandLayout = islandMetrics.usesIslandLayout
@@ -975,8 +1011,6 @@ struct SkyView: View {
                     islandDirectionWingWidth: islandMetrics.directionWingWidth,
                     wingHeight: islandMetrics.wingHeight,
                     wingCornerRadius: islandMetrics.wingCornerRadius,
-                    backTitle: overviewChromeVisible ? L10n.text("navigation.sky") : nil,
-                    onBack: overviewChromeVisible ? exitOverviewToLocal : nil,
                     onStatusTap: {
                         handleStatusWingTap()
                     },
@@ -1043,13 +1077,6 @@ struct SkyView: View {
     private var statusMode: SkyStatusIndicator.Mode {
         if session.pointingAvailability == .unavailable {
             return .degraded(reason: L10n.text("sky.degraded.pointing"))
-        }
-        if overviewChromeVisible {
-            return .field(
-                timeLabel: clock.isLive
-                    ? L10n.text("sky.global.now")
-                    : L10n.format("sky.global.offset", clock.offsetLabel)
-            )
         }
         if archivePresentationReady,
            let id = capture.engagedObjectId,
