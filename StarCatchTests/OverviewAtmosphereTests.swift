@@ -65,6 +65,33 @@ final class OverviewAtmosphereTests: XCTestCase {
         )
     }
 
+    func testSatelliteSignaturesStaySparseStableAndOutsideTheGlobe() {
+        XCTAssertTrue(SkyOverviewView.showsSatelliteSignature(
+            isCurated: true,
+            noradId: 1,
+            distanceSquared: 20 * 20,
+            earthRadiusSquared: 100 * 100
+        ))
+        XCTAssertTrue(SkyOverviewView.showsSatelliteSignature(
+            isCurated: false,
+            noradId: 89 * 7,
+            distanceSquared: 110 * 110,
+            earthRadiusSquared: 100 * 100
+        ))
+        XCTAssertFalse(SkyOverviewView.showsSatelliteSignature(
+            isCurated: false,
+            noradId: 89 * 7,
+            distanceSquared: 95 * 95,
+            earthRadiusSquared: 100 * 100
+        ))
+        XCTAssertFalse(SkyOverviewView.showsSatelliteSignature(
+            isCurated: false,
+            noradId: 90,
+            distanceSquared: 110 * 110,
+            earthRadiusSquared: 100 * 100
+        ))
+    }
+
     func testBrightStarBinaryDecodingAndInvalidFallback() throws {
         var data = Data("SCST".utf8)
         append(UInt16(1), to: &data)

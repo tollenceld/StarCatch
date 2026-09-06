@@ -200,6 +200,8 @@ struct SkyOverviewView: View {
         let point: CGPoint
         /// 大于零表示朝向观察者。
         let depth: Double
+        /// 经过高度压缩后的轨道壳层半径，用于把同一片点云分成远景、壳层与近景。
+        let displayRadius: Double
     }
 
     private var transitionVisuals: ObservationScale.TransitionVisuals {
@@ -312,6 +314,7 @@ struct SkyOverviewView: View {
                     drawField(
                         backField,
                         samples: samples,
+                        geometry: geometry,
                         front: false,
                         simplified: renderingSimplified
                     )
@@ -339,12 +342,14 @@ struct SkyOverviewView: View {
                     drawField(
                         frontField,
                         samples: samples,
+                        geometry: geometry,
                         front: true,
                         simplified: renderingSimplified
                     )
                     drawFocusedObject(frontField, samples: samples)
                 }
                 context.drawLayer { surfaceOverlay in
+                    drawEarthForegroundRim(surfaceOverlay, geometry: geometry)
                     drawObserverVisibilityOverlay(
                         surfaceOverlay,
                         geometry: geometry,
@@ -912,6 +917,20 @@ struct SkyOverviewView: View {
         return 1
     }
 
+    /// 微型卫星结构必须保持稀疏且稳定。策展对象始终保留；普通目录只在地球
+    /// 外缘之外按 NORAD ID 确定性抽样，避免每帧随机闪烁或把大陆重新淹没。
+    nonisolated static func showsSatelliteSignature(
+        isCurated: Bool,
+        noradId: Int,
+        distanceSquared: CGFloat,
+        earthRadiusSquared: CGFloat
+    ) -> Bool {
+        isCurated || (
+            noradId.isMultiple(of: 89)
+                && distanceSquared > earthRadiusSquared * 0.9216
+        )
+    }
+
     // MARK: - 三维投影
 
     struct GlobeGeometry {
@@ -933,7 +952,9 @@ struct SkyOverviewView: View {
         let verticalRadius = (size.height - 214) / CGFloat(2 * maximumOrbitDisplayRadius)
         let radius = max(148, min(horizontalRadius, verticalRadius))
         let orbitalExtent = radius * CGFloat(maximumOrbitDisplayRadius)
-        let preferredCenterY = size.height * 0.42
+        // 顶部模式栏与底部控制台之间以视觉中心而非屏幕数学中心排布。
+        // 稍微下沉后，放大状态仍能给顶部留出呼吸，同时收掉下方无意义的空场。
+        let preferredCenterY = size.height * 0.445
         let centerY = min(
             size.height - 174 - orbitalExtent,
             max(78 + orbitalExtent, preferredCenterY)
@@ -1018,7 +1039,8 @@ struct SkyOverviewView: View {
                 x: center.x + CGFloat(transformed.x * scale),
                 y: center.y - CGFloat(transformed.y * scale)
             ),
-            depth: transformed.z * displayRadius
+            depth: transformed.z * displayRadius,
+            displayRadius: displayRadius
         )
     }
 
@@ -1064,6 +1086,7 @@ struct SkyOverviewView: View {
         var neutral = Path()
         var warm = Path()
         var halo = Path()
+        var glints = Path()
 
         for star in projectedBrightStars {
             let diameter = star.radius * 2
@@ -1084,17 +1107,27 @@ struct SkyOverviewView: View {
             }
             if star.radius > 1.05 {
                 halo.addEllipse(in: rect.insetBy(dx: -2.2, dy: -2.2))
+                let span = 2.1 + star.radius * 1.25
+                glints.move(to: CGPoint(x: star.point.x - span, y: star.point.y))
+                glints.addLine(to: CGPoint(x: star.point.x + span, y: star.point.y))
+                glints.move(to: CGPoint(x: star.point.x, y: star.point.y - span * 0.62))
+                glints.addLine(to: CGPoint(x: star.point.x, y: star.point.y + span * 0.62))
             }
         }
 
-        context.fill(faint, with: .color(Palette.inkHigh.opacity(0.3)))
-        context.fill(cool, with: .color(Color(red: 0.76, green: 0.86, blue: 1).opacity(0.72)))
-        context.fill(neutral, with: .color(Palette.inkHigh.opacity(0.74)))
-        context.fill(warm, with: .color(Color(red: 0.94, green: 0.86, blue: 0.7).opacity(0.7)))
+        context.fill(faint, with: .color(Palette.inkHigh.opacity(0.18)))
+        context.fill(cool, with: .color(Color(red: 0.76, green: 0.86, blue: 1).opacity(0.62)))
+        context.fill(neutral, with: .color(Palette.inkHigh.opacity(0.62)))
+        context.fill(warm, with: .color(Color(red: 0.94, green: 0.86, blue: 0.7).opacity(0.6)))
         context.drawLayer { glow in
             glow.addFilter(.blur(radius: 2.4))
-            glow.fill(halo, with: .color(Palette.inkHigh.opacity(0.1)))
+            glow.fill(halo, with: .color(Palette.inkHigh.opacity(0.08)))
         }
+        context.stroke(
+            glints,
+            with: .color(Palette.inkHigh.opacity(0.26)),
+            style: StrokeStyle(lineWidth: 0.38, lineCap: .round)
+        )
     }
 
     private func drawAmbientSpace(
@@ -1238,46 +1271,88 @@ struct SkyOverviewView: View {
     private func drawField(
         _ context: GraphicsContext,
         samples: [RenderSample],
+        geometry: GlobeGeometry,
         front: Bool,
         simplified: Bool
     ) {
-        var field: [CGPoint] = []
-        var nearField: [CGPoint] = []
-        field.reserveCapacity(samples.count / 2)
-        nearField.reserveCapacity(samples.count / 8)
+        var rearShell: [CGPoint] = []
+        var globeCrossing: [CGPoint] = []
+        var orbitalShell: [CGPoint] = []
+        var foreground: [CGPoint] = []
+        rearShell.reserveCapacity(samples.count / 2)
+        globeCrossing.reserveCapacity(samples.count / 5)
+        orbitalShell.reserveCapacity(samples.count / 3)
+        foreground.reserveCapacity(samples.count / 8)
+
+        let earthRadius = geometry.radius * zoom * CGFloat(Self.earthDisplayRadius)
+        let earthRadiusSquared = earthRadius * earthRadius
 
         for sample in samples where sample.object.id != focusedObjectId {
             guard (sample.projected.depth >= 0) == front else { continue }
-            let isNear = front && sample.projected.depth > 0.24
-            if isNear {
-                nearField.append(sample.projected.point)
+            guard front else {
+                rearShell.append(sample.projected.point)
+                continue
+            }
+
+            let dx = sample.projected.point.x - geometry.center.x
+            let dy = sample.projected.point.y - geometry.center.y
+            let distanceSquared = dx * dx + dy * dy
+            let crossesGlobe = distanceSquared < earthRadiusSquared * 0.970_225
+            let normalizedDepth = sample.projected.depth
+                / max(0.001, sample.projected.displayRadius)
+            if crossesGlobe {
+                globeCrossing.append(sample.projected.point)
+            } else if normalizedDepth > 0.52 {
+                foreground.append(sample.projected.point)
             } else {
-                field.append(sample.projected.point)
+                orbitalShell.append(sample.projected.point)
             }
         }
 
-        let sideOpacity = front ? 1.0 : 0.19
+        if !front {
+            SkyRenderer.drawTargetField(
+                context,
+                points: rearShell,
+                tint: Palette.networkTint,
+                opacity: 0.095,
+                coreRadius: 0.3,
+                haloStrength: 0
+            )
+            return
+        }
+
+        // 穿过地球盘面的前景卫星仍然保留真实位置，但退成极细的测量点，
+        // 不再与大陆点阵争夺主层级。
         SkyRenderer.drawTargetField(
             context,
-            points: field,
-            tint: Palette.inkMid,
-            opacity: 0.37 * sideOpacity,
-            coreRadius: front ? 0.57 : 0.41,
-            haloStrength: simplified ? 0 : (front ? 0.012 : 0)
+            points: globeCrossing,
+            tint: Palette.networkTint,
+            opacity: 0.16,
+            coreRadius: 0.31,
+            haloStrength: 0
         )
-        if front {
-            SkyRenderer.drawTargetField(
-                context, points: nearField, tint: Palette.inkHigh,
-                opacity: 0.6,
-                coreRadius: 0.8,
-                haloStrength: simplified ? 0 : 0.032
-            )
-            drawSatelliteSignatures(
-                context,
-                samples: samples,
-                simplified: simplified
-            )
-        }
+        SkyRenderer.drawTargetField(
+            context,
+            points: orbitalShell,
+            tint: Palette.networkTint,
+            opacity: 0.3,
+            coreRadius: 0.43,
+            haloStrength: 0
+        )
+        SkyRenderer.drawTargetField(
+            context,
+            points: foreground,
+            tint: Palette.inkHigh,
+            opacity: 0.5,
+            coreRadius: 0.62,
+            haloStrength: simplified ? 0 : 0.018
+        )
+        drawSatelliteSignatures(
+            context,
+            samples: samples,
+            geometry: geometry,
+            simplified: simplified
+        )
     }
 
     /// 在数千颗真实星核之上只为稳定子集增加 3–5pt 人造结构。轮廓按任务语义
@@ -1285,6 +1360,7 @@ struct SkyOverviewView: View {
     private func drawSatelliteSignatures(
         _ context: GraphicsContext,
         samples: [RenderSample],
+        geometry: GlobeGeometry,
         simplified: Bool
     ) {
         guard !simplified else { return }
@@ -1294,71 +1370,98 @@ struct SkyOverviewView: View {
         var science = Path()
         var legacy = Path()
 
+        var cores = Path()
+        var coreClearance = Path()
+        let earthRadius = geometry.radius * zoom * CGFloat(Self.earthDisplayRadius)
+        let earthRadiusSquared = earthRadius * earthRadius
+
         for sample in samples where sample.projected.depth > 0.08 {
             let object = sample.object
-            guard object.isFeatured
-                    || object.isCurated
-                    || object.noradId.isMultiple(of: 17)
+            // 许多普通节点也能生成通用档案，不能因此全部升级成重点符号。
+            // 只有人工策展任务与稀疏确定性样本获得完整微型轮廓。
+            let isLandmark = object.isCurated
+            let screenDX = sample.projected.point.x - geometry.center.x
+            let screenDY = sample.projected.point.y - geometry.center.y
+            let distanceSquared = screenDX * screenDX + screenDY * screenDY
+            guard Self.showsSatelliteSignature(
+                isCurated: isLandmark,
+                noradId: object.noradId,
+                distanceSquared: distanceSquared,
+                earthRadiusSquared: earthRadiusSquared
+            )
             else { continue }
 
             let point = sample.projected.point
-            let angle = SkyRenderer.satelliteSignatureAngle(seed: object.noradId)
-            let dx = CGFloat(cos(angle))
-            let dy = CGFloat(sin(angle))
-            let px = -dy
-            let py = dx
-            let start = CGPoint(x: point.x + dx * 2.1, y: point.y + dy * 2.1)
-            let end = CGPoint(x: point.x + dx * 5.2, y: point.y + dy * 5.2)
+            var radial = CGVector(
+                dx: point.x - geometry.center.x,
+                dy: point.y - geometry.center.y
+            )
+            let radialLength = max(0.001, sqrt(distanceSquared))
+            radial.dx /= radialLength
+            radial.dy /= radialLength
+            let tangent = CGVector(dx: -radial.dy, dy: radial.dx)
+            let extent: CGFloat = isLandmark ? 4.7 : 3.8
+
+            func offset(_ vector: CGVector, by amount: CGFloat) -> CGPoint {
+                CGPoint(
+                    x: point.x + vector.dx * amount,
+                    y: point.y + vector.dy * amount
+                )
+            }
+
+            func addPanels(to path: inout Path, extent: CGFloat) {
+                path.move(to: offset(tangent, by: 1.45))
+                path.addLine(to: offset(tangent, by: extent))
+                path.move(to: offset(tangent, by: -1.45))
+                path.addLine(to: offset(tangent, by: -extent))
+            }
+
+            let coreRect = CGRect(
+                x: point.x - 0.86,
+                y: point.y - 0.86,
+                width: 1.72,
+                height: 1.72
+            )
+            cores.addEllipse(in: coreRect)
+            coreClearance.addEllipse(in: coreRect.insetBy(dx: -1.15, dy: -1.15))
 
             switch SkyRenderer.satelliteSignature(for: object) {
             case .network:
-                for offset: CGFloat in [-0.65, 0.65] {
-                    network.move(to: CGPoint(x: start.x + px * offset, y: start.y + py * offset))
-                    network.addLine(to: CGPoint(x: end.x + px * offset, y: end.y + py * offset))
-                }
+                addPanels(to: &network, extent: extent)
             case .navigation:
-                navigation.move(to: start)
-                navigation.addLine(to: end)
-                navigation.addLine(to: CGPoint(
-                    x: end.x - dx * 1.5 + px * 1.25,
-                    y: end.y - dy * 1.5 + py * 1.25
-                ))
+                addPanels(to: &navigation, extent: extent * 0.8)
+                navigation.move(to: offset(radial, by: 1.45))
+                navigation.addLine(to: offset(radial, by: 3.35))
             case .observation:
-                let arcCenter = CGPoint(
-                    x: point.x + dx * 3.4,
-                    y: point.y + dy * 3.4
-                )
-                let arcRadius: CGFloat = 2.05
-                let arcStart = angle - 0.72
-                observation.move(to: CGPoint(
-                    x: arcCenter.x + cos(arcStart) * arcRadius,
-                    y: arcCenter.y + sin(arcStart) * arcRadius
-                ))
-                observation.addArc(
-                    center: arcCenter,
-                    radius: arcRadius,
-                    startAngle: .radians(arcStart),
-                    endAngle: .radians(angle + 0.72),
-                    clockwise: false
-                )
+                addPanels(to: &observation, extent: extent * 0.72)
+                observation.move(to: offset(radial, by: -1.4))
+                observation.addLine(to: offset(radial, by: -3.1))
             case .science:
-                science.move(to: start)
-                science.addLine(to: end)
-                let midpoint = CGPoint(x: (start.x + end.x) / 2, y: (start.y + end.y) / 2)
-                science.move(to: CGPoint(x: midpoint.x - px * 1.25, y: midpoint.y - py * 1.25))
-                science.addLine(to: CGPoint(x: midpoint.x + px * 1.25, y: midpoint.y + py * 1.25))
+                addPanels(to: &science, extent: extent * 0.84)
+                science.move(to: offset(radial, by: -2.5))
+                science.addLine(to: offset(radial, by: 2.5))
             case .legacy:
-                legacy.move(to: start)
-                legacy.addLine(to: CGPoint(x: start.x + dx * 2.1, y: start.y + dy * 2.1))
+                legacy.move(to: offset(tangent, by: 1.5))
+                legacy.addLine(to: offset(tangent, by: extent * 0.68))
             }
         }
 
-        let style = StrokeStyle(lineWidth: 0.46, lineCap: .round, lineJoin: .round)
-        context.stroke(network, with: .color(Palette.networkTint.opacity(0.3)), style: style)
-        context.stroke(navigation, with: .color(Palette.signal.opacity(0.34)), style: style)
-        context.stroke(observation, with: .color(Palette.observationTint.opacity(0.34)), style: style)
-        context.stroke(science, with: .color(Palette.explorationTint.opacity(0.32)), style: style)
-        context.stroke(legacy, with: .color(Palette.legacyTint.opacity(0.24)), style: style)
+        let clearanceStyle = StrokeStyle(lineWidth: 1.5, lineCap: .round, lineJoin: .round)
+        let style = StrokeStyle(lineWidth: 0.62, lineCap: .round, lineJoin: .round)
+        for path in [network, navigation, observation, science, legacy] {
+            context.stroke(
+                path,
+                with: .color(Palette.voidBlack.opacity(0.72)),
+                style: clearanceStyle
+            )
+        }
+        context.fill(coreClearance, with: .color(Palette.voidBlack.opacity(0.74)))
+        context.fill(cores, with: .color(Palette.inkHigh.opacity(0.9)))
+        context.stroke(network, with: .color(Palette.networkTint.opacity(0.68)), style: style)
+        context.stroke(navigation, with: .color(Palette.signal.opacity(0.7)), style: style)
+        context.stroke(observation, with: .color(Palette.observationTint.opacity(0.72)), style: style)
+        context.stroke(science, with: .color(Palette.explorationTint.opacity(0.7)), style: style)
+        context.stroke(legacy, with: .color(Palette.legacyTint.opacity(0.52)), style: style)
     }
 
     private func drawFocusedObject(_ context: GraphicsContext, samples: [RenderSample]) {
@@ -1625,28 +1728,50 @@ struct SkyOverviewView: View {
             presence: surfaceDetailPresence
         )
         context.stroke(
-            earth,
-            with: .color(Palette.inkMid.opacity(0.54)),
-            style: StrokeStyle(lineWidth: 0.82)
-        )
-        context.stroke(
             Path(ellipseIn: earthRect.insetBy(dx: -1.45, dy: -1.45)),
             with: .color(Palette.observationTint.opacity(simplified ? 0.1 : 0.16)),
             style: StrokeStyle(lineWidth: 0.46)
+        )
+    }
+
+    /// 前景卫星绘制完成后重新压住地球边缘。深色底线清出物理遮挡关系，
+    /// 受光侧的短弧再给出大气层厚度，避免高密度轨道点把球体轮廓咬碎。
+    private func drawEarthForegroundRim(
+        _ context: GraphicsContext,
+        geometry: GlobeGeometry
+    ) {
+        guard surfaceDetailPresence > 0.01 else { return }
+        let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
+        let earthRect = CGRect(
+            x: geometry.center.x - earthRadius,
+            y: geometry.center.y - earthRadius,
+            width: earthRadius * 2,
+            height: earthRadius * 2
+        )
+        let earth = Path(ellipseIn: earthRect)
+        context.stroke(
+            earth,
+            with: .color(Palette.voidBlack.opacity(0.84 * surfaceDetailPresence)),
+            style: StrokeStyle(lineWidth: 2.35)
+        )
+        context.stroke(
+            earth,
+            with: .color(Palette.inkMid.opacity(0.47 * surfaceDetailPresence)),
+            style: StrokeStyle(lineWidth: 0.68)
         )
 
         var illuminatedLimb = Path()
         illuminatedLimb.addArc(
             center: geometry.center,
-            radius: earthRadius - 0.35,
+            radius: earthRadius - 0.3,
             startAngle: .degrees(192),
             endAngle: .degrees(310),
             clockwise: false
         )
         context.stroke(
             illuminatedLimb,
-            with: .color(Palette.inkHigh.opacity(0.24)),
-            style: StrokeStyle(lineWidth: 0.72, lineCap: .round)
+            with: .color(Palette.inkHigh.opacity(0.34 * surfaceDetailPresence)),
+            style: StrokeStyle(lineWidth: 0.86, lineCap: .round)
         )
     }
 
@@ -1774,27 +1899,27 @@ struct SkyOverviewView: View {
         let presence = surfaceDetailPresence
         context.fill(
             interior,
-            with: .color(Palette.observationTint.opacity(0.31 * presence))
+            with: .color(Palette.observationTint.opacity(0.25 * presence))
         )
         context.fill(
             interiorRim,
-            with: .color(Palette.observationTint.opacity(0.15 * presence))
+            with: .color(Palette.observationTint.opacity(0.1 * presence))
         )
         context.fill(
             nearCoastal,
-            with: .color(Palette.observationTint.opacity(0.4 * presence))
+            with: .color(Palette.observationTint.opacity(0.34 * presence))
         )
         context.fill(
             nearCoastalRim,
-            with: .color(Palette.observationTint.opacity(0.2 * presence))
+            with: .color(Palette.observationTint.opacity(0.15 * presence))
         )
         context.fill(
             coastal,
-            with: .color(Palette.inkHigh.opacity(0.48 * presence))
+            with: .color(Palette.inkHigh.opacity(0.62 * presence))
         )
         context.fill(
             coastalRim,
-            with: .color(Palette.inkHigh.opacity(0.24 * presence))
+            with: .color(Palette.inkHigh.opacity(0.22 * presence))
         )
     }
 
@@ -1818,7 +1943,7 @@ struct SkyOverviewView: View {
         simplified: Bool
     ) {
         let tint = Palette.inkLow.opacity(
-            (simplified ? 0.075 : 0.13) * surfaceDetailPresence
+            (simplified ? 0.06 : 0.09) * surfaceDetailPresence
         )
         let latitudeStep = simplified ? 45.0 : 30.0
         let longitudeStep = simplified ? Double.pi / 4 : Double.pi / 6
@@ -2076,7 +2201,7 @@ struct SkyOverviewView: View {
                     fillPath,
                     with: .color(
                         Palette.signal.opacity(
-                            (simplified ? 0.055 : 0.09) * presence
+                            (simplified ? 0.045 : 0.068) * presence
                         )
                     )
                 )
@@ -2088,7 +2213,7 @@ struct SkyOverviewView: View {
             projected: ring,
             front: true,
             color: Palette.signal.opacity(
-                (simplified ? 0.24 : 0.46) * presence
+                (simplified ? 0.2 : 0.36) * presence
             ),
             style: StrokeStyle(
                 lineWidth: simplified ? 0.52 : 0.68,
@@ -2119,7 +2244,7 @@ struct SkyOverviewView: View {
             front: true,
             color: Palette.voidBlack.opacity(0.82 * surfaceDetailPresence),
             style: StrokeStyle(
-                lineWidth: simplified ? 2.2 : 2.6,
+                lineWidth: simplified ? 1.9 : 2.15,
                 lineCap: .round
             )
         )
@@ -2128,17 +2253,18 @@ struct SkyOverviewView: View {
             projected: ring,
             front: true,
             color: Palette.signal.opacity(
-                (simplified ? 0.68 : 0.82) * surfaceDetailPresence
+                (simplified ? 0.56 : 0.66) * surfaceDetailPresence
             ),
             style: StrokeStyle(
-                lineWidth: simplified ? 0.82 : 1.02,
+                lineWidth: simplified ? 0.7 : 0.84,
                 lineCap: .round,
-                dash: [2.2, 2.8]
+                dash: [1.8, 3.1]
             )
         )
 
         let labelPresence = transitionVisuals.chromePresence
         guard !simplified,
+              observerLabelEmphasized,
               labelPresence > 0.01,
               let labelAnchor = ring
                   .filter({ $0.depth >= 0 })
@@ -2237,7 +2363,7 @@ struct SkyOverviewView: View {
                         width: 20,
                         height: 20
                     )),
-                    with: .color(Palette.signal.opacity(0.24 * alpha))
+                    with: .color(Palette.signal.opacity(0.18 * alpha))
                 )
             }
         }
@@ -2248,9 +2374,9 @@ struct SkyOverviewView: View {
                 width: ringRadius * 2,
                 height: ringRadius * 2
             )),
-            with: .color(Palette.signal.opacity(0.96 * alpha)),
+            with: .color(Palette.signal.opacity(0.82 * alpha)),
             style: StrokeStyle(
-                lineWidth: 0.9,
+                lineWidth: 0.78,
                 dash: [1.8, 2.3],
                 dashPhase: CGFloat(motionTime * 1.6)
             )
@@ -2261,14 +2387,14 @@ struct SkyOverviewView: View {
         diamond.addLine(to: CGPoint(x: point.x, y: point.y + 4.2))
         diamond.addLine(to: CGPoint(x: point.x - 4.2, y: point.y))
         diamond.closeSubpath()
-        context.fill(diamond, with: .color(Palette.signal.opacity(0.42 * alpha)))
+        context.fill(diamond, with: .color(Palette.signal.opacity(0.34 * alpha)))
         context.stroke(
             diamond,
             with: .color(Palette.inkHigh.opacity(0.98 * alpha)),
             style: StrokeStyle(lineWidth: 0.9)
         )
         let labelPresence = transitionVisuals.chromePresence
-        guard labelPresence > 0.01 else { return }
+        guard observerLabelEmphasized, labelPresence > 0.01 else { return }
         let labelTint = observerLabelEmphasized ? Palette.signal : Palette.inkMid
         let baseLabelOpacity = observerLabelEmphasized
             ? 0.9
