@@ -1612,7 +1612,11 @@ struct SkyOverviewView: View {
         )
 
         drawEarthGrid(context, geometry: geometry, simplified: simplified)
-        drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
+        if coastlineStore.landDots.isEmpty {
+            drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
+        } else {
+            drawEarthLandDots(context, geometry: geometry)
+        }
         drawObserverVisibilityRegion(
             context,
             geometry: geometry,
@@ -1704,6 +1708,108 @@ struct SkyOverviewView: View {
             with: .color(Palette.observationTint.opacity(simplified ? 0.14 : 0.2)),
             style: StrokeStyle(lineWidth: 1.15, lineCap: .round)
         )
+    }
+
+    /// 大陆在构建期被采样成近似等面积的点阵。Canvas 每帧只旋转预计算的
+    /// 单位球方向并合并为六条 Path；不做多边形判断，也不逐段描摹复杂海岸线。
+    /// 海岸邻近点更小、更亮，内陆点稍大、更安静，兼顾轮廓精度与陆地体量。
+    private func drawEarthLandDots(
+        _ context: GraphicsContext,
+        geometry: GlobeGeometry
+    ) {
+        guard surfaceDetailPresence > 0.01 else { return }
+        let siderealRadians = zeroMeanSiderealTime(
+            julianDate: observation.julianDate
+        ) * .pi / 180
+        let earthRotation = simd_quatd(
+            angle: siderealRadians,
+            axis: SIMD3(0, 0, 1)
+        )
+        let surfaceOrientation = simd_normalize(renderedOrientation * earthRotation)
+
+        var coastal = Path()
+        var coastalRim = Path()
+        var nearCoastal = Path()
+        var nearCoastalRim = Path()
+        var interior = Path()
+        var interiorRim = Path()
+
+        for dot in coastlineStore.landDots {
+            let direction = SIMD3(
+                Double(dot.direction.x),
+                Double(dot.direction.y),
+                Double(dot.direction.z)
+            )
+            let projected = Self.projectDirection(
+                direction,
+                displayRadius: Self.earthDisplayRadius,
+                center: geometry.center,
+                radius: geometry.radius,
+                orientation: surfaceOrientation,
+                zoom: zoom
+            )
+            guard projected.depth >= 0.012 else { continue }
+            let nearHorizon = projected.depth < Self.earthDisplayRadius * 0.24
+            let diameter = Self.landDotDiameter(
+                sizeClass: dot.sizeClass,
+                zoom: zoom,
+                nearHorizon: nearHorizon
+            )
+            let rect = CGRect(
+                x: projected.point.x - diameter / 2,
+                y: projected.point.y - diameter / 2,
+                width: diameter,
+                height: diameter
+            )
+            switch (dot.sizeClass, nearHorizon) {
+            case (0, false): coastal.addEllipse(in: rect)
+            case (0, true): coastalRim.addEllipse(in: rect)
+            case (1, false): nearCoastal.addEllipse(in: rect)
+            case (1, true): nearCoastalRim.addEllipse(in: rect)
+            case (_, false): interior.addEllipse(in: rect)
+            case (_, true): interiorRim.addEllipse(in: rect)
+            }
+        }
+
+        let presence = surfaceDetailPresence
+        context.fill(
+            interior,
+            with: .color(Palette.observationTint.opacity(0.31 * presence))
+        )
+        context.fill(
+            interiorRim,
+            with: .color(Palette.observationTint.opacity(0.15 * presence))
+        )
+        context.fill(
+            nearCoastal,
+            with: .color(Palette.observationTint.opacity(0.4 * presence))
+        )
+        context.fill(
+            nearCoastalRim,
+            with: .color(Palette.observationTint.opacity(0.2 * presence))
+        )
+        context.fill(
+            coastal,
+            with: .color(Palette.inkHigh.opacity(0.48 * presence))
+        )
+        context.fill(
+            coastalRim,
+            with: .color(Palette.inkHigh.opacity(0.24 * presence))
+        )
+    }
+
+    nonisolated static func landDotDiameter(
+        sizeClass: UInt8,
+        zoom: CGFloat,
+        nearHorizon: Bool
+    ) -> CGFloat {
+        let base: CGFloat = switch sizeClass {
+        case 0: 0.68
+        case 1: 0.92
+        default: 1.16
+        }
+        let zoomScale = min(1.34, max(0.84, sqrt(zoom)))
+        return base * zoomScale * (nearHorizon ? 0.76 : 1)
     }
 
     private func drawEarthGrid(

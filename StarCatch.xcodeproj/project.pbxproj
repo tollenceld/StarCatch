@@ -26,6 +26,7 @@
 		41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343FF92394A7814FD1DE6EFA /* PointingProvider.swift */; };
 		47234D45C96FDB9D08892E57 /* BootSequenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15874937BFB5C04ABF07F03A /* BootSequenceView.swift */; };
 		489F2384F2AEF996008F6118 /* SatelliteStoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */; };
+		4BC124B043ED4649018ECCBC /* earth_land_dots_50m.bin in Resources */ = {isa = PBXBuildFile; fileRef = CB4E90A544CB2D6F2166F1C6 /* earth_land_dots_50m.bin */; };
 		4DBEA44D0F54B8662D9030A1 /* earth_coastlines_50m.bin in Resources */ = {isa = PBXBuildFile; fileRef = 342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */; };
 		5D275617161364BBE646062E /* ObservationLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE08D9AC749129724E543DB0 /* ObservationLog.swift */; };
 		5D5DAFCEFE7D46958DF98D88 /* SatelliteKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5E65F462749E92BDC454CC83 /* SatelliteKit */; };
@@ -140,6 +141,7 @@
 		CA3613AB785EE9DC5B915AA7 /* BrightStarField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrightStarField.swift; sourceTree = "<group>"; };
 		CAED47075CCD0A05E34BD0F4 /* ArchiveOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveOverlay.swift; sourceTree = "<group>"; };
 		CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationHaptics.swift; sourceTree = "<group>"; };
+		CB4E90A544CB2D6F2166F1C6 /* earth_land_dots_50m.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = earth_land_dots_50m.bin; sourceTree = "<group>"; };
 		CC1242DAD73E4C1124A97F05 /* SkySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkySession.swift; sourceTree = "<group>"; };
 		CC72F3D341678B6E05B6865B /* CaptureStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureStateMachine.swift; sourceTree = "<group>"; };
 		D2F9347467801F9F456031BB /* SkyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyView.swift; sourceTree = "<group>"; };
@@ -258,6 +260,7 @@
 				DE151DF9DAA8D2B9D855B010 /* bright_stars_bsc5p.bin */,
 				7CDEE5FF1B933D8AF1C1D67B /* catalog.json */,
 				342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */,
+				CB4E90A544CB2D6F2166F1C6 /* earth_land_dots_50m.bin */,
 				7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */,
 			);
 			path = Resources;
@@ -448,6 +451,7 @@
 				26E5EFACEF7E03DD64169A4C /* bright_stars_bsc5p.bin in Resources */,
 				C93A8B858A6D65FDFDDAEA54 /* catalog.json in Resources */,
 				4DBEA44D0F54B8662D9030A1 /* earth_coastlines_50m.bin in Resources */,
+				4BC124B043ED4649018ECCBC /* earth_land_dots_50m.bin in Resources */,
 				39A138A742BE73310774170E /* satellite_profiles.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

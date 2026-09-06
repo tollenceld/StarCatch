@@ -6,6 +6,65 @@ import XCTest
 
 @MainActor
 final class OverviewAtmosphereTests: XCTestCase {
+
+    func testLandDotBinaryDecodingAndCoastalSizing() throws {
+        var data = Data("SCLD".utf8)
+        append(UInt16(1), to: &data)
+        append(UInt32(3), to: &data)
+        append(Float(0), to: &data)
+        append(Float(0), to: &data)
+        data.append(UInt8(0))
+        append(Float(31.23), to: &data)
+        append(Float(121.47), to: &data)
+        data.append(UInt8(1))
+        append(Float(-33.86), to: &data)
+        append(Float(151.21), to: &data)
+        data.append(UInt8(2))
+
+        let dots = EarthCoastlineStore.decodeLandDots(data)
+        XCTAssertEqual(dots.count, 3)
+        XCTAssertEqual(dots.map(\.sizeClass), [0, 1, 2])
+        XCTAssertEqual(simd_length(dots[0].direction), 1, accuracy: 0.0001)
+        XCTAssertTrue(EarthCoastlineStore.decodeLandDots(data.dropLast()).isEmpty)
+        XCTAssertTrue(EarthCoastlineStore.decodeLandDots(Data("broken".utf8)).isEmpty)
+
+        let coastal = SkyOverviewView.landDotDiameter(
+            sizeClass: 0,
+            zoom: 1,
+            nearHorizon: false
+        )
+        let interior = SkyOverviewView.landDotDiameter(
+            sizeClass: 2,
+            zoom: 1,
+            nearHorizon: false
+        )
+        let horizon = SkyOverviewView.landDotDiameter(
+            sizeClass: 2,
+            zoom: 1,
+            nearHorizon: true
+        )
+        XCTAssertLessThan(coastal, interior)
+        XCTAssertLessThan(horizon, interior)
+    }
+
+    func testBundledLandDotAssetHasStableDensityAndUnitDirections() throws {
+        let url = try XCTUnwrap(
+            Bundle.main.url(
+                forResource: "earth_land_dots_50m",
+                withExtension: "bin"
+            )
+        )
+        let dots = EarthCoastlineStore.decodeLandDots(try Data(contentsOf: url))
+        XCTAssertTrue(5_000 ... 7_000 ~= dots.count)
+        XCTAssertGreaterThan(dots.filter { $0.sizeClass == 0 }.count, 1_000)
+        XCTAssertGreaterThan(dots.filter { $0.sizeClass == 2 }.count, 3_000)
+        XCTAssertTrue(
+            dots.allSatisfy {
+                abs(simd_length($0.direction) - 1) < 0.0001
+            }
+        )
+    }
+
     func testBrightStarBinaryDecodingAndInvalidFallback() throws {
         var data = Data("SCST".utf8)
         append(UInt16(1), to: &data)
@@ -118,5 +177,9 @@ final class OverviewAtmosphereTests: XCTestCase {
         data.append(UInt8(truncatingIfNeeded: value >> 8))
         data.append(UInt8(truncatingIfNeeded: value >> 16))
         data.append(UInt8(truncatingIfNeeded: value >> 24))
+    }
+
+    private func append(_ value: Float, to data: inout Data) {
+        append(value.bitPattern, to: &data)
     }
 }
