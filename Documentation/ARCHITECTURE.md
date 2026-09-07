@@ -13,7 +13,7 @@ RootView
 ├── 后台准备 CatalogStore ──完成后→ SkySession / EphemerisEngine / ObserverLocation
 ├── SkyClock
 ├── CaptureStateMachine
-├── AppSheetDestination ──→ CatalogFilterSheet / InstrumentPanel
+├── AppPageDestination ──→ CatalogFilterPage / ObservationHistoryPage / SettingsPage
 └── SkyView（编排）
      │
      ├── SkyChromeState（纯值解释）
@@ -33,7 +33,7 @@ RootView
 
 | 状态 | 唯一所有者 | 说明 |
 | --- | --- | --- |
-| 启动准备、全屏阅读与当前 Sheet | `RootView` | APP 级页面编排；`AppSheetDestination` 互斥表达筛选/仪器 Sheet，目录不得在首帧前同步解析 |
+| 启动准备、全屏阅读与当前工具页 | `RootView` | APP 级页面编排；`AppPageDestination` 互斥表达筛选、记录和设置全屏页，目录不得在首帧前同步解析 |
 | 设备指向、观察者、目录筛选、星历 | `SkySession` | 天空会话的共享事实源 |
 | 当前/过去/未来观测时刻 | `SkyClock` | 时间轴唯一事实源 |
 | 瞬时识别、候选、明确锁定、明确换锁、释放 | `CaptureStateMachine` | 感应档案可自动呈现；持续捕获仍需明确意图 |
@@ -81,7 +81,8 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 
 - `SkyChromeState.swift`
 - `SkyCommandDock.swift`
-- `CatalogFilterControl.swift`（系统 Sheet 内容）
+- `CatalogFilterControl.swift`（全屏筛选页）
+- `ObservationHistoryPage.swift` / `SettingsPage.swift`（独立功能流）
 - `SkyActionControls.swift`
 - `TimeDial.swift`
 
@@ -121,8 +122,8 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 11. 全球卫星场必须按背面、地球盘面、外侧壳层和近景四档批量绘制；地球盘面上的前景卫星只能
     使用低对比测量点，完整微型轮廓只分配给策展目标与确定性稀疏样本。地球前景边缘在卫星层后
     重新描画，以稳定遮挡关系；不得用切换对象集合制造层次。
-12. Sheet 覆盖时天空继续绘制可见帧，但暂停新的捕获采样；筛选 Sheet 只修改 `SkySession` 的
-    现有筛选事实并实时刷新，Chrome 和 Sheet 不得触发目录 IO 或逐帧传播。
+12. 筛选、记录或设置全屏页覆盖时保留主天空实例和状态，但暂停捕获采样、高频姿态与帧更新；
+    筛选页只修改 `SkySession` 的现有筛选事实并实时刷新，页面不得触发目录 IO 或逐帧传播。
 13. 全球空闲展示旋转复用既有 30fps `TimelineView`，每帧只计算一次沿地球局部极轴的四元数并
     组合进统一场景姿态；不得新增 Timer 或 CADisplayLink。地球手势与时间轴惯性期间保持暂停，
     结束 2 秒后连续恢复；Reduce Motion 下必须保持静止，J2000 背景恒星始终不参与该旋转。
@@ -182,9 +183,9 @@ xcodegen generate
 1. `SkyView.swift` 同时编排 30fps Canvas、捕获关系、空间档案、缩放和全局星图，
    文件较大。拆分前需要为姿态变化、锁定/离屏/回归和时间轴建立可重复的视觉基线；
    不能通过放宽 `private` 或跨文件共享可变状态来追求行数下降。
-2. `InstrumentPanel.swift` 已由 `InstrumentRoute` 和 `NavigationStack` 统一导航，但设置、系统状态、
-   观测列表和详情子视图仍保存在同一文件。下一次仅在有明确维护收益时拆文件，并保持路由、
-   清空记录、动态字体和“目录中已不存在的历史对象”回退测试。
+2. 设置与观测记录已经拆成独立 `NavigationStack` 功能流，并分别使用轻量 `SettingsRoute` 和
+   `ObservationRoute`。后续修改仍需保持清空记录、动态字体、原生列表手势和“目录中已不存在的
+   历史对象”回退测试。
 3. 离线轨道快照的长期更新方式属于产品决策：随 App 版本更新、增加受控联网刷新，
    或建设自有数据服务会改变隐私、审核和运维边界，本轮不替用户选择。
 

@@ -1,11 +1,58 @@
 import SwiftUI
 
-/// 实时作用于背景天空的渐进式筛选 Sheet。局部状态只负责即时选中反馈；每次动作
-/// 同步写回 `SkySession`，因此关闭 Sheet 不需要“应用”步骤。
-struct CatalogFilterSheet: View {
-    let session: SkySession
+/// 顶部筛选摘要的稳定值模型。范围始终排在任务、机构和星座筛选之前，
+/// 让页面与测试共享同一顺序。
+struct CatalogFilterSummaryItem: Identifiable, Equatable {
+    enum Selection: Equatable {
+        case scope(CatalogScope)
+        case filter(CatalogFilter)
+    }
 
-    @Environment(\.dismiss) private var dismiss
+    let selection: Selection
+
+    var id: String {
+        switch selection {
+        case .scope(let scope): "scope.\(scope.id)"
+        case .filter(let filter): "filter.\(filter.id)"
+        }
+    }
+
+    var title: String {
+        switch selection {
+        case .scope(let scope): scope.title
+        case .filter(let filter): filter.title
+        }
+    }
+
+    var tint: Color {
+        switch selection {
+        case .scope: Palette.signal
+        case .filter(let filter): filter.tint
+        }
+    }
+
+    nonisolated static func resolve(
+        scope: CatalogScope,
+        filters: Set<CatalogFilter>
+    ) -> [CatalogFilterSummaryItem] {
+        var result: [CatalogFilterSummaryItem] = []
+        if scope != .all {
+            result.append(CatalogFilterSummaryItem(selection: .scope(scope)))
+        }
+        result.append(contentsOf: CatalogFilter.allCases.compactMap { filter in
+            guard filter != .all, filters.contains(filter) else { return nil }
+            return CatalogFilterSummaryItem(selection: .filter(filter))
+        })
+        return result
+    }
+}
+
+/// 即时作用于当前天空的全屏筛选页。局部状态只负责选中反馈，每次动作同步写回
+/// `SkySession`，返回页面不会撤销已做出的选择。
+struct CatalogFilterPage: View {
+    let session: SkySession
+    let onBack: () -> Void
+
     @State private var scope: CatalogScope
     @State private var selections: Set<CatalogFilter>
     @State private var resultCount: Int
@@ -25,29 +72,25 @@ struct CatalogFilterSheet: View {
         GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 10),
     ]
 
-    init(session: SkySession) {
+    init(session: SkySession, onBack: @escaping () -> Void = {}) {
         self.session = session
+        self.onBack = onBack
         _scope = State(initialValue: session.catalogScope)
         _selections = State(initialValue: session.catalogFilters)
         _resultCount = State(initialValue: session.visibleObjects.count)
     }
 
     var body: some View {
-        ZStack {
-            AppSheetChromeBackground()
-
+        AppPageShell(
+            backTitle: L10n.text("navigation.sky"),
+            title: L10n.text("filter.title"),
+            onBack: onBack
+        ) {
             VStack(spacing: 0) {
-                AppSheetHeader(
-                    title: L10n.text("filter.title"),
-                    leadingTitle: hasSelection ? L10n.text("action.reset") : nil,
-                    onLeadingAction: hasSelection ? { reset() } : nil,
-                    trailingTitle: L10n.text("action.done"),
-                    onTrailingAction: dismiss.callAsFunction
-                )
+                selectionSummary
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 24) {
-                        liveSummary
                         frequentLenses
                         scopeSection
                         ForEach(Self.detailedSections) { section in
@@ -55,44 +98,118 @@ struct CatalogFilterSheet: View {
                         }
                     }
                     .padding(.horizontal, AppChromeMetrics.edgeInset)
-                    .padding(.top, 12)
+                    .padding(.top, 20)
                     .padding(.bottom, 36)
                 }
             }
         }
-        .preferredColorScheme(.dark)
+    }
+
+    private var summaryItems: [CatalogFilterSummaryItem] {
+        CatalogFilterSummaryItem.resolve(scope: scope, filters: selections)
     }
 
     private var hasSelection: Bool {
-        scope != .all || !selections.isEmpty
+        !summaryItems.isEmpty
     }
 
-    private var liveSummary: some View {
-        HStack(alignment: .center, spacing: 12) {
-            ZStack {
-                Circle()
-                    .stroke(Palette.signal.opacity(0.28), lineWidth: 0.7)
-                    .frame(width: 34, height: 34)
-                Circle()
-                    .fill(Palette.signal.opacity(0.82))
-                    .frame(width: 4, height: 4)
+    private var selectionSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(L10n.text("filter.filtered"))
+                        .font(Typography.guide)
+                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                    Text(L10n.format("filter.visible", resultCount))
+                        .font(Typography.statusTag)
+                        .tracking(Typography.statusTagTracking)
+                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                }
+
+                Spacer(minLength: 12)
+
+                if hasSelection {
+                    Button(L10n.text("action.reset"), action: reset)
+                        .font(Typography.statusTag)
+                        .tracking(Typography.statusTagTracking)
+                        .foregroundStyle(Palette.signal.opacity(Palette.Level.present))
+                        .buttonStyle(.plain)
+                        .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                        .accessibilityLabel(L10n.text("filter.reset.accessibility"))
+                }
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(L10n.text("filter.live_note"))
-                    .font(Typography.guide)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.92))
-                Text(L10n.format("filter.visible", resultCount))
-                    .font(Typography.statusTag)
-                    .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if summaryItems.isEmpty {
+                        summaryChip(
+                            title: CatalogScope.all.title,
+                            tint: Palette.inkMid,
+                            action: nil
+                        )
+                    } else {
+                        ForEach(summaryItems) { item in
+                            summaryChip(
+                                title: item.title,
+                                tint: item.tint,
+                                action: { remove(item) }
+                            )
+                        }
+                    }
+                }
+                .padding(.vertical, 1)
             }
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .frame(minHeight: 64)
-        .background(sheetSurface)
-        .accessibilityElement(children: .combine)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .padding(.top, 14)
+        .padding(.bottom, 13)
+        .background(Palette.sheetBackground)
+        .overlay(alignment: .bottom) { ContentHairline() }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func summaryChip(
+        title: String,
+        tint: Color,
+        action: (() -> Void)?
+    ) -> some View {
+        Group {
+            if let action {
+                Button(action: action) {
+                    chipContent(title: title, tint: tint, removable: true)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(title), \(L10n.text("action.delete"))")
+            } else {
+                chipContent(title: title, tint: tint, removable: false)
+                    .accessibilityLabel(title)
+            }
+        }
+    }
+
+    private func chipContent(title: String, tint: Color, removable: Bool) -> some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(tint.opacity(0.86))
+                .frame(width: 5, height: 5)
+            Text(title)
+                .font(Typography.statusTag)
+                .tracking(0.35)
+                .lineLimit(1)
+            if removable {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+        }
+        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+        .padding(.horizontal, 12)
+        .frame(minHeight: 32)
+        .background(tint.opacity(removable ? 0.1 : 0.055), in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(tint.opacity(removable ? 0.32 : 0.2), lineWidth: 0.6)
+        }
+        .contentShape(Capsule())
     }
 
     private var frequentLenses: some View {
@@ -136,7 +253,7 @@ struct CatalogFilterSheet: View {
                     }
                 }
             }
-            .background(sheetSurface)
+            .background(Palette.sheetSurface)
         }
     }
 
@@ -220,7 +337,7 @@ struct CatalogFilterSheet: View {
     ) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: filterSymbol(filter))
+                Image(systemName: filter.symbolName)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .foregroundStyle(filter.tint.opacity(selected ? 0.96 : 0.68))
                     .frame(width: 20)
@@ -257,10 +374,6 @@ struct CatalogFilterSheet: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private var sheetSurface: some ShapeStyle {
-        Palette.sheetSurface
-    }
-
     private var divider: some View {
         Rectangle()
             .fill(Palette.inkFaint.opacity(0.24))
@@ -293,6 +406,15 @@ struct CatalogFilterSheet: View {
         ObservationHaptics.shared.selectionChanged()
     }
 
+    private func remove(_ item: CatalogFilterSummaryItem) {
+        switch item.selection {
+        case .scope:
+            selectScope(.all)
+        case .filter(let filter):
+            toggle(filter)
+        }
+    }
+
     private func reset() {
         scope = .all
         selections.removeAll()
@@ -304,30 +426,8 @@ struct CatalogFilterSheet: View {
     private func refreshResultCount() {
         resultCount = session.visibleObjects.count
     }
-
-    private func filterSymbol(_ filter: CatalogFilter) -> String {
-        switch filter {
-        case .all: "scope"
-        case .featured: "book.closed"
-        case .humanScience: "sparkles"
-        case .earthObservation: "globe.americas"
-        case .navigation: "location.north.line"
-        case .communications: "antenna.radiowaves.left.and.right"
-        case .orbitalHeritage: "clock.arrow.circlepath"
-        case .unitedStates: "star"
-        case .europe: "circle.hexagongrid"
-        case .china: "scope"
-        case .otherPublic: "globe"
-        case .starlink: "circle.grid.cross"
-        case .oneweb: "circle.hexagongrid"
-        case .chinaConstellations: "point.3.connected.trianglepath.dotted"
-        case .kuiper: "circle.dotted.circle"
-        case .mobileConstellations: "antenna.radiowaves.left.and.right"
-        }
-    }
 }
 
 #Preview {
-    CatalogFilterSheet(session: SkySession())
-        .preferredColorScheme(.dark)
+    CatalogFilterPage(session: SkySession())
 }

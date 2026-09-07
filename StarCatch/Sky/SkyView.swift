@@ -12,7 +12,9 @@ struct SkyView: View {
     @ObservedObject var session: SkySession
     @ObservedObject var capture: CaptureStateMachine
     @ObservedObject var clock: SkyClock
-    var isSheetPresented = false
+    /// 工具页出现后立即暂停捕获；完全覆盖天空后再移除 30fps 绘制表面。
+    var isUtilityPagePresented = false
+    var renderingSuspended = false
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
     /// 设置与观测档案由上层负责呈现；观测记录同时作为底部控制栏的稳定入口，
     /// 目标卡仍可按内容直接进入深度档案。
@@ -210,7 +212,15 @@ struct SkyView: View {
     }
 
     var body: some View {
-        interactionSurface
+        Group {
+            if renderingSuspended {
+                Palette.voidBlack
+                    .ignoresSafeArea()
+                    .accessibilityHidden(true)
+            } else {
+                interactionSurface
+            }
+        }
         .onAppear {
             EarthCoastlineStore.shared.prepare()
             if initialOverviewPresented {
@@ -452,7 +462,7 @@ struct SkyView: View {
                 capture.returnToExploring()
             }
         }
-        .onChange(of: isSheetPresented) { _, presented in
+        .onChange(of: isUtilityPagePresented) { _, presented in
             if presented { dismissTransientOverlay() }
         }
     }
@@ -477,7 +487,7 @@ struct SkyView: View {
             )
         }
 
-        guard !isSheetPresented,
+        guard !isUtilityPagePresented,
               !clock.isScrubbing,
               presentationMode == .local,
               frameTime - lastCaptureSample

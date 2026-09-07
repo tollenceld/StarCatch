@@ -42,12 +42,61 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(entry.altitudeKm, snapshot.altitudeKm)
         XCTAssertFalse(entry.objectName.isEmpty)
 
+        let secondObject = try XCTUnwrap(Self.store.objects.dropFirst().first)
+        restored.record(objectId: secondObject.id, catalog: Self.store)
         restored.remove(objectId: object.id)
-        XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
+        let afterSingleDelete = ObservationLog(defaults: defaults)
+        XCTAssertEqual(afterSingleDelete.entries.map(\.objectId), [secondObject.id])
 
-        restored.record(objectId: object.id, catalog: Self.store)
-        restored.clear()
+        afterSingleDelete.clear()
         XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
+    }
+
+    func testObservationHistoryGroupsNewestDaysAndEntriesFirst() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+
+        let older = Date(timeIntervalSince1970: 1_750_000_000)
+        let newerSameDay = older.addingTimeInterval(900)
+        let newestDay = older.addingTimeInterval(86_400)
+        let sections = ObservationHistorySection.resolve(
+            entries: [
+                observationEntry(id: "older", date: older),
+                observationEntry(id: "same-day-newer", date: newerSameDay),
+                observationEntry(id: "newest-day", date: newestDay),
+            ],
+            calendar: calendar
+        )
+
+        XCTAssertEqual(sections.count, 2)
+        XCTAssertEqual(sections[0].entries.map(\.objectId), ["newest-day"])
+        XCTAssertEqual(
+            sections[1].entries.map(\.objectId),
+            ["same-day-newer", "older"]
+        )
+    }
+
+    func testFilterSummaryKeepsScopeBeforeExistingFilterGroupOrder() {
+        let items = CatalogFilterSummaryItem.resolve(
+            scope: .mediumAndHigh,
+            filters: [.starlink, .unitedStates, .earthObservation]
+        )
+
+        XCTAssertEqual(
+            items.map(\.selection),
+            [
+                .scope(.mediumAndHigh),
+                .filter(.earthObservation),
+                .filter(.unitedStates),
+                .filter(.starlink),
+            ]
+        )
+    }
+
+    func testFilterSummaryFallsBackToEmptyForAllOrbitsWithoutFilters() {
+        XCTAssertTrue(
+            CatalogFilterSummaryItem.resolve(scope: .all, filters: []).isEmpty
+        )
     }
 
     func testReleaseAnimationFitsCaptureLifecycle() {
@@ -1726,16 +1775,18 @@ final class TimeTests: XCTestCase {
         XCTAssertNil(overlay)
     }
 
-    func testSheetAndInstrumentRoutesRemainLightweightAndStable() {
-        XCTAssertEqual(AppSheetDestination.filters.id, "filters")
+    func testUtilityPageRoutesRemainLightweightAndStable() {
+        XCTAssertEqual(AppPageDestination.filters.id, "filters")
+        XCTAssertEqual(AppPageDestination.observations.id, "observations")
         XCTAssertEqual(
-            AppSheetDestination.instrument(initialRoute: .systemStatus).id,
-            "instrument"
+            AppPageDestination.settings(initialRoute: .systemStatus).id,
+            "settings"
         )
         XCTAssertEqual(
-            InstrumentRoute.observationDetail("iss"),
-            InstrumentRoute.observationDetail("iss")
+            ObservationRoute.detail("iss"),
+            ObservationRoute.detail("iss")
         )
+        XCTAssertEqual(SettingsRoute.systemStatus, SettingsRoute.systemStatus)
     }
 
     func testSpatialMotionResolvesRealTimerDeltaAndCapsLongPauses() {
@@ -1789,6 +1840,33 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(session.catalogScope, .all)
         XCTAssertTrue(session.catalogFilters.isEmpty)
         XCTAssertEqual(session.visibleObjects.count, Self.store.objects.count)
+    }
+
+    private func observationEntry(
+        id: String,
+        date: Date
+    ) -> ObservationLog.Entry {
+        ObservationLog.Entry(
+            objectId: id,
+            objectName: id,
+            firstSeen: date,
+            lastSeen: date,
+            count: 1,
+            observedAt: nil,
+            azimuth: nil,
+            elevation: nil,
+            altitudeKm: nil,
+            rangeKm: nil,
+            velocityKmS: nil,
+            category: nil,
+            cosparId: nil,
+            noradId: nil,
+            orbitClass: nil,
+            launched: nil,
+            status: nil,
+            kind: nil,
+            family: nil
+        )
     }
 
     private func makeChrome(

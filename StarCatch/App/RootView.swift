@@ -27,7 +27,7 @@ struct RootView: View {
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
-    /// 全屏阅读阶段与天空互斥；筛选和设置改由系统 Sheet 覆盖在常驻天空之上。
+    /// 全屏阅读阶段与天空互斥；筛选、记录和设置作为天空之上的全屏工具页呈现。
     private enum Stage {
         case booting
         case manual
@@ -37,8 +37,9 @@ struct RootView: View {
 
     /// 无论首启还是回访都先建立一个可立即绘制的启动层；目录完成后再进入业务页面。
     @State private var stage: Stage = .booting
-    @State private var presentedSheet: AppSheetDestination?
-    @State private var manualReturnsToInstrument = false
+    @State private var presentedPage: AppPageDestination?
+    @State private var skyRenderingSuspended = false
+    @State private var manualReturnsToSettings = false
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     private var sceneAnimation: Animation {
@@ -50,6 +51,18 @@ struct RootView: View {
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         )
+    }
+    private var utilityPageAnimation: Animation {
+        reducedMotion || systemReducedMotion
+            ? .easeOut(duration: 0.16)
+            : Motion.sceneTransition
+    }
+    private var utilityPageTransition: AnyTransition {
+        guard !reducedMotion, !systemReducedMotion else { return .opacity }
+        return .move(edge: .trailing).combined(with: .opacity)
+    }
+    private var utilityPageTransitionDuration: TimeInterval {
+        reducedMotion || systemReducedMotion ? 0.16 : 0.54
     }
     private var forceLegacyMaterial: Bool {
         #if DEBUG
@@ -63,7 +76,7 @@ struct RootView: View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            // Sheet 出现时天空仍保持同一实例和连续渲染，只暂停捕获采样。
+            // 工具页出现时保留同一个天空实例；页面覆盖完成后才暂停昂贵绘制。
             if stage == .sky, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
@@ -72,37 +85,48 @@ struct RootView: View {
                         session: session,
                         capture: capture,
                         clock: clock,
-                        isSheetPresented: presentedSheet != nil,
+                        isUtilityPagePresented: presentedPage != nil,
+                        renderingSuspended: skyRenderingSuspended,
                         onOpenFilters: {
-                            presentedSheet = .filters
+                            presentPage(.filters)
                         },
                         onOpenInstrument: {
-                            presentedSheet = .instrument(initialRoute: nil)
+                            presentPage(.settings(initialRoute: nil))
                         },
                         onOpenSystemStatus: {
-                            presentedSheet = .instrument(initialRoute: .systemStatus)
+                            presentPage(.settings(initialRoute: .systemStatus))
                         },
                         onOpenArchive: {
-                            presentedSheet = .instrument(initialRoute: .observations)
+                            presentPage(.observations)
                         }
                     )
                         .transition(.opacity)
+                        .allowsHitTesting(presentedPage == nil)
+                        .accessibilityHidden(presentedPage != nil)
                 }
+            }
+
+            if stage == .sky,
+               let destination = presentedPage,
+               let session {
+                appPage(destination, session: session)
+                    .transition(utilityPageTransition)
+                    .zIndex(20)
             }
 
             // 手册：从设置中按需重新打开
             if stage == .manual, let session {
                 ManualBookView(
                     session: session,
-                    revisiting: manualReturnsToInstrument
+                    revisiting: manualReturnsToSettings
                 ) {
-                    let returnsToInstrument = manualReturnsToInstrument
+                    let returnsToSettings = manualReturnsToSettings
                     withAnimation(sceneAnimation) {
                         stage = .sky
                     }
-                    manualReturnsToInstrument = false
-                    if returnsToInstrument {
-                        reopenInstrumentAfterFullScreenReturn()
+                    manualReturnsToSettings = false
+                    if returnsToSettings {
+                        reopenSettingsAfterFullScreenReturn()
                     }
                 }
                 .transition(contentPageTransition)
@@ -127,35 +151,27 @@ struct RootView: View {
                     withAnimation(sceneAnimation) {
                         stage = .sky
                     }
-                    reopenInstrumentAfterFullScreenReturn()
+                    reopenSettingsAfterFullScreenReturn()
                 }
                 .transition(contentPageTransition)
             }
         }
-        .sheet(item: $presentedSheet) { destination in
-            if let session {
-                appSheet(destination, session: session)
-            }
-        }
         .task { await prepareSession() }
         .onChange(of: stage) { _, newStage in
-            guard let session else { return }
-            if newStage == .sky {
-                session.start()
-                session.requestObserverAccess()
-            } else {
-                presentedSheet = nil
-                session.stop()
+            if newStage != .sky {
+                presentedPage = nil
+                skyRenderingSuspended = false
             }
+            synchronizeSessionActivity()
+        }
+        .onChange(of: presentedPage) { _, _ in
+            synchronizeSessionActivity()
         }
         .onChange(of: scenePhase) { _, phase in
             switch phase {
             case .active:
                 clock.resume()
-                if stage == .sky, let session {
-                    session.start()
-                    session.requestObserverAccess()
-                }
+                synchronizeSessionActivity()
             case .inactive, .background:
                 session?.stop()
                 clock.suspend()
@@ -167,52 +183,78 @@ struct RootView: View {
     }
 
     @ViewBuilder
-    private func appSheet(
-        _ destination: AppSheetDestination,
+    private func appPage(
+        _ destination: AppPageDestination,
         session: SkySession
     ) -> some View {
         switch destination {
         case .filters:
-            CatalogFilterSheet(session: session)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
-                .presentationContentInteraction(.scrolls)
-                .presentationCornerRadius(32)
-                .presentationBackground(Palette.sheetBackground)
+            CatalogFilterPage(session: session, onBack: dismissPage)
 
-        case .instrument(let initialRoute):
-            InstrumentPanel(
+        case .observations:
+            ObservationHistoryPage(session: session, onBack: dismissPage)
+
+        case .settings(let initialRoute):
+            SettingsPage(
                 session: session,
                 initialRoute: initialRoute,
-                onOpenManual: openManualFromInstrument,
-                onOpenPrivacy: openPrivacyFromInstrument
+                onBack: dismissPage,
+                onOpenManual: openManualFromSettings,
+                onOpenPrivacy: openPrivacyFromSettings
             )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackgroundInteraction(.disabled)
-            .presentationContentInteraction(.scrolls)
-            .presentationCornerRadius(32)
-            .presentationBackground(Palette.sheetBackground)
         }
     }
 
-    private func openManualFromInstrument() {
-        presentedSheet = nil
-        manualReturnsToInstrument = true
+    private func presentPage(_ destination: AppPageDestination) {
+        guard stage == .sky, presentedPage == nil else { return }
+        skyRenderingSuspended = false
+        withAnimation(utilityPageAnimation) {
+            presentedPage = destination
+        }
+        let delay = utilityPageTransitionDuration
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(delay))
+            guard presentedPage == destination else { return }
+            skyRenderingSuspended = true
+        }
+    }
+
+    private func dismissPage() {
+        guard presentedPage != nil else { return }
+        skyRenderingSuspended = false
+        withAnimation(utilityPageAnimation) {
+            presentedPage = nil
+        }
+    }
+
+    private func openManualFromSettings() {
+        presentedPage = nil
+        skyRenderingSuspended = false
+        manualReturnsToSettings = true
         withAnimation(sceneAnimation) { stage = .manual }
     }
 
-    private func openPrivacyFromInstrument() {
-        presentedSheet = nil
+    private func openPrivacyFromSettings() {
+        presentedPage = nil
+        skyRenderingSuspended = false
         withAnimation(sceneAnimation) { stage = .privacy }
     }
 
-    private func reopenInstrumentAfterFullScreenReturn() {
+    private func reopenSettingsAfterFullScreenReturn() {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(180))
             guard stage == .sky else { return }
-            presentedSheet = .instrument(initialRoute: nil)
+            presentPage(.settings(initialRoute: nil))
+        }
+    }
+
+    private func synchronizeSessionActivity() {
+        guard let session else { return }
+        if stage == .sky, presentedPage == nil, scenePhase == .active {
+            session.start()
+            session.requestObserverAccess()
+        } else {
+            session.stop()
         }
     }
 
@@ -248,8 +290,9 @@ struct RootView: View {
     }
 
     #if DEBUG
-    /// 调试参数：--skipBoot 跳过启动序列；--openFilter / --openInstrument 直接展开 Sheet；
-    /// --openStatus / --openObservations 直接进入仪器 Sheet 的指定路由；
+    /// 调试参数：--skipBoot 跳过启动序列；--openFilter / --openInstrument 直接打开全屏工具页；
+    /// --openStatus / --openObservations 直接进入状态或记录页；
+    /// --seedObservations 为记录页写入一组可滚动的本地调试记录；
     /// --forceManual 强制跳到手册（配合 --manualPage <n>）；
     /// --markManualSeen 强制视为已看过手册，直接进 sky；
     /// --emptySky 把模拟器初始指向移到空域；
@@ -276,17 +319,22 @@ struct RootView: View {
                 stage = .sky
             }
         }
+        if args.contains("--seedObservations") {
+            for object in session.catalog.objects.prefix(32) {
+                session.log.record(objectId: object.id, catalog: session.catalog)
+            }
+        }
         if args.contains("--openInstrument") {
-            presentedSheet = .instrument(initialRoute: nil)
+            presentedPage = .settings(initialRoute: nil)
         } else if args.contains("--openStatus") {
-            presentedSheet = .instrument(initialRoute: .systemStatus)
+            presentedPage = .settings(initialRoute: .systemStatus)
         } else if args.contains("--openObservations") {
-            presentedSheet = .instrument(initialRoute: .observations)
+            presentedPage = .observations
         } else if args.contains("--openFilter") {
-            presentedSheet = .filters
+            presentedPage = .filters
         }
         if args.contains("--openPrivacy") {
-            presentedSheet = nil
+            presentedPage = nil
             stage = .privacy
         }
         if args.contains("--emptySky") {

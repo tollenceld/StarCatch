@@ -37,9 +37,9 @@ enum AppChromeSurfaceMode: Equatable {
     }
 }
 
-/// 系统 Sheet 的内容层。它与天空基底保持同一暖黑色相，但用稳定的明度差和
-/// 顶缘高光明确前后景；Reduce Transparency 下不依赖模糊也能读出边界。
-struct AppSheetChromeBackground: View {
+/// 全屏工具页的内容层。它与天空基底保持同一暖黑色相，但用稳定的明度差和
+/// 顶缘高光建立页面层级；Reduce Transparency 下不依赖模糊也能读出边界。
+struct AppPageChromeBackground: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
@@ -68,25 +68,33 @@ struct AppSheetChromeBackground: View {
     }
 }
 
-/// 筛选和设置根页共用的 Sheet 标题栏。系统抓手负责拖拽，标题栏只承担当前
-/// 页面身份和清晰的文字动作，避免在暗色 Sheet 上再悬浮一枚过重的圆形关闭键。
-struct AppSheetHeader: View {
+/// 筛选、记录与设置全屏页共用的顶部导航。页面标题固定靠右，左侧始终是
+/// 指向上一层的明确返回入口。
+struct AppPageHeader: View {
+    let backTitle: String
     let title: String
-    var leadingTitle: String? = nil
-    var onLeadingAction: (() -> Void)? = nil
-    let trailingTitle: String
-    let onTrailingAction: () -> Void
+    let onBack: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            headerSlot(alignment: .leading) {
-                if let leadingTitle, let onLeadingAction {
-                    Button(leadingTitle, action: onLeadingAction)
-                        .foregroundStyle(Palette.signal.opacity(0.9))
-                        .buttonStyle(.plain)
-                        .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+        HStack(spacing: 12) {
+            Button(action: onBack) {
+                HStack(spacing: ContentTopBarMetrics.itemSpacing) {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.semibold))
+                    Text(backTitle)
+                        .lineLimit(1)
                 }
+                .font(Typography.guide)
+                .tracking(Typography.guideTracking)
+                .foregroundStyle(Palette.signal.opacity(Palette.Level.full))
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(minHeight: ContentTopBarMetrics.controlHeight)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.format("navigation.back", backTitle))
+
+            Spacer(minLength: 12)
 
             Text(title)
                 .font(Typography.guide)
@@ -94,19 +102,12 @@ struct AppSheetHeader: View {
                 .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-                .frame(maxWidth: .infinity)
-
-            headerSlot(alignment: .trailing) {
-                Button(trailingTitle, action: onTrailingAction)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.full))
-                    .buttonStyle(.plain)
-                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
-            }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .layoutPriority(1)
         }
-        .font(Typography.guide)
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .frame(height: 56)
-        .background(Palette.sheetBackground.opacity(0.96))
+        .background(Palette.sheetBackground)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Palette.inkFaint.opacity(Palette.Level.functionalDivider))
@@ -114,13 +115,31 @@ struct AppSheetHeader: View {
         }
         .accessibilityElement(children: .contain)
     }
+}
 
-    private func headerSlot<Content: View>(
-        alignment: Alignment,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        content()
-            .frame(maxWidth: .infinity, alignment: alignment)
+/// 全屏工具页的共同外壳：统一背景、标题栏和左缘返回手势，具体页面只负责正文。
+struct AppPageShell<Content: View>: View {
+    let backTitle: String
+    let title: String
+    let onBack: () -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ZStack {
+            AppPageChromeBackground()
+
+            VStack(spacing: 0) {
+                AppPageHeader(
+                    backTitle: backTitle,
+                    title: title,
+                    onBack: onBack
+                )
+                content()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .appEdgeBackGesture(action: onBack)
     }
 }
 
