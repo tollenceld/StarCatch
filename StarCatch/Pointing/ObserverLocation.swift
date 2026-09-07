@@ -20,11 +20,11 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         var assumed: Bool
     }
 
-    /// 默认坐标：北京。未授权定位时使用。
+    /// 默认坐标：上海。未授权定位时使用。
     static let fallback = Coordinates(
-        latitude: 39.9042,
-        longitude: 116.4074,
-        altitudeMeters: 50,
+        latitude: 31.2304,
+        longitude: 121.4737,
+        altitudeMeters: 4,
         horizontalAccuracyMeters: .infinity,
         measuredAt: .distantPast,
         assumed: true
@@ -64,7 +64,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         } else if manager.authorizationStatus == .denied
                     || manager.authorizationStatus == .restricted {
             // 撤销权限后立即停止沿用上一份真实坐标。界面与轨道引擎会同步回到
-            // 明确标注的北京假定坐标，和应用内隐私说明保持一致。
+            // 明确标注的上海假定坐标，和应用内隐私说明保持一致。
             coordinates = Self.fallback
         }
     }

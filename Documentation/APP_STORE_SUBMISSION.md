@@ -29,7 +29,7 @@
 - 支持 URL：当前临时使用 `https://github.com/tollenceld/StarCatch/issues`。正式提交前应提供包含可联系邮箱的公开支持页，并由账号持有人确认版权主体和适用地区要求的商家联系方式。
 - 新版年龄分级问卷；当前内容预计适合最低年龄档，最终以问卷结果为准。
 - 1–10 张 App Store 截图；优先提供 6.9 英寸 iPhone 规格。
-- App Review 备注：说明真机使用定位与姿态，模拟器使用拖拽；拒绝定位时使用北京假定坐标。
+- App Review 备注：说明真机使用定位与姿态，模拟器使用拖拽；拒绝定位时使用上海假定坐标。
 - Signing Team、分发证书、Provisioning Profile、App Store Connect App Record 和 TestFlight 外部测试。
 - App Store Connect 中的价格与销售范围、税务和银行协议、出口合规问卷。
 - 欧盟数字服务法（DSA）商家身份；如在中国大陆提供，还需由发行主体确认 ICP/当地许可与内容合规。

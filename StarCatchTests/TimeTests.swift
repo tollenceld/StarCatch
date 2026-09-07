@@ -1327,6 +1327,55 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(quarterTurn.y, 1, accuracy: 0.000_001)
     }
 
+    func testDefaultObserverIsShanghai() {
+        XCTAssertEqual(ObserverLocation.fallback.latitude, 31.2304, accuracy: 0.000_001)
+        XCTAssertEqual(ObserverLocation.fallback.longitude, 121.4737, accuracy: 0.000_001)
+        XCTAssertEqual(ObserverLocation.fallback.altitudeMeters, 4, accuracy: 0.000_001)
+        XCTAssertTrue(ObserverLocation.fallback.assumed)
+    }
+
+    func testOverviewPresentationCentersShanghaiMeridianAndKeepsRotationHorizontal() {
+        let latitude = ObserverLocation.fallback.latitude
+        let longitude = ObserverLocation.fallback.longitude
+        let siderealRadians = 1.17
+        let presentation = SkyOverviewView.presentationOrientation(
+            latitude: 0,
+            longitude: longitude,
+            siderealRadians: siderealRadians
+        )
+        let equatorialFocus = SkyOverviewView.sphericalSurfaceDirection(
+            latitude: 0,
+            longitude: longitude,
+            siderealRadians: siderealRadians
+        )
+        let centered = presentation.act(equatorialFocus)
+        XCTAssertEqual(centered.x, 0, accuracy: 0.000_001)
+        XCTAssertEqual(centered.y, 0, accuracy: 0.000_001)
+        XCTAssertEqual(centered.z, 1, accuracy: 0.000_001)
+
+        let polarAxis = presentation.act(SIMD3<Double>(0, 0, 1))
+        XCTAssertEqual(polarAxis.x, 0, accuracy: 0.000_001)
+        XCTAssertEqual(polarAxis.y, 1, accuracy: 0.000_001)
+        XCTAssertEqual(polarAxis.z, 0, accuracy: 0.000_001)
+
+        let observer = SkyOverviewView.sphericalSurfaceDirection(
+            latitude: latitude,
+            longitude: longitude,
+            siderealRadians: siderealRadians
+        )
+        let initial = presentation.act(observer)
+        XCTAssertEqual(initial.x, 0, accuracy: 0.000_001)
+        XCTAssertGreaterThan(initial.y, 0)
+
+        let oneDegree = simd_quatd(
+            angle: .pi / 180,
+            axis: SIMD3<Double>(0, 0, 1)
+        )
+        let advanced = (presentation * oneDegree).act(observer)
+        XCTAssertGreaterThan(advanced.x, 0)
+        XCTAssertEqual(advanced.y, initial.y, accuracy: 0.000_001)
+    }
+
     func testOffsetLabelFormat() {
         let clock = SkyClock()
         clock.scrub(by: 2 * 3600 + 14 * 60 + 36)
@@ -1446,7 +1495,7 @@ final class TimeTests: XCTestCase {
     func testGeoIsStationary() {
         let store = Self.store
         let predictor = PassPredictor(store: store)
-        // Himawari-9 从北京看常驻天空
+        // Himawari-9 从上海看常驻天空
         let p = predictor.nextPass(
             for: "himawari9",
             observer: ObserverLocation.fallback,

@@ -217,10 +217,11 @@ struct SkyOverviewView: View {
 
     /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
     /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
-    @State private var orientation = Self.defaultOrientation
-    @State private var settledOrientation = Self.defaultOrientation
-    @State private var orbitGestureStartOrientation = Self.defaultOrientation
-    @State private var rotationGestureStartOrientation = Self.defaultOrientation
+    @State private var orientation = Self.identityOrientation
+    @State private var settledOrientation = Self.identityOrientation
+    @State private var orbitGestureStartOrientation = Self.identityOrientation
+    @State private var rotationGestureStartOrientation = Self.identityOrientation
+    @State private var hasEstablishedDefaultOrientation = false
     @State private var zoom = ObservationScale.defaultOverviewZoom
     @State private var settledZoom = ObservationScale.defaultOverviewZoom
     @State private var scaleGestureActive = false
@@ -266,10 +267,29 @@ struct SkyOverviewView: View {
         transitionVisuals.surfaceDetailPresence
     }
 
+    /// 默认镜头把观察者经度置于中央经线，并让赤道和纬线保持屏幕水平。默认
+    /// 观察者为上海；获得真实定位后，复位会改为对准真实位置所在经度。
+    private var defaultPresentationOrientation: simd_quatd {
+        let coordinates = session.observer.coordinates
+        let siderealRadians = zeroMeanSiderealTime(
+            julianDate: observation.julianDate
+        ) * .pi / 180
+        return Self.presentationOrientation(
+            latitude: 0,
+            longitude: coordinates.longitude,
+            siderealRadians: siderealRadians
+        )
+    }
+
+    private var establishedOrientation: simd_quatd {
+        hasEstablishedDefaultOrientation ? orientation : defaultPresentationOrientation
+    }
+
     /// 转场初段仍会对设备姿态产生很轻的响应；接近全局尺度后固定到进入时的
     /// 观察方向，并把控制权完整交给触摸旋转。
     private var manuallyControlledOrientation: simd_quatd {
-        guard let entryPointing else { return orientation }
+        let baseOrientation = establishedOrientation
+        guard let entryPointing else { return baseOrientation }
         let azimuthDelta = Self.shortestAngle(
             from: entryPointing.azimuth,
             to: session.pointing.azimuth
@@ -281,7 +301,7 @@ struct SkyOverviewView: View {
             pitch: elevationDelta * 0.28 * handoff,
             roll: 0
         )
-        return simd_normalize(pointingAdjustment * orientation)
+        return simd_normalize(pointingAdjustment * baseOrientation)
     }
 
     /// 展示相位沿地球局部极轴组合到统一空间四元数。大陆、经纬网、观察者和
@@ -458,6 +478,7 @@ struct SkyOverviewView: View {
             .onAppear {
                 coastlineStore.prepare()
                 brightStarStore.prepare()
+                establishDefaultOrientationIfNeeded()
                 showcaseRotation.reset(
                     at: ProcessInfo.processInfo.systemUptime,
                     motionEnabled: transitionMotionEnabled
@@ -663,6 +684,16 @@ struct SkyOverviewView: View {
             }
     }
 
+    private func establishDefaultOrientationIfNeeded() {
+        guard !hasEstablishedDefaultOrientation else { return }
+        let defaultOrientation = defaultPresentationOrientation
+        orientation = defaultOrientation
+        settledOrientation = defaultOrientation
+        orbitGestureStartOrientation = defaultOrientation
+        rotationGestureStartOrientation = defaultOrientation
+        hasEstablishedDefaultOrientation = true
+    }
+
     private func resetView() {
         guard interactive else { return }
         cancelSpatialInertia()
@@ -670,8 +701,10 @@ struct SkyOverviewView: View {
             at: ProcessInfo.processInfo.systemUptime,
             motionEnabled: false
         )
-        let startingOrientation = orientation
-        settledOrientation = Self.defaultOrientation
+        let startingOrientation = establishedOrientation
+        let targetOrientation = defaultPresentationOrientation
+        hasEstablishedDefaultOrientation = true
+        settledOrientation = targetOrientation
         settledZoom = ObservationScale.defaultOverviewZoom
         beginRenderInteraction()
         withAnimation(Motion.fieldReset) {
@@ -700,14 +733,14 @@ struct SkyOverviewView: View {
                 let eased = linear * linear * (3 - 2 * linear)
                 orientation = simd_slerp(
                     startingOrientation,
-                    Self.defaultOrientation,
+                    targetOrientation,
                     eased
                 )
                 if linear >= 1 { break }
                 try? await Task.sleep(for: .seconds(SpatialMotion.frameInterval))
             }
             guard event == spatialMotionEvent else { return }
-            orientation = Self.defaultOrientation
+            orientation = targetOrientation
             settledOrientation = orientation
             spatialInertiaActive = false
             recoverRenderDetails(after: 0.08)
@@ -939,11 +972,37 @@ struct SkyOverviewView: View {
         emphasizeObserverLabel()
     }
 
-    nonisolated private static let defaultOrientation = orientation(
-        yaw: -0.42,
-        pitch: 0.28,
-        roll: 0
+    nonisolated private static let identityOrientation = simd_quatd(
+        angle: 0,
+        axis: SIMD3(0, 0, 1)
     )
+
+    /// 标准地球仪镜头：目标经纬度朝向观察者，当地东向映射为屏幕右侧，北向
+    /// 映射为屏幕上方。全球页传入零纬度，使地轴完全位于屏幕竖直方向；绕极轴
+    /// 旋转因此只会沿水平纬线展开，不会产生俯视转盘式的屏幕平面旋转。
+    nonisolated static func presentationOrientation(
+        latitude: Double,
+        longitude: Double,
+        siderealRadians: Double
+    ) -> simd_quatd {
+        let latitudeRadians = latitude * .pi / 180
+        let longitudeRadians = longitude * .pi / 180 + siderealRadians
+        let longitudeAlignment = simd_quatd(
+            angle: -longitudeRadians,
+            axis: SIMD3(0, 0, 1)
+        )
+        let latitudeAlignment = simd_quatd(
+            angle: latitudeRadians - .pi / 2,
+            axis: SIMD3(0, 1, 0)
+        )
+        let horizonAlignment = simd_quatd(
+            angle: -.pi / 2,
+            axis: SIMD3(0, 0, 1)
+        )
+        return simd_normalize(
+            horizonAlignment * latitudeAlignment * longitudeAlignment
+        )
+    }
 
     /// 与旧投影次序一致：先经度、再俯仰、最后沿屏幕视轴滚转。
     nonisolated static func orientation(
@@ -2269,43 +2328,14 @@ struct SkyOverviewView: View {
         presence: Double
     ) {
         guard presence > 0.01,
-              let up = observerSurfaceDirection()
+              let centerProjection = observerProjection(geometry: geometry),
+              let ring = observerVisibilityRing(
+                  geometry: geometry,
+                  sampleCount: simplified ? 28 : 56,
+                  angularRadiusDegrees: 28
+              )
         else { return }
-        let centerProjection = Self.projectDirection(
-            up,
-            displayRadius: Self.earthDisplayRadius,
-            center: geometry.center,
-            radius: geometry.radius,
-            orientation: geometry.orientation,
-            zoom: zoom
-        )
         guard centerProjection.depth > -0.02 else { return }
-
-        var tangent = simd_cross(SIMD3<Double>(0, 0, 1), up)
-        if simd_length(tangent) < 1e-6 {
-            tangent = SIMD3(1, 0, 0)
-        } else {
-            tangent = simd_normalize(tangent)
-        }
-        let bitangent = simd_normalize(simd_cross(up, tangent))
-        let angularRadius = 28.0 * Double.pi / 180
-        let sampleCount = simplified ? 28 : 56
-        let ring = (0 ... sampleCount).map { index in
-            let angle = Double(index) / Double(sampleCount) * 2 * Double.pi
-            let surfaceDirection = up * cos(angularRadius)
-                + (
-                    tangent * cos(angle)
-                        + bitangent * sin(angle)
-                ) * sin(angularRadius)
-            return Self.projectDirection(
-                surfaceDirection,
-                displayRadius: Self.earthDisplayRadius,
-                center: geometry.center,
-                radius: geometry.radius,
-                orientation: geometry.orientation,
-                zoom: zoom
-            )
-        }
 
         if ring.allSatisfy({ $0.depth >= 0 }) {
             var fillPath = Path()
@@ -2337,15 +2367,14 @@ struct SkyOverviewView: View {
             projected: ring,
             front: true,
             color: Palette.signal.opacity(
-                (simplified ? 0.2 : 0.36) * presence
+                (simplified ? 0.17 : 0.28) * presence
             ),
             style: StrokeStyle(
-                lineWidth: simplified ? 0.52 : 0.68,
+                lineWidth: simplified ? 0.42 : 0.54,
                 lineCap: .round,
-                dash: [1.4, 2.6]
+                dash: [1.1, 2.8]
             )
         )
-
     }
 
     /// 可见范围的面填充留在地球表面，轮廓则在卫星层之上再描一次。
@@ -2358,7 +2387,8 @@ struct SkyOverviewView: View {
         guard surfaceDetailPresence > 0.01,
               let ring = observerVisibilityRing(
                   geometry: geometry,
-                  sampleCount: simplified ? 32 : 64
+                  sampleCount: simplified ? 32 : 64,
+                  angularRadiusDegrees: 28
               )
         else { return }
 
@@ -2368,7 +2398,7 @@ struct SkyOverviewView: View {
             front: true,
             color: Palette.voidBlack.opacity(0.82 * surfaceDetailPresence),
             style: StrokeStyle(
-                lineWidth: simplified ? 1.9 : 2.15,
+                lineWidth: simplified ? 1.18 : 1.38,
                 lineCap: .round
             )
         )
@@ -2377,14 +2407,68 @@ struct SkyOverviewView: View {
             projected: ring,
             front: true,
             color: Palette.signal.opacity(
-                (simplified ? 0.56 : 0.66) * surfaceDetailPresence
+                (simplified ? 0.5 : 0.62) * surfaceDetailPresence
             ),
             style: StrokeStyle(
-                lineWidth: simplified ? 0.7 : 0.84,
+                lineWidth: simplified ? 0.56 : 0.66,
                 lineCap: .round,
-                dash: [1.8, 3.1]
+                dash: [1.1, 2.8]
             )
         )
+
+        if !simplified,
+           let innerRing = observerVisibilityRing(
+               geometry: geometry,
+               sampleCount: 64,
+               angularRadiusDegrees: 25.5
+           ) {
+            strokeSegments(
+                context,
+                projected: innerRing,
+                front: true,
+                color: Palette.observationTint.opacity(
+                    0.2 * surfaceDetailPresence
+                ),
+                style: StrokeStyle(
+                    lineWidth: 0.34,
+                    lineCap: .round,
+                    dash: [0.7, 3.6]
+                )
+            )
+
+            var calibrationTicks = Path()
+            let uniqueCount = max(0, ring.count - 1)
+            let tickStride = max(1, uniqueCount / 12)
+            if uniqueCount >= 3 {
+                for index in stride(from: 0, to: uniqueCount, by: tickStride) {
+                    let sample = ring[index]
+                    guard sample.depth >= 0 else { continue }
+                    let previous = ring[(index - 1 + uniqueCount) % uniqueCount].point
+                    let next = ring[(index + 1) % uniqueCount].point
+                    let dx = next.x - previous.x
+                    let dy = next.y - previous.y
+                    let length = max(0.001, hypot(dx, dy))
+                    let normalX = -dy / length
+                    let normalY = dx / length
+                    let halfLength: CGFloat = 1.7
+                    calibrationTicks.move(to: CGPoint(
+                        x: sample.point.x - normalX * halfLength,
+                        y: sample.point.y - normalY * halfLength
+                    ))
+                    calibrationTicks.addLine(to: CGPoint(
+                        x: sample.point.x + normalX * halfLength,
+                        y: sample.point.y + normalY * halfLength
+                    ))
+                }
+            }
+            context.stroke(
+                calibrationTicks,
+                with: .color(
+                    Palette.inkHigh.opacity(0.36 * surfaceDetailPresence)
+                ),
+                style: StrokeStyle(lineWidth: 0.46, lineCap: .round)
+            )
+        }
 
         let labelPresence = transitionVisuals.chromePresence
         guard !simplified,
@@ -2421,7 +2505,8 @@ struct SkyOverviewView: View {
 
     private func observerVisibilityRing(
         geometry: GlobeGeometry,
-        sampleCount: Int
+        sampleCount: Int,
+        angularRadiusDegrees: Double
     ) -> [Projected3D]? {
         guard let up = observerSurfaceDirection() else { return nil }
         var tangent = simd_cross(SIMD3<Double>(0, 0, 1), up)
@@ -2431,7 +2516,7 @@ struct SkyOverviewView: View {
             tangent = simd_normalize(tangent)
         }
         let bitangent = simd_normalize(simd_cross(up, tangent))
-        let angularRadius = 28.0 * Double.pi / 180
+        let angularRadius = angularRadiusDegrees * Double.pi / 180
         return (0 ... sampleCount).map { index in
             let angle = Double(index) / Double(sampleCount) * 2 * Double.pi
             let surfaceDirection = up * cos(angularRadius)
@@ -2447,7 +2532,7 @@ struct SkyOverviewView: View {
         }
     }
 
-    /// 观察者标记在真实地表位置：断续定位环、菱形核心和外向刻度组成仪器符号，
+    /// 观察者标记在真实地表位置：呼吸定位环、坐标核心和外向刻度组成仪器符号，
     /// 静止时显示“当前位置”，交互时弱化以优先保证球体旋转的连续性。
     private func drawObserver(
         _ context: GraphicsContext,
@@ -2460,19 +2545,27 @@ struct SkyOverviewView: View {
         let point = projected.point
         let alpha = (simplified ? 0.9 : 1.0) * surfaceDetailPresence
         guard alpha > 0.01 else { return }
-        let pulse = simplified
-            ? 1
-            : 1 + CGFloat(sin(motionTime * 1.25)) * 0.055
-        let ringRadius: CGFloat = 9.2 * pulse
+        let motionEnabled = transitionMotionEnabled && !simplified
+        let breath = motionEnabled
+            ? CGFloat((sin(motionTime * 2.15) + 1) * 0.5)
+            : 0
+        let pulseProgress = motionEnabled
+            ? CGFloat(motionTime.truncatingRemainder(dividingBy: 2.8) / 2.8)
+            : 0.38
+        let ringRadius: CGFloat = 5.8 + breath * 0.65
+        let pulseRadius: CGFloat = 8.2 + pulseProgress * 5.6
+        let pulseOpacity = motionEnabled
+            ? Double((1 - pulseProgress) * (1 - pulseProgress)) * 0.42
+            : 0.14
 
         // 地表定位符始终位于点云之上；先清出一枚低调暗盘，保证它不会被卫星
         // 光核切碎，同时仍能看到下面的大陆和视域轮廓关系。
         context.fill(
             Path(ellipseIn: CGRect(
-                x: point.x - 11,
-                y: point.y - 11,
-                width: 22,
-                height: 22
+                x: point.x - 9,
+                y: point.y - 9,
+                width: 18,
+                height: 18
             )),
             with: .color(Palette.voidBlack.opacity(0.78 * alpha))
         )
@@ -2482,15 +2575,25 @@ struct SkyOverviewView: View {
                 glow.addFilter(.blur(radius: 4))
                 glow.fill(
                     Path(ellipseIn: CGRect(
-                        x: point.x - 10,
-                        y: point.y - 10,
-                        width: 20,
-                        height: 20
+                        x: point.x - 7,
+                        y: point.y - 7,
+                        width: 14,
+                        height: 14
                     )),
-                    with: .color(Palette.signal.opacity(0.18 * alpha))
+                    with: .color(Palette.signal.opacity(0.22 * alpha))
                 )
             }
         }
+        context.stroke(
+            Path(ellipseIn: CGRect(
+                x: point.x - pulseRadius,
+                y: point.y - pulseRadius,
+                width: pulseRadius * 2,
+                height: pulseRadius * 2
+            )),
+            with: .color(Palette.signal.opacity(pulseOpacity * alpha)),
+            style: StrokeStyle(lineWidth: 0.58, lineCap: .round)
+        )
         context.stroke(
             Path(ellipseIn: CGRect(
                 x: point.x - ringRadius,
@@ -2498,24 +2601,46 @@ struct SkyOverviewView: View {
                 width: ringRadius * 2,
                 height: ringRadius * 2
             )),
-            with: .color(Palette.signal.opacity(0.82 * alpha)),
+            with: .color(Palette.signal.opacity(0.76 * alpha)),
             style: StrokeStyle(
-                lineWidth: 0.78,
-                dash: [1.8, 2.3],
-                dashPhase: CGFloat(motionTime * 1.6)
+                lineWidth: 0.68,
+                lineCap: .round
             )
         )
-        var diamond = Path()
-        diamond.move(to: CGPoint(x: point.x, y: point.y - 4.2))
-        diamond.addLine(to: CGPoint(x: point.x + 4.2, y: point.y))
-        diamond.addLine(to: CGPoint(x: point.x, y: point.y + 4.2))
-        diamond.addLine(to: CGPoint(x: point.x - 4.2, y: point.y))
-        diamond.closeSubpath()
-        context.fill(diamond, with: .color(Palette.signal.opacity(0.34 * alpha)))
+
+        var coordinateTicks = Path()
+        let tickInner: CGFloat = 7.6
+        let tickOuter: CGFloat = 10
+        coordinateTicks.move(to: CGPoint(x: point.x, y: point.y - tickOuter))
+        coordinateTicks.addLine(to: CGPoint(x: point.x, y: point.y - tickInner))
+        coordinateTicks.move(to: CGPoint(x: point.x + tickInner, y: point.y))
+        coordinateTicks.addLine(to: CGPoint(x: point.x + tickOuter, y: point.y))
+        coordinateTicks.move(to: CGPoint(x: point.x, y: point.y + tickInner))
+        coordinateTicks.addLine(to: CGPoint(x: point.x, y: point.y + tickOuter))
+        coordinateTicks.move(to: CGPoint(x: point.x - tickInner, y: point.y))
+        coordinateTicks.addLine(to: CGPoint(x: point.x - tickOuter, y: point.y))
         context.stroke(
-            diamond,
-            with: .color(Palette.inkHigh.opacity(0.98 * alpha)),
-            style: StrokeStyle(lineWidth: 0.9)
+            coordinateTicks,
+            with: .color(Palette.inkHigh.opacity(0.72 * alpha)),
+            style: StrokeStyle(lineWidth: 0.62, lineCap: .round)
+        )
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: point.x - 2.25,
+                y: point.y - 2.25,
+                width: 4.5,
+                height: 4.5
+            )),
+            with: .color(Palette.signal.opacity(0.92 * alpha))
+        )
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: point.x - 0.82,
+                y: point.y - 0.82,
+                width: 1.64,
+                height: 1.64
+            )),
+            with: .color(Palette.inkHigh.opacity(0.98 * alpha))
         )
         let labelPresence = transitionVisuals.chromePresence
         guard observerLabelEmphasized, labelPresence > 0.01 else { return }
