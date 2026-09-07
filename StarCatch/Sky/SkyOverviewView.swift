@@ -2,6 +2,56 @@ import SatelliteKit
 import SwiftUI
 import simd
 
+/// 空闲展示旋转的纯值时基。它只保存相位和锚点，SwiftUI 的 30fps 时间线负责取样；
+/// 暂停与恢复不会改写用户手动姿态，因此交互前后角度连续。
+struct OverviewShowcaseRotation: Equatable {
+    nonisolated static let revolutionDuration: TimeInterval = 180
+    nonisolated static let resumeDelay: TimeInterval = 2
+
+    private(set) var phase: Double = 0
+    private(set) var anchorTime: TimeInterval = 0
+    private(set) var isPaused = true
+
+    nonisolated mutating func reset(
+        at time: TimeInterval,
+        motionEnabled: Bool
+    ) {
+        phase = 0
+        anchorTime = time
+        isPaused = !motionEnabled
+    }
+
+    nonisolated mutating func pause(at time: TimeInterval) {
+        guard !isPaused else { return }
+        phase = angle(at: time, motionEnabled: true)
+        anchorTime = time
+        isPaused = true
+    }
+
+    nonisolated mutating func resume(
+        at time: TimeInterval,
+        motionEnabled: Bool
+    ) {
+        guard motionEnabled else {
+            pause(at: time)
+            return
+        }
+        guard isPaused else { return }
+        anchorTime = time
+        isPaused = false
+    }
+
+    nonisolated func angle(
+        at time: TimeInterval,
+        motionEnabled: Bool
+    ) -> Double {
+        guard motionEnabled, !isPaused else { return phase }
+        let elapsed = max(0, time - anchorTime)
+        let angle = phase + elapsed * 2 * .pi / Self.revolutionDuration
+        return angle.truncatingRemainder(dividingBy: 2 * .pi)
+    }
+}
+
 /// 沉浸式三维地球与轨道场。所有点位来自与主视野相同的 ECI 传播帧；
 /// 地球、观察者、地表可见区域和轨道目标共享同一套旋转与缩放。
 struct SkyOverviewView: View {
@@ -158,8 +208,6 @@ struct SkyOverviewView: View {
     let ambientTrails: TrailStore
     let ambientTrailsVisible: Bool
     let focusedObjectId: String?
-    @Binding var scaleModified: Bool
-    let resetRequest: Int
     let transitionProgress: Double
     let entryPointing: Pointing?
     let celestialFrame: CelestialViewFrame?
@@ -173,8 +221,8 @@ struct SkyOverviewView: View {
     @State private var settledOrientation = Self.defaultOrientation
     @State private var orbitGestureStartOrientation = Self.defaultOrientation
     @State private var rotationGestureStartOrientation = Self.defaultOrientation
-    @State private var zoom: CGFloat = 1
-    @State private var settledZoom: CGFloat = 1
+    @State private var zoom = ObservationScale.defaultOverviewZoom
+    @State private var settledZoom = ObservationScale.defaultOverviewZoom
     @State private var scaleGestureActive = false
     @State private var orbitGestureActive = false
     @State private var rotationGestureActive = false
@@ -189,6 +237,8 @@ struct SkyOverviewView: View {
     @State private var observerLabelEvent = 0
     @State private var transientGestureHintVisible = true
     @State private var projectedBrightStars: [ProjectedBrightStar] = []
+    @State private var showcaseRotation = OverviewShowcaseRotation()
+    @State private var showcaseResumeEvent = 0
     @AppStorage("overviewGestureHintsSeen") private var gestureHintsSeen = false
 
     private struct RenderSample {
@@ -218,7 +268,7 @@ struct SkyOverviewView: View {
 
     /// 转场初段仍会对设备姿态产生很轻的响应；接近全局尺度后固定到进入时的
     /// 观察方向，并把控制权完整交给触摸旋转。
-    private var renderedOrientation: simd_quatd {
+    private var manuallyControlledOrientation: simd_quatd {
         guard let entryPointing else { return orientation }
         let azimuthDelta = Self.shortestAngle(
             from: entryPointing.azimuth,
@@ -232,6 +282,19 @@ struct SkyOverviewView: View {
             roll: 0
         )
         return simd_normalize(pointingAdjustment * orientation)
+    }
+
+    /// 展示相位沿地球局部极轴组合到统一空间四元数。大陆、经纬网、观察者和
+    /// 全部轨道对象因此同步转动；背景恒星不经过这个姿态，保持惯性静止。
+    private func renderedOrientation(at time: TimeInterval) -> simd_quatd {
+        let showcase = simd_quatd(
+            angle: showcaseRotation.angle(
+                at: time,
+                motionEnabled: transitionMotionEnabled
+            ),
+            axis: SIMD3(0, 0, 1)
+        )
+        return simd_normalize(manuallyControlledOrientation * showcase)
     }
 
     private var renderingSimplified: Bool {
@@ -255,7 +318,10 @@ struct SkyOverviewView: View {
                 )
 
                 let baseGeometry = Self.globeGeometry(in: size)
-                let geometry = renderedGeometry(in: size)
+                let geometry = renderedGeometry(
+                    in: size,
+                    at: ProcessInfo.processInfo.systemUptime
+                )
                 context.drawLayer { starField in
                     starField.opacity = transitionVisuals.orbitalPresence
                     drawBrightStarField(starField)
@@ -279,7 +345,7 @@ struct SkyOverviewView: View {
                         orbitalPosition: ephemeris.orbitalPosition,
                         center: geometry.center,
                         radius: geometry.radius,
-                        orientation: renderedOrientation,
+                        orientation: geometry.orientation,
                         zoom: zoom
                     ) else { return }
                     samples.append(RenderSample(
@@ -392,6 +458,11 @@ struct SkyOverviewView: View {
             .onAppear {
                 coastlineStore.prepare()
                 brightStarStore.prepare()
+                showcaseRotation.reset(
+                    at: ProcessInfo.processInfo.systemUptime,
+                    motionEnabled: transitionMotionEnabled
+                        && !clock.isTimeInteractionActive
+                )
                 #if DEBUG
                 let arguments = ProcessInfo.processInfo.arguments
                 if arguments.contains("--previewOverviewMaxZoom") {
@@ -407,7 +478,6 @@ struct SkyOverviewView: View {
                     renderDetailsSettled = false
                 }
                 #endif
-                scaleModified = abs(zoom - 1) > 0.015
             }
             .task(id: celestialProjectionKey(size: proxy.size)) {
                 await updateBrightStarProjection(size: proxy.size)
@@ -427,10 +497,23 @@ struct SkyOverviewView: View {
                     transientGestureHintVisible = false
                 }
             }
-            .onChange(of: resetRequest) { _, _ in resetView() }
+            .onChange(of: clock.isTimeInteractionActive) { _, active in
+                if active {
+                    pauseShowcaseRotation()
+                } else {
+                    scheduleShowcaseRotationResume()
+                }
+            }
+            .onChange(of: transitionMotionEnabled) { _, enabled in
+                if enabled {
+                    scheduleShowcaseRotationResume()
+                } else {
+                    pauseShowcaseRotation()
+                }
+            }
             .onDisappear {
+                showcaseResumeEvent &+= 1
                 cancelSpatialInertia()
-                scaleModified = false
                 onInteractionStateChanged(false)
             }
         }
@@ -451,6 +534,7 @@ struct SkyOverviewView: View {
                 else { return }
                 if !orbitGestureActive {
                     cancelSpatialInertia()
+                    pauseShowcaseRotation()
                     orbitGestureActive = true
                     orbitGestureStartOrientation = orientation
                     beginRenderInteraction()
@@ -501,6 +585,7 @@ struct SkyOverviewView: View {
                 guard interactive else { return }
                 if !rotationGestureActive {
                     cancelSpatialInertia()
+                    pauseShowcaseRotation()
                     orbitGestureActive = false
                     rotationGestureActive = true
                     rotationGestureStartOrientation = orientation
@@ -534,6 +619,7 @@ struct SkyOverviewView: View {
                 guard interactive else { return }
                 if !scaleGestureActive {
                     cancelSpatialInertia()
+                    pauseShowcaseRotation()
                     orbitGestureActive = false
                     beginRenderInteraction()
                     cancelObserverLabelEmphasis()
@@ -563,7 +649,6 @@ struct SkyOverviewView: View {
                     ObservationScale.maximumOverviewZoom,
                     max(ObservationScale.minimumOverviewZoom, rawZoom)
                 )
-                scaleModified = abs(zoom - 1) > 0.015
             }
             .onEnded { _ in
                 guard interactive else { return }
@@ -581,10 +666,13 @@ struct SkyOverviewView: View {
     private func resetView() {
         guard interactive else { return }
         cancelSpatialInertia()
+        showcaseRotation.reset(
+            at: ProcessInfo.processInfo.systemUptime,
+            motionEnabled: false
+        )
         let startingOrientation = orientation
         settledOrientation = Self.defaultOrientation
-        settledZoom = 1
-        scaleModified = false
+        settledZoom = ObservationScale.defaultOverviewZoom
         beginRenderInteraction()
         withAnimation(Motion.fieldReset) {
             zoom = settledZoom
@@ -623,6 +711,7 @@ struct SkyOverviewView: View {
             settledOrientation = orientation
             spatialInertiaActive = false
             recoverRenderDetails(after: 0.08)
+            scheduleShowcaseRotationResume()
         }
     }
 
@@ -642,6 +731,7 @@ struct SkyOverviewView: View {
             settledOrientation = orientation
             recoverRenderDetails(after: 0.08)
             emphasizeObserverLabel()
+            scheduleShowcaseRotationResume()
             return
         }
 
@@ -686,6 +776,7 @@ struct SkyOverviewView: View {
             spatialInertiaActive = false
             recoverRenderDetails(after: 0.1)
             emphasizeObserverLabel(after: 0.08)
+            scheduleShowcaseRotationResume()
         }
     }
 
@@ -695,6 +786,7 @@ struct SkyOverviewView: View {
         else {
             settledZoom = zoom
             recoverRenderDetails(after: 0.08)
+            scheduleShowcaseRotationResume()
             return
         }
 
@@ -739,13 +831,13 @@ struct SkyOverviewView: View {
                         zoom * CGFloat(exp(velocity * deltaTime))
                     )
                 )
-                scaleModified = abs(zoom - 1) > 0.015
             }
 
             guard event == spatialMotionEvent else { return }
             settledZoom = zoom
             spatialInertiaActive = false
             recoverRenderDetails(after: 0.1)
+            scheduleShowcaseRotationResume()
         }
     }
 
@@ -754,6 +846,32 @@ struct SkyOverviewView: View {
         spatialInertiaActive = false
         settledOrientation = orientation
         settledZoom = zoom
+    }
+
+    private func pauseShowcaseRotation() {
+        showcaseResumeEvent &+= 1
+        showcaseRotation.pause(at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    private func scheduleShowcaseRotationResume() {
+        showcaseResumeEvent &+= 1
+        let event = showcaseResumeEvent
+        guard transitionMotionEnabled else { return }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(OverviewShowcaseRotation.resumeDelay))
+            guard event == showcaseResumeEvent,
+                  !orbitGestureActive,
+                  !scaleGestureActive,
+                  !rotationGestureActive,
+                  !spatialInertiaActive,
+                  !clock.isTimeInteractionActive,
+                  transitionMotionEnabled
+            else { return }
+            showcaseRotation.resume(
+                at: ProcessInfo.processInfo.systemUptime,
+                motionEnabled: true
+            )
+        }
     }
 
     private func markGestureHintsSeen() {
@@ -936,6 +1054,7 @@ struct SkyOverviewView: View {
     struct GlobeGeometry {
         let center: CGPoint
         let radius: CGFloat
+        let orientation: simd_quatd
 
         var rect: CGRect {
             CGRect(
@@ -961,11 +1080,15 @@ struct SkyOverviewView: View {
         )
         return GlobeGeometry(
             center: CGPoint(x: size.width / 2, y: centerY),
-            radius: radius
+            radius: radius,
+            orientation: simd_quatd(angle: 0, axis: SIMD3(0, 0, 1))
         )
     }
 
-    private func renderedGeometry(in size: CGSize) -> GlobeGeometry {
+    private func renderedGeometry(
+        in size: CGSize,
+        at time: TimeInterval = ProcessInfo.processInfo.systemUptime
+    ) -> GlobeGeometry {
         let base = Self.globeGeometry(in: size)
         let scale = transitionMotionEnabled ? transitionVisuals.globeScale : 1
         let offset = transitionMotionEnabled
@@ -973,7 +1096,8 @@ struct SkyOverviewView: View {
             : 0
         return GlobeGeometry(
             center: CGPoint(x: base.center.x, y: base.center.y + offset),
-            radius: base.radius * scale
+            radius: base.radius * scale,
+            orientation: renderedOrientation(at: time)
         )
     }
 
@@ -1248,7 +1372,7 @@ struct SkyOverviewView: View {
                 displayRadius: displayRadius,
                 center: geometry.center,
                 radius: geometry.radius,
-                orientation: renderedOrientation,
+                orientation: geometry.orientation,
                 zoom: zoom
             )
         }
@@ -1502,7 +1626,7 @@ struct SkyOverviewView: View {
                     orbitalPosition: point.position,
                     center: geometry.center,
                     radius: geometry.radius,
-                    orientation: renderedOrientation,
+                    orientation: geometry.orientation,
                     zoom: zoom
                 ) else { return nil }
                 return (projection, point.at)
@@ -1581,7 +1705,7 @@ struct SkyOverviewView: View {
                 orbitalPosition: point.position,
                 center: geometry.center,
                 radius: geometry.radius,
-                orientation: renderedOrientation,
+                orientation: geometry.orientation,
                 zoom: zoom
             ) else { return nil }
             return (projection, point.at)
@@ -1850,7 +1974,7 @@ struct SkyOverviewView: View {
             angle: siderealRadians,
             axis: SIMD3(0, 0, 1)
         )
-        let surfaceOrientation = simd_normalize(renderedOrientation * earthRotation)
+        let surfaceOrientation = simd_normalize(geometry.orientation * earthRotation)
 
         var coastal = Path()
         var coastalRim = Path()
@@ -1965,7 +2089,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    orientation: renderedOrientation,
+                    orientation: geometry.orientation,
                     zoom: zoom
                 )
             }
@@ -1995,7 +2119,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    orientation: renderedOrientation,
+                    orientation: geometry.orientation,
                     zoom: zoom
                 )
             }
@@ -2042,7 +2166,7 @@ struct SkyOverviewView: View {
                         displayRadius: Self.earthDisplayRadius,
                         center: geometry.center,
                         radius: geometry.radius,
-                        orientation: renderedOrientation,
+                        orientation: geometry.orientation,
                         zoom: zoom
                     )
                 }
@@ -2073,7 +2197,7 @@ struct SkyOverviewView: View {
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
                     radius: geometry.radius,
-                    orientation: renderedOrientation,
+                    orientation: geometry.orientation,
                     zoom: zoom
                 )
             }
@@ -2152,7 +2276,7 @@ struct SkyOverviewView: View {
             displayRadius: Self.earthDisplayRadius,
             center: geometry.center,
             radius: geometry.radius,
-            orientation: renderedOrientation,
+            orientation: geometry.orientation,
             zoom: zoom
         )
         guard centerProjection.depth > -0.02 else { return }
@@ -2178,7 +2302,7 @@ struct SkyOverviewView: View {
                 displayRadius: Self.earthDisplayRadius,
                 center: geometry.center,
                 radius: geometry.radius,
-                orientation: renderedOrientation,
+                orientation: geometry.orientation,
                 zoom: zoom
             )
         }
@@ -2317,7 +2441,7 @@ struct SkyOverviewView: View {
                 displayRadius: Self.earthDisplayRadius,
                 center: geometry.center,
                 radius: geometry.radius,
-                orientation: renderedOrientation,
+                orientation: geometry.orientation,
                 zoom: zoom
             )
         }
@@ -2434,7 +2558,7 @@ struct SkyOverviewView: View {
             displayRadius: Self.earthDisplayRadius,
             center: geometry.center,
             radius: geometry.radius,
-            orientation: renderedOrientation,
+            orientation: geometry.orientation,
             zoom: zoom
         )
     }

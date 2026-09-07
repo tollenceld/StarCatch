@@ -73,8 +73,6 @@ struct SkyView: View {
     @State private var fieldScaleGestureSample: CGFloat = 1
     @State private var fieldScaleGestureSampleDate = Date.distantPast
     @State private var fieldScaleLogarithmicVelocity: Double = 0
-    @State private var overviewScaleModified = false
-    @State private var overviewResetRequest = 0
     @State private var presentedStoryObjectID: String?
     @State private var presentedPassForecast: PassForecast?
     @State private var engagedPreciseEphemeris: Ephemeris?
@@ -123,9 +121,6 @@ struct SkyView: View {
             && !fieldMagnificationActive
             && abs(fieldMagnification - 1) > 0.015
     }
-    private var globalFieldResetAvailable: Bool {
-        overviewScaleModified && !overviewTransitioning
-    }
     private var chromeState: SkyChromeState {
         SkyChromeState(
             presentationMode: presentationMode,
@@ -136,10 +131,7 @@ struct SkyView: View {
             acquisitionProgress: capture.acquisitionProgress,
             replacementProgress: capture.replacementProgress,
             targetSummaryVisible: lockedDetailPresented && retainedDetailObjectID != nil,
-            localFieldResetAvailable: localFieldResetAvailable,
-            globalFieldResetAvailable: globalFieldResetAvailable,
-            isLive: clock.isLive,
-            transientOverlay: transientOverlay
+            localFieldResetAvailable: localFieldResetAvailable
         )
     }
     /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
@@ -288,9 +280,6 @@ struct SkyView: View {
                 overviewEntryPointing = session.pointing
                 overviewCelestialFrame = makeCelestialViewFrame()
                 overviewIdleBeganAt = Date()
-                if arguments.contains("--openTimePanel") {
-                    transientOverlay = .globalTime
-                }
             } else if arguments.contains("--previewWideField") {
                 fieldMagnification = 0.66
                 settledFieldMagnification = fieldMagnification
@@ -433,11 +422,6 @@ struct SkyView: View {
             }
             if newMode == .global {
                 overviewIdleBeganAt = Date()
-                #if DEBUG
-                if ProcessInfo.processInfo.arguments.contains("--openTimePanel") {
-                    transientOverlay = .globalTime
-                }
-                #endif
             } else if newMode != .enteringGlobal {
                 overviewAmbientTrails.clear()
                 overviewIdleBeganAt = nil
@@ -668,26 +652,32 @@ struct SkyView: View {
         }
     }
 
-    // MARK: - 底部观测动作 / 全局时间标尺
+    // MARK: - 底部观测动作 / 全局常驻时间标尺
 
-    /// 主天空与全局星图使用同一个稳定槽位。常驻入口、捕获主动作和时间控制由
-    /// `SkyChromeState` 决定优先级，避免多个独立按钮在状态切换时互相挤压。
+    /// 主天空保留四槽控制；全局轨道页只保留时间轴。转场期间两者沿同一进度
+    /// 交叉淡化，避免把主界面的导航语义带进独立的全球页面。
     private var bottomControlBand: some View {
-        Group {
-            if chromeState.dockMode == .targetSummary,
-                      let id = retainedDetailObjectID,
-                      let object = session.catalog.objectsByID[id] {
-                lockedSummaryCard(object: object, objectID: id)
-                    .opacity(localBottomPresence)
+        ZStack(alignment: .bottom) {
+            if presentationMode.presentsOverview {
+                TimeDial(clock: clock)
+                    .padding(.horizontal, AppChromeMetrics.edgeInset)
+                    .padding(.bottom, 8)
+                    .opacity(overviewPresentationProgress)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else {
-                commandColumn
-                    .opacity(
-                        chromeState.scene == .global
-                            ? overviewPresentationProgress
-                            : localBottomPresence
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            if presentationMode != .global {
+                Group {
+                    if chromeState.dockMode == .targetSummary,
+                       let id = retainedDetailObjectID,
+                       let object = session.catalog.objectsByID[id] {
+                        lockedSummaryCard(object: object, objectID: id)
+                    } else {
+                        localCommandColumn
+                    }
+                }
+                .opacity(localBottomPresence)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .animation(
@@ -725,15 +715,10 @@ struct SkyView: View {
         .padding(.bottom, 8)
     }
 
-    private var commandColumn: some View {
+    private var localCommandColumn: some View {
         VStack(spacing: 10) {
-            if chromeState.showsTimePanel {
-                TimeDial(clock: clock)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            }
-
             if chromeState.resetAction == .localField {
-                FieldOfViewResetControl(action: resetActiveFieldOfView)
+                FieldOfViewResetControl(action: resetLocalFieldOfView)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
 
@@ -741,15 +726,10 @@ struct SkyView: View {
                 state: chromeState,
                 filtersActive: session.activeCatalogFilterCount > 0,
                 globalEntryEmphasized: globalEntryArmed,
-                overviewDisplayedCount: session.overviewObjects.count,
-                overviewCatalogCount: session.visibleObjects.count,
                 onOpenFilters: openFilters,
                 onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
-                onToggleTime: toggleTimePanel,
                 onOpenSettings: openInstrument,
-                onResetGlobal: resetActiveFieldOfView,
-                onReturnToLive: returnToLiveFromCapsule,
                 onPrimaryAction: performPrimaryAction
             )
         }
@@ -801,12 +781,7 @@ struct SkyView: View {
         onOpenArchive()
     }
 
-    private func toggleTimePanel() {
-        ObservationHaptics.shared.selectionChanged()
-        toggleTransientOverlay(.globalTime)
-    }
-
-    private func returnToLiveFromCapsule() {
+    private func returnToLiveFromOverview() {
         guard !clock.isReturningToLive else { return }
         // 只保留这一次回归生成的轨迹，避免与上一次拖动残影混在一起。
         screenTrails.clear()
@@ -816,27 +791,23 @@ struct SkyView: View {
         clock.returnToLive()
     }
 
-    private func resetActiveFieldOfView() {
+    private func resetLocalFieldOfView() {
         ObservationHaptics.shared.lightImpact(intensity: 0.68)
 
-        if overviewCommitted {
-            overviewResetRequest &+= 1
-        } else {
-            fieldMagnificationActive = false
-            settledFieldMagnification = ObservationScale.defaultLocalMagnification
-            globalEntryArmed = false
-            globalEntryGateProgress = 0
-            globalEntryHapticSent = false
-            persistentOverviewProgress = 0
-            overviewEntryPointing = nil
-            overviewCelestialFrame = nil
-            withAnimation(Motion.fieldReset) {
-                fieldMagnification = ObservationScale.defaultLocalMagnification
-            }
+        fieldMagnificationActive = false
+        settledFieldMagnification = ObservationScale.defaultLocalMagnification
+        globalEntryArmed = false
+        globalEntryGateProgress = 0
+        globalEntryHapticSent = false
+        persistentOverviewProgress = 0
+        overviewEntryPointing = nil
+        overviewCelestialFrame = nil
+        withAnimation(Motion.fieldReset) {
+            fieldMagnification = ObservationScale.defaultLocalMagnification
         }
     }
 
-    /// 顶部详情、时间面板和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
+    /// 顶部详情和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
     /// 这一层之上，因此点击内容仍执行自身动作，点击天空空白则只收起当前浮层。
     @ViewBuilder
     private var transientDismissLayer: some View {
@@ -918,7 +889,7 @@ struct SkyView: View {
         globalEntryGateProgress = 0
         globalEntryHapticSent = false
         if !clock.isLive {
-            returnToLiveFromCapsule()
+            returnToLiveFromOverview()
         }
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
         withAnimation(overviewModeAnimation) {
@@ -1021,8 +992,7 @@ struct SkyView: View {
                     height: SkyTopBarMetrics.controlHeight
                 )
 
-                if let panel = transientOverlay,
-                   panel != .globalTime {
+                if let panel = transientOverlay {
                     let panelWidth = min(260, geo.size.width - 36)
                     let sourceCenterX = topPanelCenterX(
                         panel,
@@ -1236,7 +1206,7 @@ struct SkyView: View {
                     L10n.format("sky.value.days", session.tleAgeDays)
                 ),
             ]
-        case .direction, .globalTime:
+        case .direction:
             [
                 (L10n.text("sky.metric.azimuth"), statusAzimuth.replacingOccurrences(of: "AZ ", with: "")),
                 (L10n.text("sky.metric.altitude"), statusElevation.replacingOccurrences(of: "EL ", with: "")),
@@ -1542,8 +1512,6 @@ struct SkyView: View {
                     suppressMotion: suppressMotion
                 ),
                 focusedObjectId: capture.engagedObjectId,
-                scaleModified: $overviewScaleModified,
-                resetRequest: overviewResetRequest,
                 transitionProgress: progress,
                 entryPointing: overviewEntryPointing,
                 celestialFrame: overviewCelestialFrame,

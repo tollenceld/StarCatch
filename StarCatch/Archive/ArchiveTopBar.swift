@@ -14,7 +14,6 @@ enum AppChromeMetrics {
     static let itemSpacing: CGFloat = 10
     static let commandControlSize: CGFloat = 52
     static let commandRailHeight: CGFloat = 64
-    static let globalConsoleHeight: CGFloat = 104
     static let commandRailCornerRadius: CGFloat = 24
     static let mainActionWidth: CGFloat = 168
     static let strokeWidth: CGFloat = 0.55

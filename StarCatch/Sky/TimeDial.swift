@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// 时间坐标仪 —— 仅在全局星图下缘出现的时间观测模块。
+/// 时间坐标仪 —— 全球轨道页下缘常驻的时间观测模块。
 ///
 /// 水平拖动改变观测时刻：向左回溯，向右抵达未来。中央读针固定，刻度与整片天空
-/// 随时间移动。LIVE 下永久保留低强度拖动提示；“返回此刻”由全球控制台的遥测
-/// 行承担，避免在刻度和底栏之间再悬浮一枚孤立胶囊。
+/// 随时间移动。非 LIVE 时中央读数直接成为“回到此刻”入口，避免再叠加独立底栏。
 struct TimeDial: View {
     @ObservedObject var clock: SkyClock
 
@@ -47,14 +46,13 @@ struct TimeDial: View {
                 )
         }
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        // 时间轴位于天空拖拽层之上，优先接收横向手势，避免被“移动准星”吞掉。
-        .highPriorityGesture(dragGesture)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L10n.text("time.accessibility.label"))
         .accessibilityValue(accessibilityValue)
         .accessibilityHint(L10n.text("time.accessibility.hint"))
         .accessibilityAdjustableAction { direction in
             markInteracted()
+            clock.beginScrub()
             switch direction {
             case .increment:
                 clock.scrub(by: Self.accessibilityStep)
@@ -63,6 +61,7 @@ struct TimeDial: View {
             @unknown default:
                 break
             }
+            clock.endScrub(velocitySecondsPerSecond: 0)
         }
         .accessibilityAction(named: L10n.text("time.return_now")) {
             returnToLive()
@@ -76,6 +75,8 @@ struct TimeDial: View {
             readout
             ruler
                 .frame(height: 48)
+                // 刻度区优先接收横向手势；上方状态读数仍保留按钮点击。
+                .highPriorityGesture(dragGesture)
         }
         .padding(.horizontal, 16)
         .padding(.top, 10)
@@ -123,21 +124,35 @@ struct TimeDial: View {
         .frame(minHeight: 20)
     }
 
+    @ViewBuilder
     private var timeStatus: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Palette.signal.opacity(clock.isLive ? 0.76 : 0.46))
-                .frame(width: 4, height: 4)
+        if clock.isLive {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Palette.signal.opacity(0.76))
+                    .frame(width: 4, height: 4)
 
-            Text(clock.isLive ? L10n.text("time.live") : clock.relativeOffsetLabel)
-                .font(Typography.statusTag)
-                .tracking(clock.isLive ? Typography.statusTagTracking : 0.7)
-                .foregroundStyle(
-                    (clock.isLive ? Palette.inkMid : Palette.signal)
-                        .opacity(clock.isLive ? Palette.Level.present : 0.82)
-                )
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
+                Text(L10n.text("time.live"))
+                    .font(Typography.statusTag)
+                    .tracking(Typography.statusTagTracking)
+                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .lineLimit(1)
+            }
+        } else {
+            Button(action: returnToLive) {
+                Label(clock.relativeOffsetLabel, systemImage: "arrow.counterclockwise")
+                    .font(Typography.statusTag)
+                    .tracking(0.7)
+                    .foregroundStyle(Palette.signal.opacity(0.88))
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 12)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(SkyCapsulePressStyle())
+            .padding(.vertical, -12)
+            .accessibilityLabel(L10n.text("time.return_now"))
         }
     }
 
@@ -286,7 +301,7 @@ struct TimeDial: View {
                 if !dragging {
                     dragging = true
                     lastDragX = 0
-                    clock.cancelMomentum()
+                    clock.beginScrub()
                     markInteracted()
                 }
                 // 镜头进度直接跟手，不再等待 offset 触发条件视图替换。

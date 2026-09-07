@@ -20,6 +20,10 @@ final class SkyClock: ObservableObject {
     /// “返回此刻”的连续回归状态。视图用它增强轨迹与按钮反馈，不自行推断 offset。
     @Published private(set) var isReturningToLive = false
 
+    /// 时间轴从手指落下到惯性（或回归动画）结束的完整活动区间。
+    /// 全球地球仪据此暂停自动展示，不需要猜测 CADisplayLink 是否仍在运行。
+    @Published private(set) var isTimeInteractionActive = false
+
     /// 是否与现实同步。判断用小容差 —— 结束回归后严格归零。
     var isLive: Bool { offset == 0 }
 
@@ -58,6 +62,12 @@ final class SkyClock: ObservableObject {
         return startOffset * (1 - p)
     }
 
+    /// 开始一次时间轴操纵；若上一段惯性仍在运行，先从当前偏移接管。
+    func beginScrub() {
+        cancelMomentum()
+        isTimeInteractionActive = true
+    }
+
     /// 拖动中：直接累加偏移（由 TimeDial 换算好秒数传入）。
     func scrub(by deltaSeconds: TimeInterval) {
         cancelMomentum()
@@ -78,9 +88,13 @@ final class SkyClock: ObservableObject {
 
     /// 拖动结束：以标尺速度进入惯性。
     func endScrub(velocitySecondsPerSecond v: Double) {
-        guard abs(v) > 40 else { return } // 太慢不值得惯性
+        guard abs(v) > 40 else {
+            isTimeInteractionActive = false
+            return
+        }
         velocity = v
         isReturningToLive = false
+        isTimeInteractionActive = true
         startTicking()
     }
 
@@ -90,6 +104,7 @@ final class SkyClock: ObservableObject {
         velocity = 0
         guard !isLive else {
             isReturningToLive = false
+            isTimeInteractionActive = false
             stopTicking()
             return
         }
@@ -97,11 +112,12 @@ final class SkyClock: ObservableObject {
         returnElapsed = 0
         activeReturnDuration = Self.returnDuration(forOffset: offset)
         isReturningToLive = true
+        isTimeInteractionActive = true
         startTicking()
     }
 
     /// 立即静止在当前观测时刻（拨动开始前调用）。
-    func cancelMomentum() {
+    private func cancelMomentum() {
         velocity = 0
         if !isReturningToLive {
             stopTicking()
@@ -150,6 +166,7 @@ final class SkyClock: ObservableObject {
             if progress >= 1 {
                 offset = 0
                 isReturningToLive = false
+                isTimeInteractionActive = false
                 stopTicking()
             }
             return
@@ -161,11 +178,13 @@ final class SkyClock: ObservableObject {
             velocity *= exp(-dt / 0.6)
             if abs(velocity) < 20 {
                 velocity = 0
+                isTimeInteractionActive = false
                 stopTicking()
             }
             // 撞到边界即停
             if offset == -Self.maxOffset || offset == Self.maxOffset {
                 velocity = 0
+                isTimeInteractionActive = false
                 stopTicking()
             }
         } else if !isReturningToLive {

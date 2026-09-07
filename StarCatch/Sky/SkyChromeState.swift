@@ -16,7 +16,6 @@ struct SkyChromeState: Equatable {
         case sensing
         case capture(PrimaryAction)
         case targetSummary
-        case global
         case hidden
     }
 
@@ -29,14 +28,11 @@ struct SkyChromeState: Equatable {
 
     enum ResetAction: Equatable {
         case localField
-        case globalField
     }
 
     let scene: Scene
     let dockMode: DockMode
     let resetAction: ResetAction?
-    let showsTimePanel: Bool
-    let isLive: Bool
 
     init(
         presentationMode: SkyPresentationMode,
@@ -47,29 +43,21 @@ struct SkyChromeState: Equatable {
         acquisitionProgress: Double,
         replacementProgress: Double,
         targetSummaryVisible: Bool,
-        localFieldResetAvailable: Bool,
-        globalFieldResetAvailable: Bool,
-        isLive: Bool,
-        transientOverlay: SkyTransientOverlay?
+        localFieldResetAvailable: Bool
     ) {
-        self.isLive = isLive
-
         switch presentationMode {
         case .enteringGlobal, .exitingGlobal:
             scene = .transitioning
             dockMode = .hidden
             resetAction = nil
-            showsTimePanel = false
 
         case .global:
             scene = .global
-            dockMode = .global
-            resetAction = globalFieldResetAvailable ? .globalField : nil
-            showsTimePanel = transientOverlay == .globalTime
+            dockMode = .hidden
+            resetAction = nil
 
         case .local:
             scene = .local
-            showsTimePanel = false
             let resolvedDock = Self.resolveLocalDock(
                 capturePhase: capturePhase,
                 captureConfirmationEnabled: captureConfirmationEnabled,
@@ -127,7 +115,6 @@ struct SkyChromeState: Equatable {
 enum SkyTransientOverlay: String, Identifiable, Equatable {
     case observationStatus
     case direction
-    case globalTime
 
     var id: String { rawValue }
 

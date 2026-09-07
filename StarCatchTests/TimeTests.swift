@@ -384,7 +384,12 @@ final class TimeTests: XCTestCase {
         )
         XCTAssertEqual(ObservationScale.defaultLocalMagnification, 1)
         XCTAssertEqual(ObservationScale.minimumOverviewZoom, 0.72)
+        XCTAssertEqual(ObservationScale.defaultOverviewZoom, 0.82)
         XCTAssertEqual(ObservationScale.maximumOverviewZoom, 2.2)
+        XCTAssertTrue(
+            (ObservationScale.minimumOverviewZoom ... ObservationScale.maximumOverviewZoom)
+                .contains(ObservationScale.defaultOverviewZoom)
+        )
 
         XCTAssertEqual(
             SpatialMotion.projectedScale(
@@ -879,6 +884,47 @@ final class TimeTests: XCTestCase {
         XCTAssertLessThan(back.depth, 0)
     }
 
+    func testOverviewShowcaseRotationUsesThreeMinutePositiveCycle() {
+        var rotation = OverviewShowcaseRotation()
+        rotation.reset(at: 10, motionEnabled: true)
+
+        XCTAssertEqual(
+            rotation.angle(at: 55, motionEnabled: true),
+            .pi / 2,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            rotation.angle(at: 190, motionEnabled: true),
+            0,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(OverviewShowcaseRotation.revolutionDuration, 180)
+        XCTAssertEqual(OverviewShowcaseRotation.resumeDelay, 2)
+    }
+
+    func testOverviewShowcaseRotationPausesContinuouslyAndHonorsReducedMotion() {
+        var rotation = OverviewShowcaseRotation()
+        rotation.reset(at: 10, motionEnabled: true)
+        rotation.pause(at: 55)
+        let pausedAngle = rotation.angle(at: 400, motionEnabled: true)
+        XCTAssertEqual(pausedAngle, .pi / 2, accuracy: 0.000_001)
+
+        rotation.resume(at: 100, motionEnabled: true)
+        XCTAssertEqual(
+            rotation.angle(at: 145, motionEnabled: true),
+            .pi,
+            accuracy: 0.000_001
+        )
+
+        rotation.reset(at: 500, motionEnabled: false)
+        XCTAssertTrue(rotation.isPaused)
+        XCTAssertEqual(
+            rotation.angle(at: 680, motionEnabled: false),
+            0,
+            accuracy: 0.000_001
+        )
+    }
+
     // MARK: - SkyClock
 
     func testClockStartsLive() {
@@ -911,6 +957,18 @@ final class TimeTests: XCTestCase {
         clock.endScrubPresentation()
         XCTAssertFalse(clock.isScrubbing)
         XCTAssertEqual(clock.offset, 3600, accuracy: 0.001, "松手只回退镜头，不丢失选中时刻")
+    }
+
+    func testTimeInteractionCoversDirectScrubUntilRelease() {
+        let clock = SkyClock()
+        clock.beginScrub()
+        XCTAssertTrue(clock.isTimeInteractionActive)
+
+        clock.scrub(by: 600)
+        clock.endScrub(velocitySecondsPerSecond: 0)
+
+        XCTAssertFalse(clock.isTimeInteractionActive)
+        XCTAssertEqual(clock.offset, 600, accuracy: 0.001)
     }
 
     func testReturnToLiveAlsoDismissesOverview() {
@@ -1514,7 +1572,7 @@ final class TimeTests: XCTestCase {
         )
     }
 
-    func testSkyChromeExplorationKeepsThreeControlsAndLocalReset() {
+    func testSkyChromeExplorationKeepsFourControlsAndLocalReset() {
         let chrome = makeChrome(
             localReset: true,
             phase: .exploring
@@ -1523,7 +1581,6 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(chrome.scene, .local)
         XCTAssertEqual(chrome.dockMode, .exploration)
         XCTAssertEqual(chrome.resetAction, .localField)
-        XCTAssertFalse(chrome.showsTimePanel)
     }
 
     func testSkyChromeCapturePriorityHidesExplorationDock() {
@@ -1551,7 +1608,7 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(replacement.dockMode, .capture(.replace(progress: 0.63)))
     }
 
-    func testSkyChromeTargetSummaryAndGlobalTimeTakePriority() {
+    func testSkyChromeTargetSummaryAndGlobalPageHidesCommandDock() {
         let target = makeChrome(
             phase: .locked(objectId: "iss"),
             replacementObjectID: "hst",
@@ -1560,17 +1617,10 @@ final class TimeTests: XCTestCase {
         )
         XCTAssertEqual(target.dockMode, .targetSummary)
 
-        let global = makeChrome(
-            presentation: .global,
-            globalReset: true,
-            isLive: false,
-            overlay: .globalTime
-        )
+        let global = makeChrome(presentation: .global)
         XCTAssertEqual(global.scene, .global)
-        XCTAssertEqual(global.dockMode, .global)
-        XCTAssertEqual(global.resetAction, .globalField)
-        XCTAssertTrue(global.showsTimePanel)
-        XCTAssertFalse(global.isLive)
+        XCTAssertEqual(global.dockMode, .hidden)
+        XCTAssertNil(global.resetAction)
 
         let transition = makeChrome(presentation: .enteringGlobal)
         XCTAssertEqual(transition.scene, .transitioning)
@@ -1583,9 +1633,7 @@ final class TimeTests: XCTestCase {
             SkyCommandConfiguration.resolve(
                 state: localState,
                 filtersActive: true,
-                globalEntryEmphasized: true,
-                displayedCount: 4_595,
-                catalogCount: 16_395
+                globalEntryEmphasized: true
             )
         )
         XCTAssertEqual(
@@ -1593,35 +1641,15 @@ final class TimeTests: XCTestCase {
             [.filters, .observations, .global, .settings]
         )
         XCTAssertEqual(local.activeItems, [.filters, .global])
-        XCTAssertFalse(local.isGlobal)
-        XCTAssertNil(local.displayedCount)
-        XCTAssertNil(local.catalogCount)
 
-        let globalState = makeChrome(
-            presentation: .global,
-            globalReset: true,
-            isLive: false,
-            overlay: .globalTime
-        )
-        let global = try XCTUnwrap(
+        let globalState = makeChrome(presentation: .global)
+        XCTAssertNil(
             SkyCommandConfiguration.resolve(
                 state: globalState,
                 filtersActive: false,
-                globalEntryEmphasized: false,
-                displayedCount: 4_595,
-                catalogCount: 16_395
+                globalEntryEmphasized: false
             )
         )
-        XCTAssertEqual(
-            global.items,
-            [.filters, .observations, .time, .settings]
-        )
-        XCTAssertEqual(global.activeItems, [.time])
-        XCTAssertTrue(global.isGlobal)
-        XCTAssertEqual(global.displayedCount, 4_595)
-        XCTAssertEqual(global.catalogCount, 16_395)
-        XCTAssertTrue(global.showsGlobalReset)
-        XCTAssertTrue(global.showsReturnToLive)
     }
 
     func testSkyCommandConfigurationDefersToCaptureAndTransitionPriority() {
@@ -1634,9 +1662,7 @@ final class TimeTests: XCTestCase {
             SkyCommandConfiguration.resolve(
                 state: captureState,
                 filtersActive: false,
-                globalEntryEmphasized: false,
-                displayedCount: 100,
-                catalogCount: 200
+                globalEntryEmphasized: false
             )
         )
 
@@ -1645,9 +1671,7 @@ final class TimeTests: XCTestCase {
             SkyCommandConfiguration.resolve(
                 state: transitionState,
                 filtersActive: false,
-                globalEntryEmphasized: false,
-                displayedCount: 100,
-                catalogCount: 200
+                globalEntryEmphasized: false
             )
         )
     }
@@ -1770,16 +1794,13 @@ final class TimeTests: XCTestCase {
     private func makeChrome(
         presentation: SkyPresentationMode = .local,
         localReset: Bool = false,
-        globalReset: Bool = false,
         phase: CaptureStateMachine.Phase = .exploring,
         captureConfirmation: Bool = false,
         recognitionReady: Bool = false,
         replacementObjectID: String? = nil,
         acquisitionProgress: Double = 0,
         replacementProgress: Double = 0,
-        targetSummaryVisible: Bool = false,
-        isLive: Bool = true,
-        overlay: SkyTransientOverlay? = nil
+        targetSummaryVisible: Bool = false
     ) -> SkyChromeState {
         SkyChromeState(
             presentationMode: presentation,
@@ -1790,10 +1811,7 @@ final class TimeTests: XCTestCase {
             acquisitionProgress: acquisitionProgress,
             replacementProgress: replacementProgress,
             targetSummaryVisible: targetSummaryVisible,
-            localFieldResetAvailable: localReset,
-            globalFieldResetAvailable: globalReset,
-            isLive: isLive,
-            transientOverlay: overlay
+            localFieldResetAvailable: localReset
         )
     }
 }

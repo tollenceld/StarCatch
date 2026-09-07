@@ -11,6 +11,7 @@ enum ObservationScale {
     static let minimumLocalMagnification: CGFloat = 0.52
     static let maximumLocalMagnification: CGFloat = 4
     static let minimumOverviewZoom: CGFloat = 0.72
+    static let defaultOverviewZoom: CGFloat = 0.82
     static let maximumOverviewZoom: CGFloat = 2.2
 
     /// 局部天空与地球仪之间的唯一视觉时间轴。所有字段都由同一归一化进度
