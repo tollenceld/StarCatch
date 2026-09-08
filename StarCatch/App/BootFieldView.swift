@@ -117,65 +117,14 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     }
 
     var earthAngularVelocityDegrees: Double {
-        guard !reducedMotion else { return 0 }
-        if elapsed <= Self.revealDuration { return 4 }
-        if elapsed <= Self.accelerationEnd {
-            let progress = (elapsed - Self.revealDuration)
-                / (Self.accelerationEnd - Self.revealDuration)
-            return 4 + progress * 24
-        }
-        if elapsed <= Self.minimumPresentationDuration { return 28 }
-        let slowing = min(
-            1,
-            (elapsed - Self.minimumPresentationDuration)
-                / Self.cruiseTransitionDuration
-        )
-        return 28 - slowing * 23
+        reducedMotion ? 0 : 360 / OverviewShowcaseRotation.revolutionDuration
     }
 
-    /// About 53° during the 3.2-second film, followed by a continuous 5°/s cruise.
+    /// 与全局页的空闲展示旋转共享 180 秒一周的克制节奏。点阵大陆让短时间内的
+    /// 细微转动仍然可读，同时慢加载无需在电影结束处变速或重置相位。
     var earthRotationRadians: Double {
         guard !reducedMotion else { return 0.32 }
-        let initial = -0.5
-        let revealTravel = min(elapsed, Self.revealDuration) * 4
-        guard elapsed > Self.revealDuration else {
-            return initial + revealTravel * .pi / 180
-        }
-
-        let accelerationDuration = Self.accelerationEnd - Self.revealDuration
-        let accelerationSlope = 24 / accelerationDuration
-        let accelerationDelta = min(
-            accelerationDuration,
-            elapsed - Self.revealDuration
-        )
-        var degrees = revealTravel
-            + 4 * accelerationDelta
-            + 0.5 * accelerationSlope * accelerationDelta * accelerationDelta
-        guard elapsed > Self.accelerationEnd else {
-            return initial + degrees * .pi / 180
-        }
-
-        let highSpeedDelta = min(
-            Self.minimumPresentationDuration - Self.accelerationEnd,
-            elapsed - Self.accelerationEnd
-        )
-        degrees += highSpeedDelta * 28
-        guard elapsed > Self.minimumPresentationDuration else {
-            return initial + degrees * .pi / 180
-        }
-
-        let slowdownDelta = min(
-            Self.cruiseTransitionDuration,
-            elapsed - Self.minimumPresentationDuration
-        )
-        let slowdownSlope = -23 / Self.cruiseTransitionDuration
-        degrees += 28 * slowdownDelta
-            + 0.5 * slowdownSlope * slowdownDelta * slowdownDelta
-        degrees += max(
-            0,
-            elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
-        ) * 5
-        return initial + degrees * .pi / 180
+        return elapsed * 2 * .pi / OverviewShowcaseRotation.revolutionDuration
     }
 
     var isCruising: Bool {
@@ -247,7 +196,7 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
                 inclination: inclination,
                 ascendingNode: ascendingNode,
                 initialPhase: Double(random.nextUnit()) * 2 * .pi,
-                displayRadius: 0.68 + Double(random.nextUnit()) * 0.27,
+                displayRadius: 0.61 + Double(random.nextUnit()) * 0.27,
                 turnsPerSecond: 0.18 + Double(random.nextUnit()) * 0.14,
                 direction: index.isMultiple(of: 7) ? -1 : 1,
                 tintIndex: index % 4,
@@ -278,23 +227,26 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
     }
 }
 
-/// Lightweight boot-only globe. The 30fps path evaluates a bounded analytic
-/// preset and compiled coordinate constants; it performs no IO or propagation.
+/// Lightweight boot-only orbital scene. The 30fps path evaluates a bounded analytic
+/// preset plus the globe renderer's prepared geography cache; it performs no IO or propagation.
 struct BootOrbitalFieldView: View {
     let timeline: BootOrbitalTimeline
 
+    @ObservedObject private var coastlineStore = EarthCoastlineStore.shared
     private let dust = StarDust()
     private let preset = BootOrbitalScenePreset.standard
+    private let zoom = ObservationScale.defaultOverviewZoom
 
     private struct Geometry {
         let center: CGPoint
         let sceneRadius: CGFloat
-        let earthRadius: CGFloat
     }
 
-    private struct ProjectedPoint {
-        let point: CGPoint
-        let depth: Double
+    private typealias ProjectedPoint = SkyOverviewView.Projected3D
+
+    private struct ProjectedSatellite {
+        let satellite: BootOrbitalScenePreset.Satellite
+        let projected: ProjectedPoint
     }
 
     var body: some View {
@@ -326,12 +278,34 @@ struct BootOrbitalFieldView: View {
                 in: size,
                 scale: timeline.globeScale
             )
-            let viewOrientation = Self.viewOrientation
+            let viewOrientation = Self.viewOrientation(
+                rotation: timeline.earthRotationRadians
+            )
+            let globeGeometry = SkyOverviewView.GlobeGeometry(
+                center: geometry.center,
+                radius: geometry.sceneRadius,
+                orientation: viewOrientation
+            )
+            let satelliteSamples = projectedSatellites(
+                geometry: geometry,
+                orientation: viewOrientation
+            )
+            context.drawLayer { ambient in
+                ambient.opacity = timeline.sceneOpacity
+                SkyOverviewView.drawGlobeAmbient(
+                    ambient,
+                    geometry: globeGeometry,
+                    zoom: zoom,
+                    simplified: false
+                )
+            }
             context.drawLayer { back in
                 back.opacity = timeline.sceneOpacity
                 drawSatellites(
                     back,
+                    samples: satelliteSamples,
                     geometry: geometry,
+                    globeGeometry: globeGeometry,
                     viewOrientation: viewOrientation,
                     front: false
                 )
@@ -340,17 +314,27 @@ struct BootOrbitalFieldView: View {
                 earth.opacity = timeline.sceneOpacity
                 drawEarth(
                     earth,
-                    geometry: geometry,
-                    viewOrientation: viewOrientation
+                    geometry: globeGeometry
                 )
             }
             context.drawLayer { front in
                 front.opacity = timeline.sceneOpacity
                 drawSatellites(
                     front,
+                    samples: satelliteSamples,
                     geometry: geometry,
+                    globeGeometry: globeGeometry,
                     viewOrientation: viewOrientation,
                     front: true
+                )
+            }
+            context.drawLayer { rim in
+                rim.opacity = timeline.sceneOpacity
+                SkyOverviewView.drawGlobeForegroundRim(
+                    rim,
+                    geometry: globeGeometry,
+                    zoom: zoom,
+                    presence: 1
                 )
             }
 
@@ -365,19 +349,22 @@ struct BootOrbitalFieldView: View {
                 .accessibilityHidden(true)
         }
         .accessibilityHidden(true)
+        .onAppear { coastlineStore.prepare() }
     }
 
     private func drawSatellites(
         _ context: GraphicsContext,
+        samples: [ProjectedSatellite],
         geometry: Geometry,
+        globeGeometry: SkyOverviewView.GlobeGeometry,
         viewOrientation: simd_quatd,
         front: Bool
     ) {
         if timeline.trailPresence > 0.01 {
-            for satellite in preset.satellites where satellite.hasTrail {
+            for sample in samples where sample.satellite.hasTrail {
                 drawTrail(
                     context,
-                    satellite: satellite,
+                    satellite: sample.satellite,
                     geometry: geometry,
                     viewOrientation: viewOrientation,
                     front: front
@@ -385,10 +372,41 @@ struct BootOrbitalFieldView: View {
             }
         }
 
-        var ordinary = Path()
-        var cool = Path()
-        var pale = Path()
         var highlighted = Path()
+        for sample in samples {
+            guard sample.satellite.hasTrail,
+                  (sample.projected.depth >= 0) == front
+            else { continue }
+            let radius: CGFloat = front ? 0.96 : 0.52
+            let rect = CGRect(
+                x: sample.projected.point.x - radius,
+                y: sample.projected.point.y - radius,
+                width: radius * 2,
+                height: radius * 2
+            )
+            highlighted.addEllipse(in: rect)
+        }
+
+        SkyOverviewView.drawGlobeSatelliteField(
+            context,
+            projected: samples.lazy.map(\.projected),
+            geometry: globeGeometry,
+            zoom: zoom,
+            front: front,
+            simplified: false
+        )
+        context.fill(
+            highlighted,
+            with: .color(Palette.inkHigh.opacity(front ? 0.92 : 0.18))
+        )
+    }
+
+    private func projectedSatellites(
+        geometry: Geometry,
+        orientation: simd_quatd
+    ) -> [ProjectedSatellite] {
+        var result: [ProjectedSatellite] = []
+        result.reserveCapacity(preset.satellites.count)
         for satellite in preset.satellites {
             let projected = project(
                 preset.position(
@@ -396,44 +414,14 @@ struct BootOrbitalFieldView: View {
                     phaseTime: timeline.satellitePhaseTime
                 ),
                 geometry: geometry,
-                orientation: viewOrientation
+                orientation: orientation
             )
-            guard (projected.depth >= 0) == front else { continue }
-            let radius: CGFloat = satellite.hasTrail ? 0.96 : (front ? 0.43 : 0.32)
-            let rect = CGRect(
-                x: projected.point.x - radius,
-                y: projected.point.y - radius,
-                width: radius * 2,
-                height: radius * 2
-            )
-            if satellite.hasTrail {
-                highlighted.addEllipse(in: rect)
-            } else {
-                switch satellite.tintIndex {
-                case 1: cool.addEllipse(in: rect)
-                case 2: pale.addEllipse(in: rect)
-                default: ordinary.addEllipse(in: rect)
-                }
-            }
+            result.append(ProjectedSatellite(
+                satellite: satellite,
+                projected: projected
+            ))
         }
-
-        let depthOpacity = front ? 1.0 : 0.22
-        context.fill(
-            ordinary,
-            with: .color(Palette.inkHigh.opacity(0.44 * depthOpacity))
-        )
-        context.fill(
-            cool,
-            with: .color(Palette.observationTint.opacity(0.46 * depthOpacity))
-        )
-        context.fill(
-            pale,
-            with: .color(Palette.inkMid.opacity(0.48 * depthOpacity))
-        )
-        context.fill(
-            highlighted,
-            with: .color(Palette.inkHigh.opacity(0.92 * depthOpacity))
-        )
+        return result
     }
 
     private func drawTrail(
@@ -444,7 +432,9 @@ struct BootOrbitalFieldView: View {
         front: Bool
     ) {
         let sampleCount = BootOrbitalScenePreset.trailSampleCount
-        let sampleInterval = 0.012
+        // 与时间拨动的视觉语义一致：轨迹必须能明确说明运动方向，而不是只在
+        // 星核后留下几像素装饰。固定解析采样仍保持 24 × 8 的有界成本。
+        let sampleInterval = 0.028
         let projected = (0 ..< sampleCount).map { index in
             let age = Double(sampleCount - 1 - index) * sampleInterval
             return project(
@@ -475,12 +465,12 @@ struct BootOrbitalFieldView: View {
             let ageProgress = Double(index) / Double(projected.count - 1)
             let opacity = timeline.trailPresence
                 * pow(ageProgress, 1.7)
-                * (front ? 0.52 : 0.1)
+                * (front ? 0.66 : 0.14)
             context.stroke(
                 segment,
                 with: .color(tint.opacity(opacity)),
                 style: StrokeStyle(
-                    lineWidth: front ? 0.72 : 0.46,
+                    lineWidth: front ? 0.78 : 0.48,
                     lineCap: .round
                 )
             )
@@ -489,217 +479,18 @@ struct BootOrbitalFieldView: View {
 
     private func drawEarth(
         _ context: GraphicsContext,
-        geometry: Geometry,
-        viewOrientation: simd_quatd
+        geometry: SkyOverviewView.GlobeGeometry
     ) {
-        let earthRect = CGRect(
-            x: geometry.center.x - geometry.earthRadius,
-            y: geometry.center.y - geometry.earthRadius,
-            width: geometry.earthRadius * 2,
-            height: geometry.earthRadius * 2
-        )
-        let earth = Path(ellipseIn: earthRect)
-
-        // Atmosphere without blur: three restrained shells keep the render path cheap.
-        context.stroke(
-            Path(ellipseIn: earthRect.insetBy(dx: -3, dy: -3)),
-            with: .color(Palette.observationTint.opacity(0.055)),
-            style: StrokeStyle(lineWidth: 3)
-        )
-        context.stroke(
-            Path(ellipseIn: earthRect.insetBy(dx: -1.35, dy: -1.35)),
-            with: .color(Palette.observationTint.opacity(0.16)),
-            style: StrokeStyle(lineWidth: 0.5)
-        )
-
-        context.fill(
-            earth,
-            with: .radialGradient(
-                Gradient(stops: [
-                    .init(color: Palette.observationTint.opacity(0.105), location: 0),
-                    .init(color: Palette.dust.opacity(0.42), location: 0.42),
-                    .init(color: Palette.voidBlack.opacity(0.96), location: 1),
-                ]),
-                center: CGPoint(
-                    x: earthRect.minX + geometry.earthRadius * 0.64,
-                    y: earthRect.minY + geometry.earthRadius * 0.56
-                ),
-                startRadius: 0,
-                endRadius: geometry.earthRadius * 1.4
-            )
-        )
-
-        context.drawLayer { night in
-            night.clip(to: earth)
-            night.fill(
-                earth,
-                with: .linearGradient(
-                    Gradient(stops: [
-                        .init(color: .clear, location: 0.24),
-                        .init(color: Palette.voidBlack.opacity(0.08), location: 0.52),
-                        .init(color: Palette.voidBlack.opacity(0.5), location: 1),
-                    ]),
-                    startPoint: CGPoint(x: earthRect.minX, y: earthRect.minY),
-                    endPoint: CGPoint(x: earthRect.maxX, y: earthRect.maxY)
-                )
-            )
-        }
-
-        let earthOrientation = simd_normalize(
-            viewOrientation
-                * simd_quatd(
-                    angle: timeline.earthRotationRadians,
-                    axis: SIMD3(0, 1, 0)
-                )
-        )
-        drawEarthGrid(
+        SkyOverviewView.drawGlobeSurface(
             context,
             geometry: geometry,
-            orientation: earthOrientation
-        )
-        drawCoastlines(
-            context,
-            geometry: geometry,
-            orientation: earthOrientation
-        )
-
-        context.stroke(
-            earth,
-            with: .color(Palette.inkMid.opacity(0.56)),
-            style: StrokeStyle(lineWidth: 0.8)
-        )
-        var illuminatedLimb = Path()
-        illuminatedLimb.addArc(
-            center: geometry.center,
-            radius: geometry.earthRadius - 0.4,
-            startAngle: .degrees(142),
-            endAngle: .degrees(303),
-            clockwise: false
-        )
-        context.stroke(
-            illuminatedLimb,
-            with: .color(Palette.inkHigh.opacity(0.25)),
-            style: StrokeStyle(lineWidth: 0.72, lineCap: .round)
-        )
-    }
-
-    private func drawEarthGrid(
-        _ context: GraphicsContext,
-        geometry: Geometry,
-        orientation: simd_quatd
-    ) {
-        let sampleStep = Double.pi / 28
-        for latitudeDegrees in stride(from: -60.0, through: 60.0, by: 30.0) {
-            let latitude = latitudeDegrees * .pi / 180
-            let points = stride(
-                from: 0.0,
-                through: Double.pi * 2,
-                by: sampleStep
-            ).map { longitude in
-                projectSurface(
-                    SIMD3(
-                        cos(latitude) * cos(longitude),
-                        cos(latitude) * sin(longitude),
-                        sin(latitude)
-                    ),
-                    geometry: geometry,
-                    orientation: orientation
-                )
-            }
-            strokeSurface(
-                context,
-                points: points,
-                color: Palette.inkLow.opacity(0.1)
-            )
-        }
-        for longitude in stride(from: 0.0, to: Double.pi * 2, by: Double.pi / 6) {
-            let points = stride(
-                from: -Double.pi / 2,
-                through: Double.pi / 2,
-                by: sampleStep
-            ).map { latitude in
-                projectSurface(
-                    SIMD3(
-                        cos(latitude) * cos(longitude),
-                        cos(latitude) * sin(longitude),
-                        sin(latitude)
-                    ),
-                    geometry: geometry,
-                    orientation: orientation
-                )
-            }
-            strokeSurface(
-                context,
-                points: points,
-                color: Palette.inkLow.opacity(0.1)
-            )
-        }
-    }
-
-    private func drawCoastlines(
-        _ context: GraphicsContext,
-        geometry: Geometry,
-        orientation: simd_quatd
-    ) {
-        for coastline in SkyOverviewView.coastlineSamples {
-            let points = stride(
-                from: 0,
-                to: max(0, coastline.count - 1),
-                by: 2
-            ).map { index in
-                let latitude = Double(coastline[index]) * .pi / 180
-                let longitude = Double(coastline[index + 1]) * .pi / 180
-                return projectSurface(
-                    SIMD3(
-                        cos(latitude) * cos(longitude),
-                        cos(latitude) * sin(longitude),
-                        sin(latitude)
-                    ),
-                    geometry: geometry,
-                    orientation: orientation
-                )
-            }
-            strokeSurface(
-                context,
-                points: points,
-                color: Palette.voidBlack.opacity(0.48),
-                lineWidth: 1.15
-            )
-            strokeSurface(
-                context,
-                points: points,
-                color: Palette.observationTint.opacity(0.34),
-                lineWidth: 0.5,
-                minimumDepth: 0.08
-            )
-        }
-    }
-
-    private func strokeSurface(
-        _ context: GraphicsContext,
-        points: [ProjectedPoint],
-        color: Color,
-        lineWidth: CGFloat = 0.42,
-        minimumDepth: Double = 0
-    ) {
-        var path = Path()
-        var drawing = false
-        for point in points {
-            if point.depth >= minimumDepth {
-                if drawing {
-                    path.addLine(to: point.point)
-                } else {
-                    path.move(to: point.point)
-                    drawing = true
-                }
-            } else {
-                drawing = false
-            }
-        }
-        context.stroke(
-            path,
-            with: .color(color),
-            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+            zoom: zoom,
+            siderealRadians: 0,
+            landDots: coastlineStore.landDots,
+            detailedCoastlines: coastlineStore.coastlines,
+            fallbackCoastlines: SkyOverviewView.coastlineSamples,
+            presence: 1,
+            simplified: false
         )
     }
 
@@ -708,44 +499,50 @@ struct BootOrbitalFieldView: View {
         geometry: Geometry,
         orientation: simd_quatd
     ) -> ProjectedPoint {
-        let transformed = orientation.act(position)
-        return ProjectedPoint(
-            point: CGPoint(
-                x: geometry.center.x + transformed.x * Double(geometry.sceneRadius),
-                y: geometry.center.y - transformed.y * Double(geometry.sceneRadius)
-            ),
-            depth: transformed.z
-        )
-    }
-
-    private func projectSurface(
-        _ direction: SIMD3<Double>,
-        geometry: Geometry,
-        orientation: simd_quatd
-    ) -> ProjectedPoint {
-        let transformed = orientation.act(direction)
-        return ProjectedPoint(
-            point: CGPoint(
-                x: geometry.center.x + transformed.x * Double(geometry.earthRadius),
-                y: geometry.center.y - transformed.y * Double(geometry.earthRadius)
-            ),
-            depth: transformed.z
+        let displayRadius = simd_length(position)
+        guard displayRadius > 0 else {
+            return SkyOverviewView.projectDirection(
+                SIMD3(0, 0, 1),
+                displayRadius: 0,
+                center: geometry.center,
+                radius: geometry.sceneRadius,
+                orientation: orientation,
+                zoom: zoom
+            )
+        }
+        return SkyOverviewView.projectDirection(
+            position / displayRadius,
+            displayRadius: displayRadius,
+            center: geometry.center,
+            radius: geometry.sceneRadius,
+            orientation: orientation,
+            zoom: zoom
         )
     }
 
     private static func geometry(in size: CGSize, scale: CGFloat) -> Geometry {
-        let sceneRadius = min(size.width * 0.47, size.height * 0.29) * scale
+        let horizontalRadius = (size.width - 16)
+            / CGFloat(2 * SkyOverviewView.maximumOrbitDisplayRadius)
+        let verticalRadius = (size.height - 96)
+            / CGFloat(2 * SkyOverviewView.maximumOrbitDisplayRadius)
+        let sceneRadius = max(148, min(horizontalRadius, verticalRadius)) * scale
         return Geometry(
-            center: CGPoint(x: size.width / 2, y: size.height * 0.43),
-            sceneRadius: sceneRadius,
-            earthRadius: sceneRadius * 0.59
+            center: CGPoint(x: size.width / 2, y: size.height * 0.45),
+            sceneRadius: sceneRadius
         )
     }
 
-    private static let viewOrientation = simd_normalize(
-        simd_quatd(angle: 0.24, axis: SIMD3(1, 0, 0))
-            * simd_quatd(angle: -0.34, axis: SIMD3(0, 1, 0))
-            * simd_quatd(angle: -0.08, axis: SIMD3(0, 0, 1))
+    private static let baseViewOrientation = SkyOverviewView.presentationOrientation(
+        latitude: 0,
+        longitude: 121.4737,
+        siderealRadians: 0
     )
+
+    private static func viewOrientation(rotation: Double) -> simd_quatd {
+        simd_normalize(
+            baseViewOrientation
+                * simd_quatd(angle: rotation, axis: SIMD3(0, 0, 1))
+        )
+    }
 
 }

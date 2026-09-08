@@ -55,8 +55,9 @@ struct OverviewShowcaseRotation: Equatable {
 /// 沉浸式三维地球与轨道场。所有点位来自与主视野相同的 ECI 传播帧；
 /// 地球、观察者、地表可见区域和轨道目标共享同一套旋转与缩放。
 struct SkyOverviewView: View {
-    nonisolated private static let earthDisplayRadius: Double = 0.57
-    nonisolated private static let maximumOrbitDisplayRadius: Double = 0.88
+    /// 启动电影与全局地球共享同一套视觉半径，避免两处镜头比例逐渐漂移。
+    nonisolated static let earthDisplayRadius: Double = 0.57
+    nonisolated static let maximumOrbitDisplayRadius: Double = 0.88
     /// Natural Earth 1:110m 海岸线经过约 2° 视觉简化后的坐标。
     /// 每条数组按 `[纬度, 经度, …]` 存储，避免运行时解析地图资源。
     nonisolated static let coastlineSamples: [[Float]] = [
@@ -346,7 +347,12 @@ struct SkyOverviewView: View {
                     starField.opacity = transitionVisuals.orbitalPresence
                     drawBrightStarField(starField)
                 }
-                drawAmbientSpace(context, geometry: geometry)
+                Self.drawGlobeAmbient(
+                    context,
+                    geometry: geometry,
+                    zoom: zoom,
+                    simplified: renderingSimplified
+                )
 
                 let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
                 let live = clock.isLive
@@ -435,7 +441,12 @@ struct SkyOverviewView: View {
                     drawFocusedObject(frontField, samples: samples)
                 }
                 context.drawLayer { surfaceOverlay in
-                    drawEarthForegroundRim(surfaceOverlay, geometry: geometry)
+                    Self.drawGlobeForegroundRim(
+                        surfaceOverlay,
+                        geometry: geometry,
+                        zoom: zoom,
+                        presence: surfaceDetailPresence
+                    )
                     drawObserverVisibilityOverlay(
                         surfaceOverlay,
                         geometry: geometry,
@@ -1207,7 +1218,8 @@ struct SkyOverviewView: View {
         )
     }
 
-    nonisolated private static func projectDirection(
+    /// 共享的单位方向投影；启动电影与全局页必须使用同一深度和屏幕坐标约定。
+    nonisolated static func projectDirection(
         _ direction: SIMD3<Double>,
         displayRadius: Double,
         center: CGPoint,
@@ -1313,9 +1325,13 @@ struct SkyOverviewView: View {
         )
     }
 
-    private func drawAmbientSpace(
+    /// 启动电影与全局页共用的球体环境光。调用方只提供几何和当前细节档位，
+    /// 不读取会话、目录或任何可变业务状态。
+    static func drawGlobeAmbient(
         _ context: GraphicsContext,
-        geometry: GlobeGeometry
+        geometry: GlobeGeometry,
+        zoom: CGFloat,
+        simplified: Bool
     ) {
         let earthRadius = geometry.radius * zoom * CGFloat(Self.earthDisplayRadius)
         let shadowRect = CGRect(
@@ -1331,14 +1347,14 @@ struct SkyOverviewView: View {
             height: earthRadius * 2.56
         )
         context.drawLayer { shadow in
-            shadow.addFilter(.blur(radius: renderingSimplified ? 16 : 28))
+            shadow.addFilter(.blur(radius: simplified ? 16 : 28))
             shadow.fill(
                 Path(ellipseIn: shadowRect),
                 with: .color(Palette.voidEdge.opacity(0.7))
             )
         }
         context.drawLayer { glow in
-            glow.addFilter(.blur(radius: renderingSimplified ? 15 : 25))
+            glow.addFilter(.blur(radius: simplified ? 15 : 25))
             glow.fill(
                 Path(ellipseIn: auraRect),
                 with: .radialGradient(
@@ -1458,37 +1474,66 @@ struct SkyOverviewView: View {
         front: Bool,
         simplified: Bool
     ) {
+        Self.drawGlobeSatelliteField(
+            context,
+            projected: samples.lazy
+                .filter { $0.object.id != focusedObjectId }
+                .map(\.projected),
+            geometry: geometry,
+            zoom: zoom,
+            front: front,
+            simplified: simplified
+        )
+        guard front else { return }
+        drawSatelliteSignatures(
+            context,
+            samples: samples,
+            geometry: geometry,
+            simplified: simplified
+        )
+    }
+
+    /// 纯投影点云的共同分层规则。全局页传入真实 ECI 投影，启动电影传入
+    /// 确定性解析轨道投影；两处由同一份代码决定遮挡、亮度和前后景层次。
+    static func drawGlobeSatelliteField<S: Sequence>(
+        _ context: GraphicsContext,
+        projected: S,
+        geometry: GlobeGeometry,
+        zoom: CGFloat,
+        front: Bool,
+        simplified: Bool
+    ) where S.Element == Projected3D {
         var rearShell: [CGPoint] = []
         var globeCrossing: [CGPoint] = []
         var orbitalShell: [CGPoint] = []
         var foreground: [CGPoint] = []
-        rearShell.reserveCapacity(samples.count / 2)
-        globeCrossing.reserveCapacity(samples.count / 5)
-        orbitalShell.reserveCapacity(samples.count / 3)
-        foreground.reserveCapacity(samples.count / 8)
+        let estimatedCount = projected.underestimatedCount
+        rearShell.reserveCapacity(estimatedCount / 2)
+        globeCrossing.reserveCapacity(estimatedCount / 5)
+        orbitalShell.reserveCapacity(estimatedCount / 3)
+        foreground.reserveCapacity(estimatedCount / 8)
 
         let earthRadius = geometry.radius * zoom * CGFloat(Self.earthDisplayRadius)
         let earthRadiusSquared = earthRadius * earthRadius
 
-        for sample in samples where sample.object.id != focusedObjectId {
-            guard (sample.projected.depth >= 0) == front else { continue }
+        for sample in projected {
+            guard (sample.depth >= 0) == front else { continue }
             guard front else {
-                rearShell.append(sample.projected.point)
+                rearShell.append(sample.point)
                 continue
             }
 
-            let dx = sample.projected.point.x - geometry.center.x
-            let dy = sample.projected.point.y - geometry.center.y
+            let dx = sample.point.x - geometry.center.x
+            let dy = sample.point.y - geometry.center.y
             let distanceSquared = dx * dx + dy * dy
             let crossesGlobe = distanceSquared < earthRadiusSquared * 0.970_225
-            let normalizedDepth = sample.projected.depth
-                / max(0.001, sample.projected.displayRadius)
+            let normalizedDepth = sample.depth / max(0.001, sample.displayRadius)
             if crossesGlobe {
-                globeCrossing.append(sample.projected.point)
+                globeCrossing.append(sample.point)
             } else if normalizedDepth > 0.52 {
-                foreground.append(sample.projected.point)
+                foreground.append(sample.point)
             } else {
-                orbitalShell.append(sample.projected.point)
+                orbitalShell.append(sample.point)
             }
         }
 
@@ -1529,12 +1574,6 @@ struct SkyOverviewView: View {
             opacity: 0.5,
             coreRadius: 0.62,
             haloStrength: simplified ? 0 : 0.018
-        )
-        drawSatelliteSignatures(
-            context,
-            samples: samples,
-            geometry: geometry,
-            simplified: simplified
         )
     }
 
@@ -1814,6 +1853,49 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry,
         simplified: Bool
     ) {
+        let siderealRadians = zeroMeanSiderealTime(
+            julianDate: observation.julianDate
+        ) * .pi / 180
+        Self.drawGlobeSurface(
+            context,
+            geometry: geometry,
+            zoom: zoom,
+            siderealRadians: siderealRadians,
+            landDots: coastlineStore.landDots,
+            detailedCoastlines: coastlineStore.coastlines,
+            fallbackCoastlines: Self.coastlineSamples,
+            presence: surfaceDetailPresence,
+            simplified: simplified
+        )
+        let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
+        let earthRect = CGRect(
+            x: geometry.center.x - earthRadius,
+            y: geometry.center.y - earthRadius,
+            width: earthRadius * 2,
+            height: earthRadius * 2
+        )
+        drawObserverVisibilityRegion(
+            context,
+            geometry: geometry,
+            earthPath: Path(ellipseIn: earthRect),
+            simplified: simplified,
+            presence: surfaceDetailPresence
+        )
+    }
+
+    /// 与具体会话解耦的地球表面绘制入口。启动电影和全局页共享材质、点阵大陆、
+    /// 经纬网与轮廓；资源尚未准备好时，两者都使用同一份编译期海岸线回退。
+    static func drawGlobeSurface(
+        _ context: GraphicsContext,
+        geometry: GlobeGeometry,
+        zoom: CGFloat,
+        siderealRadians: Double,
+        landDots: [EarthLandDot],
+        detailedCoastlines: [[SIMD2<Float>]],
+        fallbackCoastlines: [[Float]],
+        presence: Double,
+        simplified: Bool
+    ) {
         let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
         let earthRect = CGRect(
             x: geometry.center.x - earthRadius,
@@ -1897,19 +1979,34 @@ struct SkyOverviewView: View {
             simplified: simplified
         )
 
-        drawEarthGrid(context, geometry: geometry, simplified: simplified)
-        if coastlineStore.landDots.isEmpty {
-            drawEarthCoastlines(context, geometry: geometry, simplified: simplified)
-        } else {
-            drawEarthLandDots(context, geometry: geometry)
-        }
-        drawObserverVisibilityRegion(
+        drawEarthGrid(
             context,
             geometry: geometry,
-            earthPath: earth,
-            simplified: simplified,
-            presence: surfaceDetailPresence
+            zoom: zoom,
+            presence: presence,
+            simplified: simplified
         )
+        if landDots.isEmpty {
+            drawEarthCoastlines(
+                context,
+                geometry: geometry,
+                zoom: zoom,
+                siderealRadians: siderealRadians,
+                detailedCoastlines: detailedCoastlines,
+                fallbackCoastlines: fallbackCoastlines,
+                presence: presence,
+                simplified: simplified
+            )
+        } else {
+            drawEarthLandDots(
+                context,
+                geometry: geometry,
+                zoom: zoom,
+                siderealRadians: siderealRadians,
+                landDots: landDots,
+                presence: presence
+            )
+        }
         context.stroke(
             Path(ellipseIn: earthRect.insetBy(dx: -1.45, dy: -1.45)),
             with: .color(Palette.observationTint.opacity(simplified ? 0.1 : 0.16)),
@@ -1919,11 +2016,13 @@ struct SkyOverviewView: View {
 
     /// 前景卫星绘制完成后重新压住地球边缘。深色底线清出物理遮挡关系，
     /// 受光侧的短弧再给出大气层厚度，避免高密度轨道点把球体轮廓咬碎。
-    private func drawEarthForegroundRim(
+    static func drawGlobeForegroundRim(
         _ context: GraphicsContext,
-        geometry: GlobeGeometry
+        geometry: GlobeGeometry,
+        zoom: CGFloat,
+        presence: Double
     ) {
-        guard surfaceDetailPresence > 0.01 else { return }
+        guard presence > 0.01 else { return }
         let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
         let earthRect = CGRect(
             x: geometry.center.x - earthRadius,
@@ -1934,12 +2033,12 @@ struct SkyOverviewView: View {
         let earth = Path(ellipseIn: earthRect)
         context.stroke(
             earth,
-            with: .color(Palette.voidBlack.opacity(0.84 * surfaceDetailPresence)),
+            with: .color(Palette.voidBlack.opacity(0.84 * presence)),
             style: StrokeStyle(lineWidth: 2.35)
         )
         context.stroke(
             earth,
-            with: .color(Palette.inkMid.opacity(0.47 * surfaceDetailPresence)),
+            with: .color(Palette.inkMid.opacity(0.47 * presence)),
             style: StrokeStyle(lineWidth: 0.68)
         )
 
@@ -1953,14 +2052,14 @@ struct SkyOverviewView: View {
         )
         context.stroke(
             illuminatedLimb,
-            with: .color(Palette.inkHigh.opacity(0.34 * surfaceDetailPresence)),
+            with: .color(Palette.inkHigh.opacity(0.34 * presence)),
             style: StrokeStyle(lineWidth: 0.86, lineCap: .round)
         )
     }
 
     /// 用海面高光、柔和昼夜分界与内侧大气边缘建立球体体积。它们全部裁切在
     /// 同一个 Canvas 图层内，不引入纹理贴图，也不会在拖动时改变几何复杂度。
-    private func drawEarthSurfaceMaterial(
+    private static func drawEarthSurfaceMaterial(
         _ context: GraphicsContext,
         earth: Path,
         earthRect: CGRect,
@@ -2021,14 +2120,15 @@ struct SkyOverviewView: View {
     /// 大陆在构建期被采样成近似等面积的点阵。Canvas 每帧只旋转预计算的
     /// 单位球方向并合并为六条 Path；不做多边形判断，也不逐段描摹复杂海岸线。
     /// 海岸邻近点更小、更亮，内陆点稍大、更安静，兼顾轮廓精度与陆地体量。
-    private func drawEarthLandDots(
+    private static func drawEarthLandDots(
         _ context: GraphicsContext,
-        geometry: GlobeGeometry
+        geometry: GlobeGeometry,
+        zoom: CGFloat,
+        siderealRadians: Double,
+        landDots: [EarthLandDot],
+        presence: Double
     ) {
-        guard surfaceDetailPresence > 0.01 else { return }
-        let siderealRadians = zeroMeanSiderealTime(
-            julianDate: observation.julianDate
-        ) * .pi / 180
+        guard presence > 0.01 else { return }
         let earthRotation = simd_quatd(
             angle: siderealRadians,
             axis: SIMD3(0, 0, 1)
@@ -2042,7 +2142,7 @@ struct SkyOverviewView: View {
         var interior = Path()
         var interiorRim = Path()
 
-        for dot in coastlineStore.landDots {
+        for dot in landDots {
             let direction = SIMD3(
                 Double(dot.direction.x),
                 Double(dot.direction.y),
@@ -2079,7 +2179,6 @@ struct SkyOverviewView: View {
             }
         }
 
-        let presence = surfaceDetailPresence
         context.fill(
             interior,
             with: .color(Palette.observationTint.opacity(0.25 * presence))
@@ -2120,13 +2219,15 @@ struct SkyOverviewView: View {
         return base * zoomScale * (nearHorizon ? 0.76 : 1)
     }
 
-    private func drawEarthGrid(
+    private static func drawEarthGrid(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
+        zoom: CGFloat,
+        presence: Double,
         simplified: Bool
     ) {
         let tint = Palette.inkLow.opacity(
-            (simplified ? 0.06 : 0.09) * surfaceDetailPresence
+            (simplified ? 0.06 : 0.09) * presence
         )
         let latitudeStep = simplified ? 45.0 : 30.0
         let longitudeStep = simplified ? Double.pi / 4 : Double.pi / 6
@@ -2152,13 +2253,13 @@ struct SkyOverviewView: View {
                     zoom: zoom
                 )
             }
-            strokeSegments(context, projected: points, front: true, color: tint)
+            strokeGlobeSegments(context, projected: points, front: true, color: tint)
             if !simplified {
-                strokeSegments(
+                strokeGlobeSegments(
                     context,
                     projected: points,
                     front: true,
-                    color: Palette.inkMid.opacity(0.045 * surfaceDetailPresence),
+                    color: Palette.inkMid.opacity(0.045 * presence),
                     minimumFrontDepth: Self.earthDisplayRadius * 0.34
                 )
             }
@@ -2182,33 +2283,34 @@ struct SkyOverviewView: View {
                     zoom: zoom
                 )
             }
-            strokeSegments(context, projected: points, front: true, color: tint)
+            strokeGlobeSegments(context, projected: points, front: true, color: tint)
             if !simplified {
-                strokeSegments(
+                strokeGlobeSegments(
                     context,
                     projected: points,
                     front: true,
-                    color: Palette.inkMid.opacity(0.045 * surfaceDetailPresence),
+                    color: Palette.inkMid.opacity(0.045 * presence),
                     minimumFrontDepth: Self.earthDisplayRadius * 0.34
                 )
             }
         }
     }
 
-    private func drawEarthCoastlines(
+    private static func drawEarthCoastlines(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
+        zoom: CGFloat,
+        siderealRadians: Double,
+        detailedCoastlines: [[SIMD2<Float>]],
+        fallbackCoastlines: [[Float]],
+        presence: Double,
         simplified: Bool
     ) {
-        let siderealRadians = zeroMeanSiderealTime(
-            julianDate: observation.julianDate
-        ) * .pi / 180
-
         if Self.usesDetailedCoastlines(
             renderingSimplified: simplified,
-            resourceAvailable: !coastlineStore.coastlines.isEmpty
+            resourceAvailable: !detailedCoastlines.isEmpty
         ) {
-            for coastline in coastlineStore.coastlines {
+            for coastline in detailedCoastlines {
                 let projected = stride(
                     from: 0,
                     to: coastline.count,
@@ -2229,9 +2331,10 @@ struct SkyOverviewView: View {
                         zoom: zoom
                     )
                 }
-                strokeCoastline(
+                strokeGlobeCoastline(
                     context,
                     projected: projected,
+                    presence: presence,
                     simplified: false
                 )
             }
@@ -2240,7 +2343,7 @@ struct SkyOverviewView: View {
 
         // 交互时持续绘制完整的编译期基础轮廓；静止后才替换为资源中的高精度海岸线。
         // 这样缩放、Arcball 与惯性期间不会出现“无大陆”的空白球体。
-        for coastline in Self.coastlineSamples {
+        for coastline in fallbackCoastlines {
             let projected = stride(
                 from: 0,
                 to: coastline.count - 1,
@@ -2260,9 +2363,10 @@ struct SkyOverviewView: View {
                     zoom: zoom
                 )
             }
-            strokeCoastline(
+            strokeGlobeCoastline(
                 context,
                 projected: projected,
+                presence: presence,
                 simplified: false
             )
         }
@@ -2275,18 +2379,19 @@ struct SkyOverviewView: View {
         !renderingSimplified && resourceAvailable
     }
 
-    private func strokeCoastline(
+    private static func strokeGlobeCoastline(
         _ context: GraphicsContext,
         projected: [Projected3D],
+        presence: Double,
         simplified: Bool
     ) {
         // 极细暗底把海岸从经纬线中分离出来，仍保持地图是轨道空间的背景。
-        strokeSegments(
+        strokeGlobeSegments(
             context,
             projected: projected,
             front: true,
             color: Palette.voidBlack.opacity(
-                (simplified ? 0.24 : 0.42) * surfaceDetailPresence
+                (simplified ? 0.24 : 0.42) * presence
             ),
             style: StrokeStyle(
                 lineWidth: simplified ? 0.9 : 1.25,
@@ -2294,12 +2399,12 @@ struct SkyOverviewView: View {
                 lineJoin: .round
             )
         )
-        strokeSegments(
+        strokeGlobeSegments(
             context,
             projected: projected,
             front: true,
             color: Palette.observationTint.opacity(
-                (simplified ? 0.16 : 0.2) * surfaceDetailPresence
+                (simplified ? 0.16 : 0.2) * presence
             ),
             style: StrokeStyle(
                 lineWidth: simplified ? 0.4 : 0.56,
@@ -2308,15 +2413,42 @@ struct SkyOverviewView: View {
             )
         )
         if !simplified {
-            strokeSegments(
+            strokeGlobeSegments(
                 context,
                 projected: projected,
                 front: true,
-                color: Palette.inkHigh.opacity(0.23 * surfaceDetailPresence),
+                color: Palette.inkHigh.opacity(0.23 * presence),
                 style: StrokeStyle(lineWidth: 0.42, lineCap: .round, lineJoin: .round),
                 minimumFrontDepth: Self.earthDisplayRadius * 0.28
             )
         }
+    }
+
+    private static func strokeGlobeSegments(
+        _ context: GraphicsContext,
+        projected: [Projected3D],
+        front: Bool,
+        color: Color,
+        style: StrokeStyle = StrokeStyle(lineWidth: 0.42),
+        minimumFrontDepth: Double = 0
+    ) {
+        var path = Path()
+        var drawing = false
+        for point in projected {
+            let matches = (point.depth >= 0) == front
+                && (!front || point.depth >= minimumFrontDepth)
+            if matches {
+                if drawing {
+                    path.addLine(to: point.point)
+                } else {
+                    path.move(to: point.point)
+                    drawing = true
+                }
+            } else {
+                drawing = false
+            }
+        }
+        context.stroke(path, with: .color(color), style: style)
     }
 
     /// 默认可见区域是一块真正贴在球面的球冠，而不是屏幕坐标中的平面圆。

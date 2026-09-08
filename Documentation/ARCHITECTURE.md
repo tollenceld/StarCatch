@@ -112,10 +112,12 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
    确定性目标在 LIVE、静止、非 Reduced Motion 时以 10fps 有界采样；任一交互或时间移动必须清空。
 8. `BrightStarStore` 只在后台映射并解码一次星表；J2000 恒星只在天球相机或画布尺寸改变时投影。
    Canvas 只能批量绘制缓存 Path，不得逐帧读取资源、筛选星表或让恒星跟随 Arcball 与地球缩放。
-9. `OrbitalBootView` 只能读取聚合后的 `BootPreparationState.isReady`。启动轨道必须来自不可变
-   `BootOrbitalScenePreset`，不得引用目录、位置、真实星表、SatelliteKit 或任何运行时资源 IO；
+9. `OrbitalBootView` 只从业务准备链读取聚合后的 `BootPreparationState.isReady`。启动轨道必须来自
+   不可变 `BootOrbitalScenePreset`，不得引用目录、位置、真实星表或 SatelliteKit；允许复用
+   `EarthCoastlineStore` 在后台一次性准备约 52 KB 的点阵地理数据，但 Canvas 每帧不得执行资源 IO。
    30fps 路径固定为 4,600 个解析点与最多 24×8 个拖尾采样；轨道基向量必须预计算，普通点位
-   必须批量绘制。慢加载只能降速巡航，不能扩容。
+   必须批量绘制。启动页与全局页共享镜头姿态、投影、地球材质和点云分层，慢加载只能让卫星
+   降速巡航，不能扩容或重置地球相位。
 10. 地球大陆不能因拖动、缩放或惯性而消失。主表面使用构建期从 Natural Earth 陆地多边形生成的
     等面积点阵；运行时只旋转预计算单位球方向并按海岸邻近等级批量填充 Path。资源加载或损坏时
     使用现有海岸线回退；两者都不把琥珀交互色用作大陆主色。

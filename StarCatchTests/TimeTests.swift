@@ -121,13 +121,15 @@ final class TimeTests: XCTestCase {
             middle.satelliteSpeedMultiplier,
             peak.satelliteSpeedMultiplier
         )
-        XCTAssertLessThan(
+        XCTAssertEqual(
             revealed.earthAngularVelocityDegrees,
-            middle.earthAngularVelocityDegrees
+            360 / OverviewShowcaseRotation.revolutionDuration,
+            accuracy: 0.0001
         )
-        XCTAssertLessThan(
+        XCTAssertEqual(
             middle.earthAngularVelocityDegrees,
-            peak.earthAngularVelocityDegrees
+            peak.earthAngularVelocityDegrees,
+            accuracy: 0.0001
         )
         XCTAssertGreaterThan(peak.earthRotationRadians, initial.earthRotationRadians)
         XCTAssertTrue(peak.brandOpacity.isFinite)
@@ -226,11 +228,15 @@ final class TimeTests: XCTestCase {
         XCTAssertGreaterThan(slowing.satellitePhaseTime, cinematicEnd.satellitePhaseTime)
         XCTAssertGreaterThan(cruising.satellitePhaseTime, slowing.satellitePhaseTime)
         XCTAssertEqual(cruising.satelliteSpeedMultiplier, 0.44, accuracy: 0.0001)
-        XCTAssertEqual(cruising.earthAngularVelocityDegrees, 5, accuracy: 0.0001)
+        XCTAssertEqual(
+            cruising.earthAngularVelocityDegrees,
+            360 / OverviewShowcaseRotation.revolutionDuration,
+            accuracy: 0.0001
+        )
         XCTAssertTrue(cruising.isCruising)
         XCTAssertEqual(
             later.earthRotationRadians - cruising.earthRotationRadians,
-            5 * .pi / 180,
+            2 * .pi / OverviewShowcaseRotation.revolutionDuration,
             accuracy: 0.0001
         )
     }
@@ -312,7 +318,14 @@ final class TimeTests: XCTestCase {
                 0,
                 accuracy: 0.0001
             )
-            XCTAssertTrue(0.68 ... 0.95 ~= satellite.displayRadius)
+            XCTAssertGreaterThanOrEqual(
+                satellite.displayRadius,
+                SkyOverviewView.earthDisplayRadius + 0.04
+            )
+            XCTAssertLessThanOrEqual(
+                satellite.displayRadius,
+                SkyOverviewView.maximumOrbitDisplayRadius
+            )
             XCTAssertTrue(0.18 ... 0.32 ~= satellite.turnsPerSecond)
         }
     }
