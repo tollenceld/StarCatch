@@ -154,6 +154,7 @@ final class SkySession: ObservableObject {
         started = false
         manualProvider?.stop()
         motionProvider?.stop()
+        observer.stop()
         ephemeris.stop()
     }
 

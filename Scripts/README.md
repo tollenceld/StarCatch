@@ -3,6 +3,10 @@
 `update_catalog.py` is a release-time tool. The iOS app does not download orbital
 data and does not need a network connection after installation.
 
+The long-term split between orbital elements, stable catalog identity, authored
+content, and a future first-party snapshot distribution layer is documented in
+[`Documentation/ORBIT_DATA_ARCHITECTURE.md`](../Documentation/ORBIT_DATA_ARCHITECTURE.md).
+
 The generator downloads the public CelesTrak active GP catalog in OMM JSON,
 uses CelesTrak group membership plus conservative name rules for StarCatch's
 task semantics, identifies major constellation families for independent sampling,

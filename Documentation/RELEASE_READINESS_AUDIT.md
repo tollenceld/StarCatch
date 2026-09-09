@@ -17,8 +17,8 @@ StarCatch 已达到 **Release Candidate** 工程状态：Release 模拟器构建
 - `PrivacyInfo.xcprivacy` 声明不跟踪、不收集，并为 UserDefaults 提供 `CA92.1` 理由。
 - App Icon 为 1024×1024 RGB PNG，无 Alpha；应用只支持 iPhone 竖屏。
 - SatelliteKit 锁定至 2.1.2 和固定 revision；第三方软件与数据物料已记录。
-- 16,395 个对象的随包目录已于 2026-08-20 刷新；超过 72 小时将自动阻止 Archive。
-- 3,817 份逐星档案与 8 份系列档案使用 schema v3；每条导语、事实、章节和里程碑都关联结构化来源与 object/family 范围。
+- 16,507 个对象的随包目录已于 2026-09-09 刷新；超过 72 小时将自动阻止 Archive。
+- 3,827 份逐星档案与 8 份系列档案使用 schema v4；每条导语、事实、章节和里程碑都关联结构化来源与 object/family 范围。
 - 目录损坏时显示可理解的错误、诊断和支持入口，不会只剩空天空。
 - Release 构建使用优化、Whole Module Optimization、dSYM、Dead Code Stripping 与产品验证。
 - 商店描述、关键词、审核步骤、隐私/年龄答卷草案和 1320×2868 演示截图已准备。

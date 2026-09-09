@@ -54,7 +54,7 @@ App 完整支持简体中文与英文，语言跟随 iOS 系统或单 App 语言
   静止恢复低速巡航，真实目录仍在首帧之后后台准备。
 
 该基线由后续功能提交持续维护；最近一次 iPhone 17 / iOS 26.3 Simulator Debug 构建成功，
-完整测试集 132/132 通过。
+完整测试集 134/134 通过。
 
 ## 稳定边界
 
@@ -83,6 +83,8 @@ App 完整支持简体中文与英文，语言跟随 iOS 系统或单 App 语言
 - 状态所有权、并发、渲染性能、工程生成和分级验证：
   [`Documentation/ARCHITECTURE.md`](Documentation/ARCHITECTURE.md)
 - 轨道资料更新与发布脚本：[`Scripts/README.md`](Scripts/README.md)
+- 轨道数据分层、网络更新决策与追踪精度：
+  [`Documentation/ORBIT_DATA_ARCHITECTURE.md`](Documentation/ORBIT_DATA_ARCHITECTURE.md)
 
 不要把长文档复制进本文件。只有稳定项目事实或已完成的架构基线发生改变时才更新本文件；单个
 功能的过程记录由 Codex 任务与 Git 历史承担。

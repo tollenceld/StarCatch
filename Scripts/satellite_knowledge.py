@@ -715,9 +715,29 @@ def sync_profiles() -> int:
     existing = existing_profiles_by_norad()
 
     excluded_existing = [(norad, path) for norad, path in existing.items() if norad not in eligible_ids]
-    if excluded_existing:
-        print("以下档案属于已排除的同质星座，请先移除：", file=sys.stderr)
-        for norad, path in excluded_existing:
+    stale_generated: list[tuple[int, Path]] = []
+    protected_authored: list[tuple[int, Path]] = []
+    for norad, path in excluded_existing:
+        try:
+            metadata, _ = front_matter(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            protected_authored.append((norad, path))
+            continue
+        if metadata.get("review_status") == "generated":
+            stale_generated.append((norad, path))
+        else:
+            protected_authored.append((norad, path))
+
+    # 公开活动目录会在对象衰减、停用或重新分类后移除条目。自动档案是
+    # 目录的派生产物，sync 应同步清理；人工档案可能包含不可重建的研究，
+    # 因此绝不自动删除，仍由维护者决定转入策展历史目录还是保留。
+    for norad, path in stale_generated:
+        path.unlink()
+        existing.pop(norad, None)
+
+    if protected_authored:
+        print("以下人工档案已不在可编译目录中，请人工确认去留：", file=sys.stderr)
+        for norad, path in protected_authored:
             print(f"- N{norad} {path}", file=sys.stderr)
         return 1
 
@@ -756,6 +776,7 @@ def sync_profiles() -> int:
     print(
         f"SatelliteKnowledge: 保留 {len(eligible)} 颗，新增 {created}、重建 {refreshed} 份逐星档案；"
         f"新增 {created_families}、重建 {refreshed_families} 份星座档案；"
+        f"清理 {len(stale_generated)} 份过期自动档案；"
         f"刷新 {refreshed_summaries} 条首层摘要，覆盖 {len(records) - len(eligible)} 个星座节点"
     )
     return 0

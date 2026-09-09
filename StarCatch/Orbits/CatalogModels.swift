@@ -449,6 +449,9 @@ enum CatalogAuthority: String, Sendable {
         " JASON", " SARAL", " COSMO-SKYMED", " CSG-", " TERRASAR",
         " TANDEM", " PAZ ", " SMOS", " GOCE", " CLUSTER", " INTEGRAL",
         " BIOMASS", " EARTHCARE",
+        // EUMETSAT Meteosat Third Generation and CNES/Airbus CO3D are
+        // explicitly named European public Earth-observation programmes.
+        " MTG-", " CO3D ",
     ]
 
     private static let chinaTokens = [

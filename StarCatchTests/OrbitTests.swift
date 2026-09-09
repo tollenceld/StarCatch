@@ -699,6 +699,14 @@ final class OrbitTests: XCTestCase {
         )
     }
 
+    func testObserverRefreshesBeforeAcceptedLocationExpires() {
+        XCTAssertLessThan(
+            ObserverLocation.refreshInterval,
+            300,
+            "观察会话必须在五分钟样本有效期结束前请求新坐标"
+        )
+    }
+
     /// Vallado/CelesTrak 官方 SGP4 验证案例 00005：避免只拿应用内部结果互相印证。
     func testSatelliteKitMatchesValladoReferenceVector() throws {
         let line1 = "1 00005U 58002B   00179.78495062  .00000023  00000-0  28098-4 0  4753"

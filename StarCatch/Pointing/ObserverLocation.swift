@@ -34,6 +34,11 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
     @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
     private let manager = CLLocationManager()
+    private var refreshTimer: Timer?
+
+    /// 观测期间保持观察者坐标新鲜，但不持续打开 GPS。单次定位由系统
+    /// 在每个周期内自行选择低成本的缓存或新样本；进入后台立即停止。
+    static let refreshInterval: TimeInterval = 4 * 60
 
     override init() {
         super.init()
@@ -54,6 +59,13 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         default:
             break // 保持 fallback
         }
+        startRefreshTimerIfNeeded()
+    }
+
+    /// 与天空会话同生命周期：页面覆盖、App 失活或进入后台时不再请求定位。
+    func stop() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
@@ -108,6 +120,19 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         // 保持 fallback，不打扰用户
+    }
+
+    private func startRefreshTimerIfNeeded() {
+        guard refreshTimer == nil else { return }
+        refreshTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.refreshInterval,
+            repeats: true
+        ) { [weak self] _ in
+            guard let self else { return }
+            let status = self.manager.authorizationStatus
+            guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
+            self.manager.requestLocation()
+        }
     }
 
     var isDeniedOrRestricted: Bool {

@@ -30,7 +30,7 @@ open StarCatch.xcodeproj
 
 ## 数据
 
-`StarCatch/Resources/catalog.json` 是随包发布的 schema v2 CelesTrak GP/OMM 离线快照，当前包含 16,243 个轨道目标；不在 active GP 分组中的少量历史目标以同一 schema 内的策展 TLE 载荷保留，运行时不再兼容旧版整份小目录文档。构建测试核对唯一 NORAD/COSPAR 标识、元素历元时效、代表性物理量和档案覆盖是否确实存在于目录；这不等同于替代官方运营方对任务状态的持续公告。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
+`StarCatch/Resources/catalog.json` 是随包发布的 schema v2 CelesTrak GP/OMM 离线快照，当前包含 16,507 个轨道目标；不在 active GP 分组中的少量历史目标以同一 schema 内的策展 TLE 载荷保留，运行时不再兼容旧版整份小目录文档。构建测试核对唯一 NORAD/COSPAR 标识、元素历元时效、代表性物理量和档案覆盖是否确实存在于目录；这不等同于替代官方运营方对任务状态的持续公告。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
 
 人工编写的逐星档案位于 [`SatelliteKnowledge`](SatelliteKnowledge/README.md)。它是可直接用 Obsidian 打开的 Markdown 资料库；Xcode 构建会自动校验并编译为紧凑 JSON，APP 运行时按 NORAD 编号读取。数千份源笔记不会进入安装包，也不会拖慢启动时的文件扫描。
 
