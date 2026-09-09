@@ -103,36 +103,30 @@ final class TimeTests: XCTestCase {
         XCTAssertLessThan(Motion.releaseDuration, 1.2, "主动释放应清晰但不拖延")
     }
 
-    func testBootOrbitalTimelineBuildsAndAcceleratesIntoTheFilm() {
+    func testBootOrbitalTimelineChoreographsOneSweepAndAResolvedHold() {
         let initial = BootOrbitalTimeline(elapsed: 0)
-        let revealed = BootOrbitalTimeline(elapsed: 0.35)
-        let middle = BootOrbitalTimeline(elapsed: 1.5)
-        let peak = BootOrbitalTimeline(elapsed: 2.8)
+        let revealed = BootOrbitalTimeline(elapsed: 0.48)
+        let peak = BootOrbitalTimeline(elapsed: 1)
+        let settling = BootOrbitalTimeline(elapsed: 1.75)
+        let hold = BootOrbitalTimeline(elapsed: 2.4)
 
         XCTAssertEqual(initial.revealProgress, 0, accuracy: 0.0001)
-        XCTAssertEqual(initial.globeScale, 0.82, accuracy: 0.0001)
-        XCTAssertEqual(revealed.globeScale, 1, accuracy: 0.0001)
-        XCTAssertGreaterThan(middle.trailPresence, 0.95)
-        XCTAssertLessThan(
-            revealed.satelliteSpeedMultiplier,
-            middle.satelliteSpeedMultiplier
-        )
-        XCTAssertLessThan(
-            middle.satelliteSpeedMultiplier,
-            peak.satelliteSpeedMultiplier
-        )
+        XCTAssertEqual(initial.globeScale, 0.94, accuracy: 0.0001)
+        XCTAssertEqual(revealed.globeScale, 1.012, accuracy: 0.0001)
+        XCTAssertEqual(BootOrbitalTimeline(elapsed: 0.9).globeScale, 1, accuracy: 0.0001)
+        XCTAssertEqual(initial.satelliteSpeedMultiplier, 0, accuracy: 0.0001)
+        XCTAssertEqual(peak.satelliteSpeedMultiplier, 1, accuracy: 0.0001)
+        XCTAssertGreaterThan(settling.satelliteSpeedMultiplier, 0)
+        XCTAssertLessThan(settling.satelliteSpeedMultiplier, 1)
+        XCTAssertEqual(hold.satelliteSpeedMultiplier, 0, accuracy: 0.0001)
+        XCTAssertGreaterThan(peak.trailPresence, settling.trailPresence)
+        XCTAssertEqual(hold.earthAngularVelocityDegrees, 0, accuracy: 0.0001)
         XCTAssertEqual(
-            revealed.earthAngularVelocityDegrees,
-            360 / OverviewShowcaseRotation.revolutionDuration,
+            BootOrbitalTimeline(elapsed: 2.8).earthRotationRadians,
+            hold.earthRotationRadians,
             accuracy: 0.0001
         )
-        XCTAssertEqual(
-            middle.earthAngularVelocityDegrees,
-            peak.earthAngularVelocityDegrees,
-            accuracy: 0.0001
-        )
-        XCTAssertGreaterThan(peak.earthRotationRadians, initial.earthRotationRadians)
-        XCTAssertTrue(peak.brandOpacity.isFinite)
+        XCTAssertGreaterThan(hold.brandOpacity, peak.brandOpacity)
     }
 
     func testSupportedLanguageUsesEnglishFallbackAndSimplifiedChinese() {
@@ -221,24 +215,67 @@ final class TimeTests: XCTestCase {
 
     func testBootOrbitalTimelineCruisesContinuouslyWhenPreparationIsSlow() {
         let cinematicEnd = BootOrbitalTimeline(elapsed: 3.2)
-        let slowing = BootOrbitalTimeline(elapsed: 3.45)
+        let restarting = BootOrbitalTimeline(elapsed: 3.6)
         let cruising = BootOrbitalTimeline(elapsed: 5)
         let later = BootOrbitalTimeline(elapsed: 6)
 
-        XCTAssertGreaterThan(slowing.satellitePhaseTime, cinematicEnd.satellitePhaseTime)
-        XCTAssertGreaterThan(cruising.satellitePhaseTime, slowing.satellitePhaseTime)
-        XCTAssertEqual(cruising.satelliteSpeedMultiplier, 0.44, accuracy: 0.0001)
+        XCTAssertGreaterThan(
+            restarting.satellitePhaseTime,
+            cinematicEnd.satellitePhaseTime
+        )
+        XCTAssertGreaterThan(
+            cruising.satellitePhaseTime,
+            restarting.satellitePhaseTime
+        )
+        XCTAssertEqual(cruising.satelliteSpeedMultiplier, 0.12, accuracy: 0.0001)
         XCTAssertEqual(
             cruising.earthAngularVelocityDegrees,
-            360 / OverviewShowcaseRotation.revolutionDuration,
+            1.2,
             accuracy: 0.0001
         )
         XCTAssertTrue(cruising.isCruising)
         XCTAssertEqual(
             later.earthRotationRadians - cruising.earthRotationRadians,
-            2 * .pi / OverviewShowcaseRotation.revolutionDuration,
+            1.2 * .pi / 180,
             accuracy: 0.0001
         )
+    }
+
+    func testBootOrbitalTimelineKeepsVelocityContinuousAcrossBeats() {
+        let boundaries: [TimeInterval] = [0.34, 0.94, 1.14, 1.92, 3.2, 4]
+        let epsilon = 0.0001
+
+        for boundary in boundaries {
+            let before = BootOrbitalTimeline(elapsed: boundary - epsilon)
+            let at = BootOrbitalTimeline(elapsed: boundary)
+            let after = BootOrbitalTimeline(elapsed: boundary + epsilon)
+            let leftSatelliteVelocity = (
+                at.satellitePhaseTime - before.satellitePhaseTime
+            ) / epsilon
+            let rightSatelliteVelocity = (
+                after.satellitePhaseTime - at.satellitePhaseTime
+            ) / epsilon
+            XCTAssertEqual(leftSatelliteVelocity, rightSatelliteVelocity, accuracy: 0.001)
+            XCTAssertEqual(
+                leftSatelliteVelocity,
+                at.satelliteSpeedMultiplier,
+                accuracy: 0.001
+            )
+
+            let radiansToDegrees = 180 / Double.pi
+            let leftEarthVelocity = (
+                at.earthRotationRadians - before.earthRotationRadians
+            ) / epsilon * radiansToDegrees
+            let rightEarthVelocity = (
+                after.earthRotationRadians - at.earthRotationRadians
+            ) / epsilon * radiansToDegrees
+            XCTAssertEqual(leftEarthVelocity, rightEarthVelocity, accuracy: 0.001)
+            XCTAssertEqual(
+                leftEarthVelocity,
+                at.earthAngularVelocityDegrees,
+                accuracy: 0.001
+            )
+        }
     }
 
     func testBootOrbitalTimelineReducedMotionIsStaticAndTrailFree() {
@@ -326,7 +363,7 @@ final class TimeTests: XCTestCase {
                 satellite.displayRadius,
                 SkyOverviewView.maximumOrbitDisplayRadius
             )
-            XCTAssertTrue(0.18 ... 0.32 ~= satellite.turnsPerSecond)
+            XCTAssertTrue(0.065 ... 0.12 ~= satellite.turnsPerSecond)
         }
     }
 

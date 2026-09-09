@@ -23,9 +23,16 @@ struct BootPreparationState: Equatable, Sendable {
 /// Pure-value clock for the deterministic orbital boot film.
 struct BootOrbitalTimeline: Equatable, Sendable {
     static let minimumPresentationDuration: TimeInterval = 3.2
-    static let revealDuration: TimeInterval = 0.35
-    static let accelerationEnd: TimeInterval = 2.65
-    static let cruiseTransitionDuration: TimeInterval = 0.55
+    static let revealDuration: TimeInterval = 0.48
+    static let establishEnd: TimeInterval = 0.34
+    static let sweepPeak: TimeInterval = 0.94
+    static let sweepRelease: TimeInterval = 1.14
+    static let settleEnd: TimeInterval = 1.92
+    static let cruiseTransitionDuration: TimeInterval = 0.8
+
+    private static let satelliteCruiseSpeed = 0.12
+    private static let earthPeakVelocityDegrees = 5.5
+    private static let earthCruiseVelocityDegrees = 1.2
 
     let elapsed: TimeInterval
     let reducedMotion: Bool
@@ -44,87 +51,146 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     }
 
     var globeScale: CGFloat {
-        reducedMotion ? 1 : 0.82 + CGFloat(revealProgress) * 0.18
+        guard !reducedMotion else { return 1 }
+        if elapsed <= Self.revealDuration {
+            return 0.94 + CGFloat(revealProgress) * 0.072
+        }
+        let settling = Self.smoothstep((elapsed - Self.revealDuration) / 0.42)
+        return 1.012 - CGFloat(settling) * 0.012
     }
 
     var trailPresence: Double {
         guard !reducedMotion else { return 0 }
-        return Self.smoothstep((elapsed - 0.48) / 0.72)
+        let arrival = Self.smoothstep((elapsed - 0.4) / 0.3)
+        let motionEnergy = Self.smoothstep(satelliteSpeedMultiplier / 0.35)
+        return arrival * (0.06 + motionEnergy * 0.74)
     }
 
     var brandOpacity: Double {
-        let arrival = Self.smoothstep((elapsed - 0.45) / 0.6)
-        let quieting = Self.smoothstep(
-            (elapsed - Self.accelerationEnd)
-                / (Self.minimumPresentationDuration - Self.accelerationEnd)
-        )
-        return reducedMotion ? 0.2 : (0.28 - quieting * 0.12) * arrival
+        let arrival = Self.smoothstep((elapsed - 1.56) / 0.56)
+        return reducedMotion ? 0.18 : 0.22 * arrival
     }
 
-    /// Multiplier applied to each preset satellite's individual turns-per-second.
+    /// A single authored gesture: establish, sweep, brake to a full hold, then
+    /// resume a restrained cruise only when real preparation takes longer.
     var satelliteSpeedMultiplier: Double {
         guard !reducedMotion else { return 0 }
-        if elapsed <= Self.revealDuration { return 0.25 }
-        if elapsed <= Self.accelerationEnd {
-            let progress = (elapsed - Self.revealDuration)
-                / (Self.accelerationEnd - Self.revealDuration)
-            return 0.25 + progress * 0.75
+        if elapsed <= Self.establishEnd { return 0 }
+        if elapsed <= Self.sweepPeak {
+            return Self.smoothstep(
+                (elapsed - Self.establishEnd)
+                    / (Self.sweepPeak - Self.establishEnd)
+            )
         }
-        if elapsed <= Self.minimumPresentationDuration { return 1 }
-        let slowing = min(
-            1,
+        if elapsed <= Self.sweepRelease { return 1 }
+        if elapsed <= Self.settleEnd {
+            return 1 - Self.smoothstep(
+                (elapsed - Self.sweepRelease)
+                    / (Self.settleEnd - Self.sweepRelease)
+            )
+        }
+        if elapsed <= Self.minimumPresentationDuration { return 0 }
+        return Self.satelliteCruiseSpeed * Self.smoothstep(
             (elapsed - Self.minimumPresentationDuration)
                 / Self.cruiseTransitionDuration
         )
-        return 1 - slowing * 0.56
     }
 
-    /// Integrated speed multiplier. Positions remain continuous when the film
-    /// leaves its high-speed ending and settles into an indefinite slow cruise.
+    /// Analytic integral of `satelliteSpeedMultiplier`. Both position and velocity
+    /// are continuous across every beat, including the deliberate full stop.
     var satellitePhaseTime: TimeInterval {
         guard !reducedMotion else { return 1.08 }
-        let revealEnd = Self.revealDuration * 0.25
-        guard elapsed > Self.revealDuration else { return elapsed * 0.25 }
-
-        let accelerationDuration = Self.accelerationEnd - Self.revealDuration
-        let accelerationSlope = 0.75 / accelerationDuration
-        let accelerated = revealEnd
-            + 0.25 * accelerationDuration
-            + 0.5 * accelerationSlope * accelerationDuration * accelerationDuration
-        if elapsed <= Self.accelerationEnd {
-            let delta = elapsed - Self.revealDuration
-            return revealEnd + 0.25 * delta + 0.5 * accelerationSlope * delta * delta
-        }
-
-        let highSpeedDuration = Self.minimumPresentationDuration - Self.accelerationEnd
-        let cinematicEnd = accelerated + highSpeedDuration
-        if elapsed <= Self.minimumPresentationDuration {
-            return accelerated + elapsed - Self.accelerationEnd
-        }
-
-        let slowdownDelta = min(
-            Self.cruiseTransitionDuration,
-            elapsed - Self.minimumPresentationDuration
+        let rise = Self.integratedRamp(
+            at: elapsed,
+            from: Self.establishEnd,
+            to: Self.sweepPeak,
+            startValue: 0,
+            endValue: 1
         )
-        let slowdownSlope = -0.56 / Self.cruiseTransitionDuration
-        let slowdownTravel = slowdownDelta
-            + 0.5 * slowdownSlope * slowdownDelta * slowdownDelta
-        let cruiseDelta = max(
+        let sweep = max(
+            0,
+            min(elapsed, Self.sweepRelease) - Self.sweepPeak
+        )
+        let braking = Self.integratedRamp(
+            at: elapsed,
+            from: Self.sweepRelease,
+            to: Self.settleEnd,
+            startValue: 1,
+            endValue: 0
+        )
+        let cruiseRamp = Self.integratedRamp(
+            at: elapsed,
+            from: Self.minimumPresentationDuration,
+            to: Self.minimumPresentationDuration + Self.cruiseTransitionDuration,
+            startValue: 0,
+            endValue: Self.satelliteCruiseSpeed
+        )
+        let cruise = max(
             0,
             elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
-        )
-        return cinematicEnd + slowdownTravel + cruiseDelta * 0.44
+        ) * Self.satelliteCruiseSpeed
+        return rise + sweep + braking + cruiseRamp + cruise
     }
 
     var earthAngularVelocityDegrees: Double {
-        reducedMotion ? 0 : 360 / OverviewShowcaseRotation.revolutionDuration
+        guard !reducedMotion else { return 0 }
+        if elapsed <= Self.establishEnd { return 0 }
+        if elapsed <= Self.sweepPeak {
+            return Self.earthPeakVelocityDegrees * Self.smoothstep(
+                (elapsed - Self.establishEnd)
+                    / (Self.sweepPeak - Self.establishEnd)
+            )
+        }
+        if elapsed <= Self.sweepRelease {
+            return Self.earthPeakVelocityDegrees
+        }
+        if elapsed <= Self.settleEnd {
+            return Self.earthPeakVelocityDegrees * (1 - Self.smoothstep(
+                (elapsed - Self.sweepRelease)
+                    / (Self.settleEnd - Self.sweepRelease)
+            ))
+        }
+        if elapsed <= Self.minimumPresentationDuration { return 0 }
+        return Self.earthCruiseVelocityDegrees * Self.smoothstep(
+            (elapsed - Self.minimumPresentationDuration)
+                / Self.cruiseTransitionDuration
+        )
     }
 
-    /// 与全局页的空闲展示旋转共享 180 秒一周的克制节奏。点阵大陆让短时间内的
-    /// 细微转动仍然可读，同时慢加载无需在电影结束处变速或重置相位。
+    /// The globe shares the satellite beats at a much smaller amplitude. It turns
+    /// about five degrees, resolves to stillness, and never snaps at handoff.
     var earthRotationRadians: Double {
         guard !reducedMotion else { return 0.32 }
-        return elapsed * 2 * .pi / OverviewShowcaseRotation.revolutionDuration
+        let rise = Self.integratedRamp(
+            at: elapsed,
+            from: Self.establishEnd,
+            to: Self.sweepPeak,
+            startValue: 0,
+            endValue: Self.earthPeakVelocityDegrees
+        )
+        let sweep = max(
+            0,
+            min(elapsed, Self.sweepRelease) - Self.sweepPeak
+        ) * Self.earthPeakVelocityDegrees
+        let braking = Self.integratedRamp(
+            at: elapsed,
+            from: Self.sweepRelease,
+            to: Self.settleEnd,
+            startValue: Self.earthPeakVelocityDegrees,
+            endValue: 0
+        )
+        let cruiseRamp = Self.integratedRamp(
+            at: elapsed,
+            from: Self.minimumPresentationDuration,
+            to: Self.minimumPresentationDuration + Self.cruiseTransitionDuration,
+            startValue: 0,
+            endValue: Self.earthCruiseVelocityDegrees
+        )
+        let cruise = max(
+            0,
+            elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
+        ) * Self.earthCruiseVelocityDegrees
+        return (rise + sweep + braking + cruiseRamp + cruise) * .pi / 180
     }
 
     var isCruising: Bool {
@@ -134,6 +200,28 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     private static func smoothstep(_ value: Double) -> Double {
         let value = min(1, max(0, value))
         return value * value * (3 - 2 * value)
+    }
+
+    /// Integral of smoothstep from zero to `value`, clamped to one interval.
+    private static func integratedSmoothstep(_ value: Double) -> Double {
+        let value = min(1, max(0, value))
+        return value * value * value - 0.5 * pow(value, 4)
+    }
+
+    private static func integratedRamp(
+        at time: TimeInterval,
+        from start: TimeInterval,
+        to end: TimeInterval,
+        startValue: Double,
+        endValue: Double
+    ) -> Double {
+        guard time > start, end > start else { return 0 }
+        let duration = end - start
+        let progress = min(1, (time - start) / duration)
+        return duration * (
+            startValue * progress
+                + (endValue - startValue) * integratedSmoothstep(progress)
+        )
     }
 }
 
@@ -172,6 +260,7 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
     static let satelliteCount = 4_600
     static let trailSatelliteCount = 24
     static let trailSampleCount = 8
+    static let trailSampleInterval: TimeInterval = 0.06
 
     let satellites: [Satellite]
 
@@ -197,7 +286,7 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
                 ascendingNode: ascendingNode,
                 initialPhase: Double(random.nextUnit()) * 2 * .pi,
                 displayRadius: 0.61 + Double(random.nextUnit()) * 0.27,
-                turnsPerSecond: 0.18 + Double(random.nextUnit()) * 0.14,
+                turnsPerSecond: 0.065 + Double(random.nextUnit()) * 0.055,
                 direction: index.isMultiple(of: 7) ? -1 : 1,
                 tintIndex: index % 4,
                 hasTrail: index < min(trailCount, count),
@@ -290,6 +379,7 @@ struct BootOrbitalFieldView: View {
                 geometry: geometry,
                 orientation: viewOrientation
             )
+            let trailPhaseTimes = historicalTrailPhaseTimes()
             context.drawLayer { ambient in
                 ambient.opacity = timeline.sceneOpacity
                 SkyOverviewView.drawGlobeAmbient(
@@ -307,6 +397,7 @@ struct BootOrbitalFieldView: View {
                     geometry: geometry,
                     globeGeometry: globeGeometry,
                     viewOrientation: viewOrientation,
+                    trailPhaseTimes: trailPhaseTimes,
                     front: false
                 )
             }
@@ -325,6 +416,7 @@ struct BootOrbitalFieldView: View {
                     geometry: geometry,
                     globeGeometry: globeGeometry,
                     viewOrientation: viewOrientation,
+                    trailPhaseTimes: trailPhaseTimes,
                     front: true
                 )
             }
@@ -358,6 +450,7 @@ struct BootOrbitalFieldView: View {
         geometry: Geometry,
         globeGeometry: SkyOverviewView.GlobeGeometry,
         viewOrientation: simd_quatd,
+        trailPhaseTimes: [TimeInterval],
         front: Bool
     ) {
         if timeline.trailPresence > 0.01 {
@@ -367,6 +460,7 @@ struct BootOrbitalFieldView: View {
                     satellite: sample.satellite,
                     geometry: geometry,
                     viewOrientation: viewOrientation,
+                    phaseTimes: trailPhaseTimes,
                     front: front
                 )
             }
@@ -429,18 +523,16 @@ struct BootOrbitalFieldView: View {
         satellite: BootOrbitalScenePreset.Satellite,
         geometry: Geometry,
         viewOrientation: simd_quatd,
+        phaseTimes: [TimeInterval],
         front: Bool
     ) {
-        let sampleCount = BootOrbitalScenePreset.trailSampleCount
-        // 与时间拨动的视觉语义一致：轨迹必须能明确说明运动方向，而不是只在
-        // 星核后留下几像素装饰。固定解析采样仍保持 24 × 8 的有界成本。
-        let sampleInterval = 0.028
-        let projected = (0 ..< sampleCount).map { index in
-            let age = Double(sampleCount - 1 - index) * sampleInterval
-            return project(
+        // 与时间拨动的视觉语义一致：轨迹取真实过去时刻，而不是固定长度装饰。
+        // 8 个历史相位由整帧共享，固定成本仍为 24 × 8 次轻量轨道投影。
+        let projected = phaseTimes.map { phaseTime in
+            project(
                 preset.position(
                     of: satellite,
-                    phaseTime: timeline.satellitePhaseTime - age
+                    phaseTime: phaseTime
                 ),
                 geometry: geometry,
                 orientation: viewOrientation
@@ -474,6 +566,19 @@ struct BootOrbitalFieldView: View {
                     lineCap: .round
                 )
             )
+        }
+    }
+
+    private func historicalTrailPhaseTimes() -> [TimeInterval] {
+        guard timeline.trailPresence > 0.01 else { return [] }
+        let sampleCount = BootOrbitalScenePreset.trailSampleCount
+        let sampleInterval = BootOrbitalScenePreset.trailSampleInterval
+        return (0 ..< sampleCount).map { index in
+            let age = Double(sampleCount - 1 - index) * sampleInterval
+            return BootOrbitalTimeline(
+                elapsed: max(0, timeline.elapsed - age),
+                reducedMotion: timeline.reducedMotion
+            ).satellitePhaseTime
         }
     }
 
