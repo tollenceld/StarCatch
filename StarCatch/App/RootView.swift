@@ -20,6 +20,7 @@ enum SkyTopBarMetrics {
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.dynamicTypeSize) private var systemDynamicTypeSize
     /// 11 MB 轨道目录必须在首帧之后于后台解析；同步构造会让系统 Launch Screen
     /// 持续占据屏幕，用户只能看到一段没有反馈的纯黑。
     @State private var session: SkySession?
@@ -27,7 +28,7 @@ struct RootView: View {
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
-    /// 全屏阅读阶段与天空互斥；筛选、记录和设置作为天空之上的全屏工具页呈现。
+    /// 全屏阅读阶段与天空互斥；工具面板保留其下方的天空实例。
     private enum Stage {
         case booting
         case manual
@@ -39,30 +40,34 @@ struct RootView: View {
     @State private var stage: Stage = .booting
     @State private var presentedPage: AppPageDestination?
     @State private var skyRenderingSuspended = false
+    @State private var panelProgress = 0.0
+    @State private var dockFrame: CGRect = .zero
+    @State private var panelSourceFrame: CGRect = .zero
+    @State private var panelLifecycle = UtilityPanelLifecycle()
+    @State private var panelTransitionTask: Task<Void, Never>?
+    @State private var settingsReturnTask: Task<Void, Never>?
+    @State private var settingsReturnPending = false
     @State private var manualReturnsToSettings = false
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     private var sceneAnimation: Animation {
-        reducedMotion || systemReducedMotion ? .easeOut(duration: 0.16) : Motion.sceneTransition
+        suppressMotion ? .easeOut(duration: 0.16) : Motion.sceneTransition
     }
     private var contentPageTransition: AnyTransition {
-        guard !reducedMotion, !systemReducedMotion else { return .opacity }
+        guard !suppressMotion else { return .opacity }
         return .asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         )
     }
-    private var utilityPageAnimation: Animation {
-        reducedMotion || systemReducedMotion
-            ? .easeOut(duration: 0.16)
-            : Motion.sceneTransition
-    }
-    private var utilityPageTransition: AnyTransition {
-        guard !reducedMotion, !systemReducedMotion else { return .opacity }
-        return .move(edge: .trailing).combined(with: .opacity)
-    }
-    private var utilityPageTransitionDuration: TimeInterval {
-        reducedMotion || systemReducedMotion ? 0.16 : 0.54
+    private var suppressMotion: Bool { reducedMotion || systemReducedMotion || debugFlag("--previewReduceMotion") }
+
+    private func debugFlag(_ flag: String) -> Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains(flag)
+        #else
+        false
+        #endif
     }
     private var forceLegacyMaterial: Bool {
         #if DEBUG
@@ -76,7 +81,7 @@ struct RootView: View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            // 工具页出现时保留同一个天空实例；页面覆盖完成后才暂停昂贵绘制。
+            // 工具面板出现时保留同一个天空实例与冻结绘制表面。
             if stage == .sky, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
@@ -106,14 +111,6 @@ struct RootView: View {
                 }
             }
 
-            if stage == .sky,
-               let destination = presentedPage,
-               let session {
-                appPage(destination, session: session)
-                    .transition(utilityPageTransition)
-                    .zIndex(20)
-            }
-
             // 手册：从设置中按需重新打开
             if stage == .manual, let session {
                 ManualBookView(
@@ -136,7 +133,7 @@ struct RootView: View {
             if stage == .booting {
                 OrbitalBootView(preparation: bootPreparation) {
                     withAnimation(
-                        reducedMotion || systemReducedMotion
+                        suppressMotion
                             ? .easeOut(duration: 0.16)
                             : Motion.bootHandoff
                     ) {
@@ -156,10 +153,58 @@ struct RootView: View {
                 .transition(contentPageTransition)
             }
         }
+        .coordinateSpace(name: "appChrome")
+        .onPreferenceChange(CommandDockFrameKey.self) { frame in
+            if presentedPage == nil { dockFrame = frame }
+        }
+        .overlay {
+            if stage == .sky, let destination = presentedPage, let session {
+                GeometryReader { geometry in
+                    let source = panelSourceFrame.width > 0 ? panelSourceFrame : CGRect(
+                        x: AppChromeMetrics.edgeInset,
+                        y: geometry.size.height - 8 - AppChromeMetrics.commandRailHeight,
+                        width: geometry.size.width - AppChromeMetrics.edgeInset * 2,
+                        height: AppChromeMetrics.commandRailHeight
+                    )
+                    UtilityPanelContainer(
+                        progress: panelProgress,
+                        source: source,
+                        top: 0,
+                        reducedMotion: suppressMotion,
+                        interactive: panelLifecycle.phase == .open,
+                        filtersActive: session.activeCatalogFilterCount > 0,
+                        showsCommands: capture.phase == .exploring,
+                        onDismiss: dismissPage
+                    ) {
+                        appPage(destination, session: session)
+                    }
+                }
+                .transition(.identity)
+            }
+        }
         .task { await prepareSession() }
+        .task(id: stage == .sky) {
+            #if DEBUG
+            guard stage == .sky,
+                  ProcessInfo.processInfo.arguments.contains("--previewUtilityPanels") else { return }
+            do {
+                try await Task.sleep(for: .seconds(1))
+                for destination: AppPageDestination in [.filters, .observations, .settings(initialRoute: nil)] {
+                    guard !Task.isCancelled, scenePhase == .active, presentedPage == nil else { return }
+                    presentPage(destination)
+                    try await Task.sleep(for: .seconds(1.8))
+                    guard !Task.isCancelled, scenePhase == .active else { return }
+                    dismissPage()
+                    try await Task.sleep(for: .seconds(0.8))
+                }
+            } catch { return }
+            #endif
+        }
         .onChange(of: stage) { _, newStage in
             if newStage != .sky {
+                cancelPanelTransition()
                 presentedPage = nil
+                panelProgress = 0
                 skyRenderingSuspended = false
             }
             synchronizeSessionActivity()
@@ -172,14 +217,24 @@ struct RootView: View {
             case .active:
                 clock.resume()
                 synchronizeSessionActivity()
+                if settingsReturnPending { reopenSettingsAfterFullScreenReturn() }
             case .inactive, .background:
+                settlePanelTransition()
+                settingsReturnTask?.cancel()
                 session?.stop()
                 clock.suspend()
             @unknown default:
                 break
             }
         }
+        .onDisappear {
+            cancelPanelTransition()
+            settingsReturnTask?.cancel()
+        }
         .environment(\.forceLegacyMaterial, forceLegacyMaterial)
+        .environment(\.chromePreviewReducedMotion, debugFlag("--previewReduceMotion"))
+        .environment(\.chromePreviewReducedTransparency, debugFlag("--previewReduceTransparency"))
+        .environment(\.dynamicTypeSize, debugFlag("--previewLargeType") ? .accessibility3 : systemDynamicTypeSize)
     }
 
     @ViewBuilder
@@ -206,44 +261,91 @@ struct RootView: View {
     }
 
     private func presentPage(_ destination: AppPageDestination) {
-        guard stage == .sky, presentedPage == nil else { return }
-        skyRenderingSuspended = false
-        withAnimation(utilityPageAnimation) {
-            presentedPage = destination
-        }
-        let delay = utilityPageTransitionDuration
-        Task { @MainActor in
-            try? await Task.sleep(for: .seconds(delay))
-            guard presentedPage == destination else { return }
-            skyRenderingSuspended = true
+        guard stage == .sky, presentedPage == nil, scenePhase == .active else { return }
+        panelSourceFrame = dockFrame
+        panelProgress = 0
+        presentedPage = destination
+        skyRenderingSuspended = true
+        let generation = panelLifecycle.begin(expanding: true)
+        panelTransitionTask = Task { @MainActor in
+            // Establish the 64pt source before the first animated transaction.
+            await Task.yield()
+            guard !Task.isCancelled, panelLifecycle.generation == generation else { return }
+            withAnimation(DockMorphMetrics.animation(expanding: true, reduced: suppressMotion)) {
+                panelProgress = 1
+            }
+            do { try await Task.sleep(for: .seconds(DockMorphMetrics.duration(expanding: true, reduced: suppressMotion))) }
+            catch { return }
+            guard !Task.isCancelled else { return }
+            panelLifecycle.complete(generation: generation)
         }
     }
 
     private func dismissPage() {
-        guard presentedPage != nil else { return }
+        guard presentedPage != nil, panelLifecycle.phase == .open else { return }
+        panelTransitionTask?.cancel()
+        let generation = panelLifecycle.begin(expanding: false)
         skyRenderingSuspended = false
-        withAnimation(utilityPageAnimation) {
+        withAnimation(DockMorphMetrics.animation(expanding: false, reduced: suppressMotion)) {
+            panelProgress = 0
+        }
+        panelTransitionTask = Task { @MainActor in
+            do { try await Task.sleep(for: .seconds(DockMorphMetrics.duration(expanding: false, reduced: suppressMotion))) }
+            catch { return }
+            guard !Task.isCancelled, panelLifecycle.complete(generation: generation) else { return }
             presentedPage = nil
         }
     }
 
+    private func cancelPanelTransition() {
+        panelTransitionTask?.cancel()
+        panelTransitionTask = nil
+        panelLifecycle.reset()
+    }
+
+    private func settlePanelTransition() {
+        panelTransitionTask?.cancel()
+        panelTransitionTask = nil
+        panelLifecycle.settle()
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if panelLifecycle.phase == .hidden {
+                presentedPage = nil
+                panelProgress = 0
+                skyRenderingSuspended = false
+            } else if presentedPage != nil {
+                panelProgress = 1
+                skyRenderingSuspended = true
+            }
+        }
+    }
+
     private func openManualFromSettings() {
+        cancelPanelTransition()
         presentedPage = nil
+        panelProgress = 0
         skyRenderingSuspended = false
         manualReturnsToSettings = true
         withAnimation(sceneAnimation) { stage = .manual }
     }
 
     private func openPrivacyFromSettings() {
+        cancelPanelTransition()
         presentedPage = nil
+        panelProgress = 0
         skyRenderingSuspended = false
         withAnimation(sceneAnimation) { stage = .privacy }
     }
 
     private func reopenSettingsAfterFullScreenReturn() {
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(180))
-            guard stage == .sky else { return }
+        settingsReturnPending = true
+        settingsReturnTask?.cancel()
+        settingsReturnTask = Task { @MainActor in
+            do { try await Task.sleep(for: .milliseconds(180)) }
+            catch { return }
+            guard !Task.isCancelled, stage == .sky, scenePhase == .active else { return }
+            settingsReturnPending = false
             presentPage(.settings(initialRoute: nil))
         }
     }
@@ -290,9 +392,11 @@ struct RootView: View {
     }
 
     #if DEBUG
-    /// 调试参数：--skipBoot 跳过启动序列；--openFilter / --openInstrument 直接打开全屏工具页；
+    /// 调试参数：--skipBoot 跳过启动序列；--openFilter / --openInstrument 直接打开工具面板；
     /// --openStatus / --openObservations 直接进入状态或记录页；
     /// --seedObservations 为记录页写入一组可滚动的本地调试记录；
+    /// --previewUtilityPanels 自动演示三页正常展开与收回（不模拟正文手势）；
+    /// --previewLargeType / --previewReduceMotion / --previewReduceTransparency 仅覆盖调试环境，不改系统偏好；
     /// --forceManual 强制跳到手册（配合 --manualPage <n>）；
     /// --markManualSeen 强制视为已看过手册，直接进 sky；
     /// --emptySky 把模拟器初始指向移到空域；
@@ -336,6 +440,12 @@ struct RootView: View {
         if args.contains("--openPrivacy") {
             presentedPage = nil
             stage = .privacy
+        }
+        if presentedPage != nil {
+            let generation = panelLifecycle.begin(expanding: true)
+            panelLifecycle.complete(generation: generation)
+            panelProgress = 1
+            skyRenderingSuspended = true
         }
         if args.contains("--emptySky") {
             session.manualProvider?.drag(translation: CGSize(width: -800, height: -100))

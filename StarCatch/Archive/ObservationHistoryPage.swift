@@ -24,7 +24,7 @@ struct ObservationHistorySection: Identifiable {
     }
 }
 
-/// 全屏观测记录。使用系统 List 协调纵向滚动与左滑删除，避免自定义 DragGesture
+/// 面板内的观测记录。使用系统 List 协调纵向滚动与左滑删除，避免自定义 DragGesture
 /// 抢占滚动手势。
 struct ObservationHistoryPage: View {
     let session: SkySession
@@ -278,7 +278,8 @@ struct ObservationHistoryPage: View {
         AppPageShell(
             backTitle: copy("navigation.observations"),
             title: copy("navigation.observation_detail"),
-            onBack: popDetail
+            onBack: popDetail,
+            isRoot: false
         ) {
             observationDetail(objectID: objectID)
         }

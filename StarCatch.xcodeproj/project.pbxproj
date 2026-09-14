@@ -21,6 +21,7 @@
 		21F5EF356F93C7D06E28E3F2 /* ManualBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6B847A4F87DAAF9559DDBA0 /* ManualBookView.swift */; };
 		26E5EFACEF7E03DD64169A4C /* bright_stars_bsc5p.bin in Resources */ = {isa = PBXBuildFile; fileRef = DE151DF9DAA8D2B9D855B010 /* bright_stars_bsc5p.bin */; };
 		2CDBBABDE3C012FF82691BD3 /* SkyCommandDock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A55E248D745507E34A339FF /* SkyCommandDock.swift */; };
+		2ED2D5E3946B083921063751 /* DockMorph.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C44AFBAE82ADE5F36655FE6 /* DockMorph.swift */; };
 		2FCC2E3974F45F4973293A3A /* SkyClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */; };
 		352EAAF4270E9334DC47F26E /* Grain.metal in Sources */ = {isa = PBXBuildFile; fileRef = 54D43B6181117F9B6935B886 /* Grain.metal */; };
 		39A138A742BE73310774170E /* satellite_profiles.json in Resources */ = {isa = PBXBuildFile; fileRef = 7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */; };
@@ -35,6 +36,7 @@
 		5E50679C759F41669BB6A568 /* SkySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1242DAD73E4C1124A97F05 /* SkySession.swift */; };
 		5ED6B3516EEDE0915D439471 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9F2A45838C56EA1F6114C60 /* RootView.swift */; };
 		606A8D0AEF6B51252C88DE5A /* Projection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */; };
+		6A49C7C199643849DFFE4832 /* PointingCoordinateReadout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96A1C8B49CDE126E3A4B8517 /* PointingCoordinateReadout.swift */; };
 		73C3BE50D1FA30FC38D0FEF9 /* OverviewAtmosphereTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94E3592F1D02D6A366D866CF /* OverviewAtmosphereTests.swift */; };
 		787205462F44B77336DE3CB2 /* EphemerisEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CAEF5F15EA29265AD47221C /* EphemerisEngine.swift */; };
 		79807E3EBF4A6032770A5EF3 /* SkyRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */; };
@@ -60,6 +62,7 @@
 		CCDE460945E44F44FFEC0B1B /* SkyChromeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9821C0F786817CDB792B2A9 /* SkyChromeState.swift */; };
 		CD45D853E0586732FB9B0572 /* OverviewAmbientTrailPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */; };
 		D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */; };
+		D10840282DF79F9C1E52A0B2 /* GlobalDockMorph.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FD59376544CBC8CACFDB96 /* GlobalDockMorph.swift */; };
 		D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */; };
 		D25E6AC16A24F696AB385FE6 /* StarDust.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0DD4A47C1FFC53DCB2FBCA2 /* StarDust.swift */; };
 		D6B0C3F23DBC479010F267E5 /* SatelliteInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = 102D414062D83F764F4ABE36 /* SatelliteInsights.swift */; };
@@ -118,6 +121,7 @@
 		68DA121A3B77B11BF915A698 /* ManualPointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManualPointingProvider.swift; sourceTree = "<group>"; };
 		790DFD44DB0F129F096490F9 /* TrackSampler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackSampler.swift; sourceTree = "<group>"; };
 		7BCF9F6E821508EF468F9B83 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		7C44AFBAE82ADE5F36655FE6 /* DockMorph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DockMorph.swift; sourceTree = "<group>"; };
 		7CDEE5FF1B933D8AF1C1D67B /* catalog.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = catalog.json; sourceTree = "<group>"; };
 		7D4E7AF8C1EF0E9831DF0B0B /* satellite_profiles.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = satellite_profiles.json; sourceTree = "<group>"; };
 		7EC47464247306D244B9499E /* AppLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLinks.swift; sourceTree = "<group>"; };
@@ -125,9 +129,11 @@
 		8E2E05D9DE4E02C4A53A4729 /* ArchiveTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveTopBar.swift; sourceTree = "<group>"; };
 		8FFCF6999D69B253CFAF67DB /* SatelliteStoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SatelliteStoryView.swift; sourceTree = "<group>"; };
 		94E3592F1D02D6A366D866CF /* OverviewAtmosphereTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewAtmosphereTests.swift; sourceTree = "<group>"; };
+		96A1C8B49CDE126E3A4B8517 /* PointingCoordinateReadout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointingCoordinateReadout.swift; sourceTree = "<group>"; };
 		9861BF03D2309E5C83352667 /* ObserverLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObserverLocation.swift; sourceTree = "<group>"; };
 		9A55E248D745507E34A339FF /* SkyCommandDock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyCommandDock.swift; sourceTree = "<group>"; };
 		A3ED49626A8ECAFCCD5421A5 /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
+		A3FD59376544CBC8CACFDB96 /* GlobalDockMorph.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalDockMorph.swift; sourceTree = "<group>"; };
 		A82392A041A3771106B6DE8D /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
 		A9E5B1529B1CE8693E33F30E /* StarCatchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = StarCatchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AB167B224BDD0ECF02BBB8EB /* Motion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Motion.swift; sourceTree = "<group>"; };
@@ -229,6 +235,7 @@
 		6A69FD009B896384CF4E2B9E /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				7C44AFBAE82ADE5F36655FE6 /* DockMorph.swift */,
 				AB167B224BDD0ECF02BBB8EB /* Motion.swift */,
 				B47C592100FBDC1B43902AB9 /* Palette.swift */,
 				A3ED49626A8ECAFCCD5421A5 /* Typography.swift */,
@@ -320,8 +327,10 @@
 				CA3613AB785EE9DC5B915AA7 /* BrightStarField.swift */,
 				36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */,
 				564E914E0FCAF7E1D356084A /* EarthCoastlineStore.swift */,
+				A3FD59376544CBC8CACFDB96 /* GlobalDockMorph.swift */,
 				CAF27856B0B0583E61AC5532 /* ObservationHaptics.swift */,
 				2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */,
+				96A1C8B49CDE126E3A4B8517 /* PointingCoordinateReadout.swift */,
 				4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */,
 				116D67906640E5C006C8B390 /* SkyActionControls.swift */,
 				E9821C0F786817CDB792B2A9 /* SkyChromeState.swift */,
@@ -510,8 +519,10 @@
 				100E9ECA0F4E99680CD2DA35 /* CatalogFilterControl.swift in Sources */,
 				1DD6FD7136765D4481A4F5CF /* CatalogModels.swift in Sources */,
 				ACF22B027FC0CE7B3B4EE2D3 /* CatalogStore.swift in Sources */,
+				2ED2D5E3946B083921063751 /* DockMorph.swift in Sources */,
 				C459C00D31425977719942A9 /* EarthCoastlineStore.swift in Sources */,
 				787205462F44B77336DE3CB2 /* EphemerisEngine.swift in Sources */,
+				D10840282DF79F9C1E52A0B2 /* GlobalDockMorph.swift in Sources */,
 				352EAAF4270E9334DC47F26E /* Grain.metal in Sources */,
 				CA51C079E576A541FD7085AD /* Localization.swift in Sources */,
 				21F5EF356F93C7D06E28E3F2 /* ManualBookView.swift in Sources */,
@@ -525,6 +536,7 @@
 				CD45D853E0586732FB9B0572 /* OverviewAmbientTrailPolicy.swift in Sources */,
 				F260B9BA3A5AA778CCC17F6B /* Palette.swift in Sources */,
 				E3E01010329E67DE6D88DD2A /* PassPredictor.swift in Sources */,
+				6A49C7C199643849DFFE4832 /* PointingCoordinateReadout.swift in Sources */,
 				41842BB1588778C8C6A29FD6 /* PointingProvider.swift in Sources */,
 				CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */,
 				606A8D0AEF6B51252C88DE5A /* Projection.swift in Sources */,

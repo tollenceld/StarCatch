@@ -8,6 +8,110 @@ import simd
 final class TimeTests: XCTestCase {
     private static let store = CatalogStore()
 
+    func testCaptureSignalUsesGreenOnlyAfterRecognitionOrLock() {
+        XCTAssertEqual(SkyStatusIndicator.Mode.observing.signal, .red)
+        XCTAssertEqual(SkyStatusIndicator.Mode.degraded(reason: "unavailable").signal, .red)
+        XCTAssertEqual(SkyStatusIndicator.Mode.sensing.signal, .yellow)
+        XCTAssertEqual(SkyStatusIndicator.Mode.focusing.signal, .yellow)
+        XCTAssertEqual(SkyStatusIndicator.Mode.locked(identifier: "ISS", confirmedAt: nil).signal, .green)
+        XCTAssertEqual(SkyStatusIndicator.Mode.releasing(identifier: "ISS").signal, .green)
+        XCTAssertTrue(SkyStatusIndicator.Mode.releasing(identifier: "ISS").isReleasing)
+    }
+
+    func testPointingReadoutWrapsAzimuthAndKeepsSignedElevation() {
+        XCTAssertEqual(PointingReadoutSample.parse("AZ 360°", wrapping: true), 0)
+        XCTAssertEqual(PointingReadoutSample.parse("EL -09°", wrapping: false), -9)
+        XCTAssertEqual(PointingReadoutSample.parse("EL +90°", wrapping: false), 90)
+        XCTAssertEqual(PointingReadoutSample.delta(from: 359, to: 0, wrapping: true), 1)
+        XCTAssertEqual(PointingReadoutSample.delta(from: 0, to: 359, wrapping: true), -1)
+        XCTAssertEqual(PointingReadoutSample.delta(from: -10, to: 10, wrapping: false), 20)
+    }
+
+    func testPointingReadoutCoalescesToSixHertzAndIgnoresUnchangedIntegers() {
+        var sample = PointingReadoutSample(azimuth: "AZ 359°", elevation: "EL +00°")
+        XCTAssertTrue(sample.update(azimuth: "AZ 000°", elevation: "EL -01°", at: 10))
+        XCTAssertTrue(sample.azimuthIncreasing)
+        XCTAssertFalse(sample.elevationIncreasing)
+        XCTAssertFalse(sample.update(azimuth: "AZ 001°", elevation: "EL -02°", at: 10.1))
+        XCTAssertEqual(sample.azimuth, 0)
+        XCTAssertTrue(sample.update(azimuth: "AZ 002°", elevation: "EL -03°", at: 10 + 1.0 / 6))
+        XCTAssertEqual(sample.azimuth, 2)
+        XCTAssertEqual(sample.elevation, -3)
+        XCTAssertFalse(sample.update(azimuth: "AZ 002°", elevation: "EL -03°", at: 11))
+    }
+
+    func testDockMorphKeepsBottomAnchorAndStartsAtRailHeight() {
+        let target = DockMorphMetrics.panelHeight(bottom: 780, top: 20)
+        XCTAssertEqual(target, 760 * 0.84, accuracy: 0.001)
+        XCTAssertEqual(DockMorphMetrics.height(progress: 0, target: target), 64)
+        XCTAssertEqual(DockMorphMetrics.height(progress: 1, target: target), target)
+        XCTAssertEqual(DockMorphMetrics.height(progress: -1, target: target), 64)
+        XCTAssertEqual(DockMorphMetrics.height(progress: 2, target: target), target)
+        for step in 1...100 {
+            let before = DockMorphMetrics.height(progress: Double(step - 1) / 100, target: target)
+            let after = DockMorphMetrics.height(progress: Double(step) / 100, target: target)
+            XCTAssertGreaterThanOrEqual(after, before)
+        }
+    }
+
+    func testDockMorphRevealsHeaderBeforeBodyAndTimelineAfterGlobeHandoff() {
+        XCTAssertEqual(DockMorphMetrics.commandsPresence(0), 1)
+        XCTAssertEqual(DockMorphMetrics.commandsPresence(0.28), 0)
+        XCTAssertGreaterThan(DockMorphMetrics.headerReveal(0.4), DockMorphMetrics.contentReveal(0.4))
+        XCTAssertEqual(DockMorphMetrics.timelineReveal(0.58), 0)
+        XCTAssertEqual(DockMorphMetrics.timelineReveal(1), 1)
+        XCTAssertEqual(DockMorphMetrics.headerReveal(1), 1)
+        XCTAssertEqual(DockMorphMetrics.contentReveal(1), 1)
+        XCTAssertEqual(DockMorphMetrics.duration(expanding: true, reduced: false), 0.48)
+        XCTAssertEqual(DockMorphMetrics.duration(expanding: false, reduced: false), 0.32)
+        XCTAssertEqual(DockMorphMetrics.duration(expanding: true, reduced: true), 0.14)
+        XCTAssertEqual(DockMorphMetrics.duration(expanding: false, reduced: true), 0.14)
+    }
+
+    func testPanelHeaderDismissRequiresDecisiveDownwardMovement() {
+        XCTAssertTrue(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 8, height: 80), predicted: .zero))
+        XCTAssertTrue(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 8, height: 40), predicted: CGSize(width: 0, height: 160)))
+        XCTAssertFalse(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 50, height: 60), predicted: CGSize(width: 0, height: 200)))
+        XCTAssertFalse(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 0, height: -100), predicted: .zero))
+        XCTAssertFalse(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 0, height: 20), predicted: CGSize(width: 0, height: 200)))
+    }
+
+    func testPanelLifecycleSettlesOnBackgroundAndRejectsOldCompletions() {
+        var lifecycle = UtilityPanelLifecycle()
+        let first = lifecycle.begin(expanding: true)
+        XCTAssertEqual(lifecycle.phase, .opening)
+        lifecycle.settle()
+        XCTAssertEqual(lifecycle.phase, .open)
+        XCTAssertFalse(lifecycle.complete(generation: first))
+        let closing = lifecycle.begin(expanding: false)
+        lifecycle.settle()
+        XCTAssertEqual(lifecycle.phase, .hidden)
+        let next = lifecycle.begin(expanding: true)
+        XCTAssertFalse(lifecycle.complete(generation: closing))
+        XCTAssertTrue(lifecycle.complete(generation: next))
+        XCTAssertEqual(lifecycle.phase, .open)
+        lifecycle.reset()
+        XCTAssertEqual(lifecycle.phase, .hidden)
+        XCTAssertFalse(lifecycle.complete(generation: next))
+    }
+
+    func testCaptureSamplingResumeDoesNotCountCoveredTimeAsDwell() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 1_750_000_000)
+        capture.update(nearest: ("iss", 0), captureEnabled: false, now: start)
+        capture.update(nearest: ("iss", 0), captureEnabled: false, now: start.addingTimeInterval(0.1))
+        let progress = capture.acquisitionProgress
+        let resume = start.addingTimeInterval(120)
+        capture.resumeSampling(now: resume)
+        capture.update(nearest: ("iss", 0), captureEnabled: false, now: resume)
+        XCTAssertEqual(capture.acquisitionProgress, progress, accuracy: 0.000_001)
+        XCTAssertFalse(capture.recognitionReady)
+        XCTAssertEqual(capture.phase, .acquiring(objectId: "iss"))
+        XCTAssertTrue(capture.confirmAcquisition(now: resume))
+        capture.resumeSampling(now: resume.addingTimeInterval(120))
+        XCTAssertEqual(capture.phase, .locked(objectId: "iss"))
+    }
+
     func testObservationLogPersistsRealSnapshotRemovesAndClears() throws {
         let suiteName = "StarCatchTests.ObservationLog.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

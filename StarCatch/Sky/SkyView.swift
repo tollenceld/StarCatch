@@ -12,7 +12,7 @@ struct SkyView: View {
     @ObservedObject var session: SkySession
     @ObservedObject var capture: CaptureStateMachine
     @ObservedObject var clock: SkyClock
-    /// 工具页出现后立即暂停捕获；完全覆盖天空后再移除 30fps 绘制表面。
+    /// 工具面板暂停采样与绘制，但保留同一个绘制表面和最后观测时刻。
     var isUtilityPagePresented = false
     var renderingSuspended = false
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
@@ -25,13 +25,16 @@ struct SkyView: View {
     var initialOverviewPresented: Bool = false
     var onInitialOverviewHandled: () -> Void = {}
 
-    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.accessibilityReduceMotion) private var platformReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
+    private var systemReducedMotion: Bool { platformReducedMotion || previewReducedMotion }
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
 
     private let dust = StarDust()
     /// 时间偏移会高频发布；这些引用必须跨 View 值重建持久存在。
     @State private var startDate = Date()
+    @State private var frozenFrameDate: Date?
     @StateObject private var screenTrails = TrailStore()
     /// 常驻星图使用较长但有界的缓存；10fps 采样，最多约 9 秒光轨。
     @StateObject private var overviewTrails = TrailStore(
@@ -103,11 +106,6 @@ struct SkyView: View {
         let wideReduction = 1 - 0.46 * wideFieldProgress
         return wideReduction * (1 - overviewPresentationProgress)
     }
-    private var localBottomPresence: Double {
-        ObservationScale.eased(
-            (0.72 - overviewPresentationProgress) / 0.5
-        )
-    }
     private var localSkyPresence: Double {
         overviewTransitionVisuals.localSkyOpacity
     }
@@ -144,9 +142,10 @@ struct SkyView: View {
 
     private var renderingSurface: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-                let time = timeline.date.timeIntervalSince(startDate)
-                let obsTime = clock.observationTime(realNow: timeline.date)
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: renderingSuspended)) { timeline in
+                let frameDate = frozenFrameDate ?? timeline.date
+                let time = frameDate.timeIntervalSince(startDate)
+                let obsTime = clock.observationTime(realNow: frameDate)
 
                 ZStack(alignment: .topLeading) {
                     canvasLayer(time: time, observation: obsTime)
@@ -170,6 +169,7 @@ struct SkyView: View {
                     )
                 )
                 .onChange(of: timeline.date) { _, frameDate in
+                    guard !renderingSuspended else { return }
                     updateFrame(
                         at: frameDate,
                         observationTime: obsTime,
@@ -212,14 +212,9 @@ struct SkyView: View {
     }
 
     var body: some View {
-        Group {
-            if renderingSuspended {
-                Palette.voidBlack
-                    .ignoresSafeArea()
-                    .accessibilityHidden(true)
-            } else {
-                interactionSurface
-            }
+        interactionSurface
+        .onChange(of: renderingSuspended, initial: true) { _, suspended in
+            frozenFrameDate = suspended ? Date() : nil
         }
         .onAppear {
             EarthCoastlineStore.shared.prepare()
@@ -463,7 +458,12 @@ struct SkyView: View {
             }
         }
         .onChange(of: isUtilityPagePresented) { _, presented in
-            if presented { dismissTransientOverlay() }
+            if presented {
+                dismissTransientOverlay()
+            } else {
+                capture.resumeSampling()
+                lastCaptureSample = -.infinity
+            }
         }
     }
 
@@ -664,19 +664,23 @@ struct SkyView: View {
 
     // MARK: - 底部观测动作 / 全局常驻时间标尺
 
-    /// 主天空保留四槽控制；全局轨道页只保留时间轴。转场期间两者沿同一进度
-    /// 交叉淡化，避免把主界面的导航语义带进独立的全球页面。
+    /// 地球保持既有场景进度；只有下缘仪器表面从四槽基座长成时间标尺。
     private var bottomControlBand: some View {
         ZStack(alignment: .bottom) {
             if presentationMode.presentsOverview {
-                TimeDial(clock: clock)
+                GlobalDockMorph(
+                    progress: overviewPresentationProgress,
+                    reducedMotion: suppressMotion,
+                    interactive: presentationMode == .global,
+                    clock: clock,
+                    filtersActive: session.activeCatalogFilterCount > 0
+                )
                     .padding(.horizontal, AppChromeMetrics.edgeInset)
                     .padding(.bottom, 8)
-                    .opacity(overviewPresentationProgress)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .transition(.identity)
             }
 
-            if presentationMode != .global {
+            if presentationMode == .local {
                 Group {
                     if chromeState.dockMode == .targetSummary,
                        let id = retainedDetailObjectID,
@@ -686,8 +690,7 @@ struct SkyView: View {
                         localCommandColumn
                     }
                 }
-                .opacity(localBottomPresence)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .transition(.identity)
             }
         }
         .animation(
@@ -730,6 +733,7 @@ struct SkyView: View {
             if chromeState.resetAction == .localField {
                 FieldOfViewResetControl(action: resetLocalFieldOfView)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .opacity(isUtilityPagePresented ? 0 : 1)
             }
 
             SkyCommandDock(
@@ -740,8 +744,17 @@ struct SkyView: View {
                 onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
                 onOpenSettings: openInstrument,
-                onPrimaryAction: performPrimaryAction
+                onPrimaryAction: performPrimaryAction,
+                showsSurface: !isUtilityPagePresented
             )
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: CommandDockFrameKey.self,
+                        value: geometry.frame(in: .named("appChrome"))
+                    )
+                }
+            }
         }
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .padding(.bottom, 8)
@@ -986,6 +999,7 @@ struct SkyView: View {
                     elevation: statusElevation,
                     presence: statusPresence,
                     activation: statusActivation,
+                    updatesPaused: renderingSuspended,
                     islandLayout: islandLayout,
                     islandGapWidth: islandMetrics.islandGapWidth,
                     islandStatusWingWidth: islandMetrics.statusWingWidth,
@@ -1095,6 +1109,7 @@ struct SkyView: View {
     }
 
     private var statusActivation: Double {
+        if isReleasing { return 1 - releasePresentationProgress(at: frozenFrameDate ?? Date()) }
         if archivePresentationReady { return 1 }
         if capture.isAcquiring { return capture.acquisitionProgress }
         return 0

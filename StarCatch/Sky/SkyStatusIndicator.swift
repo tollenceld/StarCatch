@@ -9,8 +9,10 @@ struct SkyWingSurfaceModifier: ViewModifier {
     let cornerRadius: CGFloat
     var interactive = true
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
     @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+    private var reduceTransparency: Bool { systemReduceTransparency || previewReduceTransparency }
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -238,6 +240,17 @@ struct DynamicIslandWingMetrics: Equatable {
 /// 让系统区域成为构图的一部分，而不是再在下方叠一条完整 Banner。
 struct SkyStatusIndicator: View {
 
+    enum Signal: Equatable {
+        case red, yellow, green
+        var tint: Color {
+            switch self {
+            case .red: Color(hex: 0xD1776E)
+            case .yellow: Color(hex: 0xD6B264)
+            case .green: Color(hex: 0x8BBC9B)
+            }
+        }
+    }
+
     enum Mode: Equatable {
         case observing
         case sensing
@@ -274,12 +287,17 @@ struct SkyStatusIndicator: View {
             }
         }
 
-        var indicatorTint: Color {
+        var signal: Signal {
             switch self {
-            case .observing, .field: Palette.inkMid
-            case .sensing, .focusing, .locked, .releasing: Palette.signal
-            case .degraded: Palette.legacyTint
+            case .observing, .field, .degraded: .red
+            case .sensing, .focusing: .yellow
+            case .locked, .releasing: .green
             }
+        }
+
+        var isReleasing: Bool {
+            if case .releasing = self { return true }
+            return false
         }
 
         var breathes: Bool {
@@ -307,6 +325,7 @@ struct SkyStatusIndicator: View {
     let elevation: String
     let presence: Double
     var activation: Double = 0
+    var updatesPaused = false
     var islandLayout: Bool = true
     var islandGapWidth: CGFloat = 134
     var islandStatusWingWidth: CGFloat = 116
@@ -319,37 +338,38 @@ struct SkyStatusIndicator: View {
     var onDirectionTap: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
 
-    private var suppressMotion: Bool { reducedMotion || systemReducedMotion }
+    private var suppressMotion: Bool { reducedMotion || systemReducedMotion || previewReducedMotion }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 10.0, paused: false)) { timeline in
+        TimelineView(.animation(minimumInterval: PointingReadoutSample.minimumInterval, paused: updatesPaused)) { timeline in
             let breath = mode.breathes && !suppressMotion
                 ? Motion.breath(at: timeline.date.timeIntervalSinceReferenceDate)
                 : 1
             let label = mode.label(at: timeline.date)
 
             if islandLayout {
-                islandWingPair(label: label, breath: breath)
+                islandWingPair(label: label, breath: breath, date: timeline.date)
             } else if #available(iOS 26.0, *) {
                     GlassEffectContainer(spacing: 12) {
-                        compactWingPair(label: label, breath: breath)
+                        compactWingPair(label: label, breath: breath, date: timeline.date)
                     }
                     .frame(maxWidth: .infinity)
             } else {
-                compactWingPair(label: label, breath: breath)
+                compactWingPair(label: label, breath: breath, date: timeline.date)
                     .frame(maxWidth: .infinity)
             }
         }
         .opacity(presence)
         .animation(
-            suppressMotion ? .easeOut(duration: 0.14) : Motion.interfaceExpand,
+            .easeOut(duration: suppressMotion ? 0.14 : 0.24),
             value: mode
         )
     }
 
-    private func islandWingPair(label: String, breath: Double) -> some View {
+    private func islandWingPair(label: String, breath: Double, date: Date) -> some View {
         GeometryReader { geo in
             if backTitle != nil {
                 statusWing(label: label, breath: breath)
@@ -364,7 +384,7 @@ struct SkyStatusIndicator: View {
                 let centerX = geo.size.width / 2
                 let directionCenterOffset = islandGapWidth / 2
                     + islandDirectionWingWidth / 2
-                directionWing
+                directionWing(date: date)
                     .frame(width: islandDirectionWingWidth, alignment: .leading)
                     .position(
                         x: centerX + directionCenterOffset,
@@ -384,7 +404,7 @@ struct SkyStatusIndicator: View {
                         y: SkyTopBarMetrics.controlHeight / 2
                     )
 
-                directionWing
+                directionWing(date: date)
                     .frame(width: islandDirectionWingWidth, alignment: .leading)
                     .position(
                         x: centerX + directionCenterOffset,
@@ -394,13 +414,13 @@ struct SkyStatusIndicator: View {
         }
     }
 
-    private func compactWingPair(label: String, breath: Double) -> some View {
+    private func compactWingPair(label: String, breath: Double, date: Date) -> some View {
         HStack(spacing: 0) {
             statusWing(label: label, breath: breath)
                 .frame(width: backTitle == nil ? resolvedStatusWingWidth : nil)
                 .fixedSize(horizontal: backTitle != nil, vertical: false)
             Spacer(minLength: 12)
-            directionWing
+            directionWing(date: date)
                 .frame(width: islandDirectionWingWidth)
         }
         .frame(maxWidth: .infinity)
@@ -469,19 +489,14 @@ struct SkyStatusIndicator: View {
     }
 
     @ViewBuilder
-    private var directionWing: some View {
+    private func directionWing(date: Date) -> some View {
         let core = Button(action: onDirectionTap) {
-            HStack(spacing: 4) {
-                Text(azimuth)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Rectangle()
-                    .fill(Palette.inkFaint.opacity(0.3))
-                    .frame(width: 0.5, height: 10)
-                Text(elevation)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
+            PointingCoordinateReadout(
+                azimuth: azimuth,
+                elevation: elevation,
+                sampleDate: date,
+                reducedMotion: suppressMotion
+            )
             .font(.system(size: 8.5, weight: .medium, design: .monospaced))
             .tracking(0.3)
             .foregroundStyle(Palette.inkMid.opacity(Palette.Level.secondary))
@@ -505,21 +520,32 @@ struct SkyStatusIndicator: View {
     }
 
     private func indicator(breath: Double) -> some View {
-        ZStack {
+        let tint = mode.signal.tint
+        let brightness = mode.isReleasing ? 0.25 + 0.75 * activation : 1
+        return ZStack {
+            Circle()
+                .fill(Palette.voidBlack)
+                .overlay { Circle().stroke(tint.opacity(0.32), lineWidth: 0.6) }
+                .frame(width: 9, height: 9)
             if mode.breathes {
                 Circle()
                     .trim(from: 0, to: max(0.18, min(1, activation)))
                     .stroke(
-                        mode.indicatorTint.opacity(0.34 * breath),
+                        tint.opacity(0.65 * breath),
                         style: StrokeStyle(lineWidth: 0.6, lineCap: .round)
                     )
                     .frame(width: 9, height: 9)
                     .rotationEffect(.degrees(-90))
             }
             Circle()
-                .fill(mode.indicatorTint.opacity(Palette.Level.present * breath))
-                .frame(width: 3.5, height: 3.5)
+                .fill(tint.opacity(0.92 * breath * brightness))
+                .frame(width: 5, height: 5)
+                .overlay(alignment: .topLeading) {
+                    Circle().fill(Palette.inkHigh.opacity(0.45 * brightness))
+                        .frame(width: 1.5, height: 1.5).offset(x: 0.6, y: 0.5)
+                }
         }
         .frame(width: 9, height: 9)
+        .accessibilityHidden(true)
     }
 }

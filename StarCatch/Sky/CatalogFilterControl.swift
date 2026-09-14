@@ -47,7 +47,7 @@ struct CatalogFilterSummaryItem: Identifiable, Equatable {
     }
 }
 
-/// 即时作用于当前天空的全屏筛选页。局部状态只负责选中反馈，每次动作同步写回
+/// 即时作用于当前天空的筛选面板。局部状态只负责选中反馈，每次动作同步写回
 /// `SkySession`，返回页面不会撤销已做出的选择。
 struct CatalogFilterPage: View {
     let session: SkySession

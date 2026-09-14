@@ -1,6 +1,6 @@
 import Foundation
 
-/// 主天空之上的全屏工具页面只有一个事实源。关联值只携带轻量路由，
+/// 主天空之上的互斥工具面板只有一个事实源。关联值只携带轻量路由，
 /// 不保存 View 或业务状态。
 enum AppPageDestination: Identifiable, Hashable {
     case filters

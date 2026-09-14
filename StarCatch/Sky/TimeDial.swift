@@ -6,10 +6,11 @@ import SwiftUI
 /// 随时间移动。非 LIVE 时中央读数直接成为“回到此刻”入口，避免再叠加独立底栏。
 struct TimeDial: View {
     @ObservedObject var clock: SkyClock
+    var showsSurface = true
 
-    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+    @Environment(\.accessibilityReduceMotion) private var platformReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
+    private var systemReducedMotion: Bool { platformReducedMotion || previewReducedMotion }
     @AppStorage("reducedMotion") private var reducedMotion = false
 
     /// 每 pt 对应的秒数。12s/pt：满屏一拖约 ±80 分钟，配合惯性可达数小时。
@@ -26,24 +27,11 @@ struct TimeDial: View {
 
     var body: some View {
         Group {
-            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
-                dialContent
-                    .glassEffect(
-                        .regular
-                            .tint(Palette.voidBlack.opacity(0.1))
-                            .interactive(),
-                        in: .rect(cornerRadius: 24)
-                    )
+            if showsSurface {
+                dialContent.modifier(DockSurface())
             } else {
-                fallbackContent
+                dialContent
             }
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(
-                    Palette.inkFaint.opacity(reduceTransparency ? 0.5 : 0.34),
-                    lineWidth: 0.6
-                )
         }
         .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .accessibilityElement(children: .ignore)
@@ -81,22 +69,6 @@ struct TimeDial: View {
         .padding(.horizontal, 16)
         .padding(.top, 10)
         .padding(.bottom, 8)
-    }
-
-    @ViewBuilder
-    private var fallbackContent: some View {
-        if reduceTransparency {
-            dialContent
-                .background(Palette.voidBlack.opacity(0.97), in: timeShape)
-        } else {
-            dialContent
-                .background(.ultraThinMaterial, in: timeShape)
-                .background(Palette.voidBlack.opacity(0.76), in: timeShape)
-        }
-    }
-
-    private var timeShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 24, style: .continuous)
     }
 
     // MARK: - 紧凑读数

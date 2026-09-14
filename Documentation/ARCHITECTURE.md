@@ -33,7 +33,7 @@ RootView
 
 | 状态 | 唯一所有者 | 说明 |
 | --- | --- | --- |
-| 启动准备、全屏阅读与当前工具页 | `RootView` | APP 级页面编排；`AppPageDestination` 互斥表达筛选、记录和设置全屏页，目录不得在首帧前同步解析 |
+| 启动准备、全屏阅读与当前工具面板 | `RootView` | `AppPageDestination` 互斥表达筛选、记录和设置；`UtilityPanelLifecycle` 的取消代次隔离转场完成回调，目录不得在首帧前同步解析 |
 | 设备指向、观察者、目录筛选、星历 | `SkySession` | 天空会话的共享事实源 |
 | 当前/过去/未来观测时刻 | `SkyClock` | 时间轴唯一事实源 |
 | 瞬时识别、候选、明确锁定、明确换锁、释放 | `CaptureStateMachine` | 感应档案可自动呈现；持续捕获仍需明确意图 |
@@ -81,14 +81,17 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 
 - `SkyChromeState.swift`
 - `SkyCommandDock.swift`
-- `CatalogFilterControl.swift`（全屏筛选页）
+- `CatalogFilterControl.swift`（即时筛选面板）
 - `ObservationHistoryPage.swift` / `SettingsPage.swift`（独立功能流）
 - `SkyActionControls.swift`
 - `TimeDial.swift`
+- `DockMorph.swift` / `GlobalDockMorph.swift`（共享底部表面、阶段进度与固定底缘几何）
+- `PointingCoordinateReadout.swift`（整数显示采样，不影响姿态精度）
 
 底部 Dock 只服务主天空：探索态使用筛选、观测记录、全球和设置四个等权槽位，捕获状态仍由
 `SkyChromeState` 提高中央主动作的优先级。全球轨道页不生成命令 Dock，底部仅常驻
-`TimeDial`；非 LIVE 的中央读数直接承担“回到此刻”。地球视场只通过双击或无障碍动作复位。
+`TimeDial`；进出期间共享表面沿现有场景进度从 64pt 导航基座长成标尺，内容在地球获得视觉优先级后
+交接；非 LIVE 的中央读数直接承担“回到此刻”。地球视场只通过双击或无障碍动作复位。
 感应态档案可以由准星自动呈现，并在设置项“确认捕获”关闭时使用更短退出迟滞；稳定锁定与换锁
 仍必须调用 `CaptureStateMachine` 的确认动作，不能由驻留进度或 View 手势直接改写阶段。
 捕获阈值由状态机统一持有（进入 2.5°、核心 1.25°、离开 4°），页面不重复角距判断。
@@ -127,8 +130,10 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 11. 全球卫星场必须按背面、地球盘面、外侧壳层和近景四档批量绘制；地球盘面上的前景卫星只能
     使用低对比测量点，完整微型轮廓只分配给策展目标与确定性稀疏样本。地球前景边缘在卫星层后
     重新描画，以稳定遮挡关系；不得用切换对象集合制造层次。
-12. 筛选、记录或设置全屏页覆盖时保留主天空实例和状态，但暂停捕获采样、高频姿态与帧更新；
-    筛选页只修改 `SkySession` 的现有筛选事实并实时刷新，页面不得触发目录 IO 或逐帧传播。
+12. 筛选、记录或设置面板展开时保留主天空实例、绘制表面与冻结观测时刻，暂停捕获采样、
+    高频姿态与 Timeline 帧更新，不替换为黑色 View。收回后重置采样时钟，隐藏间隔不算驻留。
+    面板最终高度为底缘到顶部安全区的 84%，保持 18pt 留白与 24pt 圆角；下拉关闭只附着顶栏，
+    不能与正文 List 的滚动或 swipeActions 竞争。筛选只修改既有筛选事实，不触发目录 IO 或逐帧传播。
 13. 全球默认镜头把观察者经度置于中央经线，使地轴屏幕投影竖直、赤道与纬线水平；假定坐标为上海。
     空闲展示旋转复用既有 30fps `TimelineView`，每帧只计算一次沿地球局部极轴的四元数并组合进
     统一场景姿态；不得新增 Timer 或 CADisplayLink。地球手势与时间轴惯性期间保持暂停，结束

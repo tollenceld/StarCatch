@@ -73,10 +73,9 @@ struct SkyCommandDock: View {
     let onEnterGlobal: () -> Void
     let onOpenSettings: () -> Void
     let onPrimaryAction: (SkyChromeState.PrimaryAction) -> Void
+    var showsSurface = true
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
     @Namespace private var dockNamespace
 
@@ -87,21 +86,6 @@ struct SkyCommandDock: View {
             state: state,
             filtersActive: filtersActive,
             globalEntryEmphasized: globalEntryEmphasized
-        )
-    }
-
-    private var surfaceMode: AppChromeSurfaceMode {
-        if #available(iOS 26.0, *) {
-            return .resolve(
-                liquidGlassAvailable: true,
-                reduceTransparency: reduceTransparency,
-                forceLegacyMaterial: forceLegacyMaterial
-            )
-        }
-        return .resolve(
-            liquidGlassAvailable: false,
-            reduceTransparency: reduceTransparency,
-            forceLegacyMaterial: forceLegacyMaterial
         )
     }
 
@@ -126,68 +110,18 @@ struct SkyCommandDock: View {
         .frame(height: AppChromeMetrics.commandRailHeight)
         .animation(dockAnimation, value: state.dockMode)
         .animation(dockAnimation, value: configuration?.activeItems)
+        .opacity(showsSurface ? 1 : 0)
     }
 
     @ViewBuilder
     private func commandSurface(_ configuration: SkyCommandConfiguration) -> some View {
-        let shape = commandShape
-        if #available(iOS 26.0, *), surfaceMode == .liquidGlass {
-            GlassEffectContainer(spacing: 0) {
-                commandContent(configuration)
-                    .glassEffect(
-                        .regular
-                            .tint(Palette.voidBlack.opacity(0.1))
-                            .interactive(),
-                        in: shape
-                    )
-                    .glassEffectID("command-surface", in: dockNamespace)
-            }
-        } else {
-            fallbackSurface(configuration, shape: shape)
-        }
-    }
-
-    @ViewBuilder
-    private func fallbackSurface(
-        _ configuration: SkyCommandConfiguration,
-        shape: RoundedRectangle
-    ) -> some View {
-        if surfaceMode == .opaque {
-            commandContent(configuration)
-                .background(Palette.voidBlack.opacity(0.97), in: shape)
-        } else {
-            commandContent(configuration)
-                .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.76), in: shape)
-        }
-    }
-
-    private func commandContent(_ configuration: SkyCommandConfiguration) -> some View {
         commandRow(configuration)
             .frame(height: AppChromeMetrics.commandRailHeight)
-            .frame(maxWidth: .infinity)
-            .frame(height: AppChromeMetrics.commandRailHeight)
-            .overlay {
-                commandShape.stroke(
-                    Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34),
-                    lineWidth: 0.6
-                )
-            }
-            .clipShape(commandShape)
+            .modifier(DockSurface())
     }
 
     private func commandRow(_ configuration: SkyCommandConfiguration) -> some View {
-        HStack(spacing: 2) {
-            ForEach(configuration.items) { item in
-                SkyCommandSlotButton(
-                    item: item,
-                    active: configuration.activeItems.contains(item),
-                    action: { perform(item) }
-                )
-                .matchedGeometryEffect(id: item.id, in: dockNamespace)
-            }
-        }
-        .padding(4)
+        SkyCommandRow(configuration: configuration, onSelect: perform)
     }
 
     private func perform(_ item: SkyCommandItem) {
@@ -219,13 +153,6 @@ struct SkyCommandDock: View {
         }
     }
 
-    private var commandShape: RoundedRectangle {
-        RoundedRectangle(
-            cornerRadius: AppChromeMetrics.commandRailCornerRadius,
-            style: .continuous
-        )
-    }
-
     private var dockAnimation: Animation {
         if suppressMotion {
             return .easeOut(
@@ -241,6 +168,25 @@ struct SkyCommandDock: View {
         case .sensing, .capture, .targetSummary, .hidden:
             return Motion.interfaceCollapse
         }
+    }
+}
+
+/// Surface-free content can crossfade inside the same growing rail.
+struct SkyCommandRow: View {
+    let configuration: SkyCommandConfiguration
+    var onSelect: (SkyCommandItem) -> Void = { _ in }
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(configuration.items) { item in
+                SkyCommandSlotButton(
+                    item: item,
+                    active: configuration.activeItems.contains(item),
+                    action: { onSelect(item) }
+                )
+            }
+        }
+        .padding(4)
     }
 }
 

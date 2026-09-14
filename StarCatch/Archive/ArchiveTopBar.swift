@@ -37,49 +37,19 @@ enum AppChromeSurfaceMode: Equatable {
     }
 }
 
-/// 全屏工具页的内容层。它与天空基底保持同一暖黑色相，但用稳定的明度差和
-/// 顶缘高光建立页面层级；Reduce Transparency 下不依赖模糊也能读出边界。
-struct AppPageChromeBackground: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        ZStack(alignment: .top) {
-            Palette.sheetBackground
-                .ignoresSafeArea()
-
-            if !reduceTransparency {
-                LinearGradient(
-                    colors: [
-                        Palette.inkFaint.opacity(0.07),
-                        Palette.sheetBackground.opacity(0),
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: 96)
-                .allowsHitTesting(false)
-            }
-
-            Rectangle()
-                .fill(Palette.inkFaint.opacity(reduceTransparency ? 0.62 : 0.38))
-                .frame(height: 0.5)
-                .allowsHitTesting(false)
-        }
-    }
-}
-
-/// 筛选、记录与设置全屏页共用的顶部导航。页面标题固定靠右，左侧始终是
+/// 筛选、记录与设置面板共用的顶部导航。页面标题固定靠右，左侧始终是
 /// 指向上一层的明确返回入口。
 struct AppPageHeader: View {
     let backTitle: String
     let title: String
     let onBack: () -> Void
+    var collapsesToSky = false
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onBack) {
                 HStack(spacing: ContentTopBarMetrics.itemSpacing) {
-                    Image(systemName: "chevron.left")
+                    Image(systemName: collapsesToSky ? "chevron.down" : "chevron.left")
                         .font(.caption.weight(.semibold))
                     Text(backTitle)
                         .lineLimit(1)
@@ -114,32 +84,59 @@ struct AppPageHeader: View {
                 .frame(height: 0.5)
         }
         .accessibilityElement(children: .contain)
+        // A fixed 56pt navigation row cannot grow with accessibility body text;
+        // keep it legible while the scrolling content retains the full type range.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 }
 
-/// 全屏工具页的共同外壳：统一背景、标题栏和左缘返回手势，具体页面只负责正文。
+/// 面板内的内容外壳；外部容器负责几何。仅顶栏可下拉关闭，子页左缘返回上一层。
 struct AppPageShell<Content: View>: View {
     let backTitle: String
     let title: String
     let onBack: () -> Void
+    var isRoot = true
     @ViewBuilder let content: () -> Content
+    @Environment(\.utilityPanelProgress) private var progress
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
+    @AppStorage("reducedMotion") private var reducedMotion = false
+    private var suppressMotion: Bool { reducedMotion || systemReducedMotion || previewReducedMotion }
 
     var body: some View {
-        ZStack {
-            AppPageChromeBackground()
-
-            VStack(spacing: 0) {
-                AppPageHeader(
-                    backTitle: backTitle,
-                    title: title,
-                    onBack: onBack
-                )
-                content()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+        if isRoot {
+            page
+        } else {
+            page.appEdgeBackGesture(action: onBack)
         }
+    }
+
+    private var page: some View {
+        VStack(spacing: 0) {
+            AppPageHeader(
+                backTitle: backTitle,
+                title: title,
+                onBack: onBack,
+                collapsesToSky: isRoot
+            )
+            .opacity(DockMorphMetrics.headerReveal(progress))
+            .offset(y: suppressMotion ? 0 : 12 * (1 - DockMorphMetrics.headerReveal(progress)))
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 16).onEnded { value in
+                    if isRoot, DockMorphMetrics.shouldDismiss(
+                        translation: value.translation,
+                        predicted: value.predictedEndTranslation
+                    ) { onBack() }
+                }
+            )
+            content()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .opacity(DockMorphMetrics.contentReveal(progress))
+                .offset(y: suppressMotion ? 0 : 20 * (1 - DockMorphMetrics.contentReveal(progress)))
+        }
+        .background(Palette.sheetBackground.opacity(DockMorphMetrics.headerReveal(progress)))
         .preferredColorScheme(.dark)
-        .appEdgeBackGesture(action: onBack)
+        .accessibilityAction(.escape, onBack)
     }
 }
 

@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 #endif
 
-/// 全屏设置页。只观察低频设备状态和本地显示偏好，不观察整颗 `SkySession`，
+/// 面板内的设置页。只观察低频设备状态和本地显示偏好，不观察整颗 `SkySession`，
 /// 避免姿态发布让设置内容反复重算。
 struct SettingsPage: View {
     let session: SkySession
@@ -13,6 +13,7 @@ struct SettingsPage: View {
 
     @ObservedObject private var observer: ObserverLocation
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
     @Environment(\.openURL) private var openURL
 
     @AppStorage("reducedMotion") private var reducedMotion = false
@@ -20,7 +21,7 @@ struct SettingsPage: View {
     @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
     @State private var path: [SettingsRoute]
 
-    private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var suppressMotion: Bool { systemReducedMotion || reducedMotion || previewReducedMotion }
     private var language: SupportedLanguage { .current }
     private func copy(_ key: String) -> String { L10n.text(key, language: language) }
 
@@ -61,7 +62,8 @@ struct SettingsPage: View {
                     AppPageShell(
                         backTitle: copy("navigation.settings"),
                         title: copy("navigation.instrument_status"),
-                        onBack: popRoute
+                        onBack: popRoute,
+                        isRoot: false
                     ) {
                         pageContent { systemStatus }
                     }

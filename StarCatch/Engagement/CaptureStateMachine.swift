@@ -76,6 +76,13 @@ final class CaptureStateMachine: ObservableObject {
     private var suppressedUntil: Date?
     private static let resuppressWindow: TimeInterval = 6.0
 
+    /// An unobserved interval is not dwell time. Preserve progress and lock facts, but
+    /// restart the sampling clock and absence hysteresis when returning from a panel.
+    func resumeSampling(now: Date = Date()) {
+        lastUpdate = now
+        exitCandidateSince = nil
+    }
+
     /// 已确认锁定或已完成的即时识别都可以由独立释放操作结束。
     /// 两种路径共用释放消隐与短暂再捕获抑制，避免仍指向目标时立即弹回。
     func releaseSignal(now: Date = Date()) {

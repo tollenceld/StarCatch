@@ -3,8 +3,18 @@ import SwiftUI
 private struct ForceLegacyMaterialKey: EnvironmentKey {
     static let defaultValue = false
 }
+private struct ChromePreviewMotionKey: EnvironmentKey { static let defaultValue = false }
+private struct ChromePreviewTransparencyKey: EnvironmentKey { static let defaultValue = false }
 
 extension EnvironmentValues {
+    var chromePreviewReducedMotion: Bool {
+        get { self[ChromePreviewMotionKey.self] }
+        set { self[ChromePreviewMotionKey.self] = newValue }
+    }
+    var chromePreviewReducedTransparency: Bool {
+        get { self[ChromePreviewTransparencyKey.self] }
+        set { self[ChromePreviewTransparencyKey.self] = newValue }
+    }
     /// 只用于确定性视觉审计；正式运行由系统版本和 Reduce Transparency 决定材质。
     var forceLegacyMaterial: Bool {
         get { self[ForceLegacyMaterialKey.self] }
@@ -26,7 +36,7 @@ enum Palette {
     /// 四周径向 vignette 渐入的终点。
     static let voidEdge = Color(hex: 0x000000)
 
-    /// 全屏工具页的抬升基底。仍属于 StarCatch 的暖黑谱系，但能从天空中读出轮廓。
+    /// 工具面板的抬升基底。仍属于 StarCatch 的暖黑谱系，但能从天空中读出轮廓。
     static let sheetBackground = Color(hex: 0x11110F)
 
     /// 工具页内摘要、范围和设置分组使用的二级表面。
