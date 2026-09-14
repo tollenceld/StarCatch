@@ -115,7 +115,7 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(revealed.globeScale, 1.012, accuracy: 0.0001)
         XCTAssertEqual(BootOrbitalTimeline(elapsed: 0.9).globeScale, 1, accuracy: 0.0001)
         XCTAssertEqual(initial.satelliteSpeedMultiplier, 0, accuracy: 0.0001)
-        XCTAssertEqual(peak.satelliteSpeedMultiplier, 1, accuracy: 0.0001)
+        XCTAssertEqual(peak.satelliteSpeedMultiplier, 1.6, accuracy: 0.0001)
         XCTAssertGreaterThan(settling.satelliteSpeedMultiplier, 0)
         XCTAssertLessThan(settling.satelliteSpeedMultiplier, 1)
         XCTAssertEqual(hold.satelliteSpeedMultiplier, 0, accuracy: 0.0001)
@@ -127,6 +127,61 @@ final class TimeTests: XCTestCase {
             accuracy: 0.0001
         )
         XCTAssertGreaterThan(hold.brandOpacity, peak.brandOpacity)
+        XCTAssertEqual(hold.earthRotationRadians, 0, accuracy: 0.0001)
+        XCTAssertEqual(
+            (hold.earthRotationRadians - initial.earthRotationRadians) * 180 / .pi,
+            19.58,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(hold.satellitePhaseTime, 1.424, accuracy: 0.0001)
+    }
+
+    func testBootGlobePresentationResolvesShanghaiWithCameraRoll() {
+        let focus = SkyOverviewView.sphericalSurfaceDirection(
+            latitude: BootGlobePresentation.latitude,
+            longitude: BootGlobePresentation.longitude,
+            siderealRadians: 0
+        )
+        let resolved = BootOrbitalTimeline(elapsed: 2.4)
+        let orientation = BootGlobePresentation.orientation(rotation: resolved.earthRotationRadians)
+        let centered = orientation.act(focus)
+        XCTAssertEqual(centered.x, 0, accuracy: 0.000_001)
+        XCTAssertEqual(centered.y, 0, accuracy: 0.000_001)
+        XCTAssertEqual(centered.z, 1, accuracy: 0.000_001)
+
+        let polarAxis = orientation.act(SIMD3<Double>(0, 0, 1))
+        XCTAssertGreaterThan(abs(polarAxis.x), 0.15)
+        XCTAssertGreaterThan(polarAxis.y, 0.8)
+        XCTAssertEqual(polarAxis.z, sin(31.2304 * .pi / 180), accuracy: 0.000_001)
+        let early = BootGlobePresentation.orientation(
+            rotation: BootOrbitalTimeline(elapsed: 0).earthRotationRadians
+        ).act(focus)
+        XCTAssertGreaterThan(simd_length(early - centered), 0.25)
+    }
+
+    func testBootSweepUsesNonlinearEasingAndExactPhaseInsideEveryBeat() {
+        let quarterRise = BootOrbitalTimeline(elapsed: 0.34 + 0.6 * 0.25)
+        let threeQuarterRise = BootOrbitalTimeline(elapsed: 0.34 + 0.6 * 0.75)
+        XCTAssertLessThan(quarterRise.satelliteSpeedMultiplier / 1.6, 0.12)
+        XCTAssertGreaterThan(threeQuarterRise.satelliteSpeedMultiplier / 1.6, 0.88)
+
+        let epsilon = 0.00001
+        for time in stride(from: 0.1, through: 4.2, by: 0.037) {
+            let before = BootOrbitalTimeline(elapsed: time - epsilon)
+            let at = BootOrbitalTimeline(elapsed: time)
+            let after = BootOrbitalTimeline(elapsed: time + epsilon)
+            XCTAssertEqual(
+                (after.satellitePhaseTime - before.satellitePhaseTime) / (2 * epsilon),
+                at.satelliteSpeedMultiplier,
+                accuracy: 0.0001
+            )
+            XCTAssertEqual(
+                (after.earthRotationRadians - before.earthRotationRadians)
+                    / (2 * epsilon) * 180 / .pi,
+                at.earthAngularVelocityDegrees,
+                accuracy: 0.0001
+            )
+        }
     }
 
     func testSupportedLanguageUsesEnglishFallbackAndSimplifiedChinese() {
@@ -275,6 +330,12 @@ final class TimeTests: XCTestCase {
                 at.earthAngularVelocityDegrees,
                 accuracy: 0.001
             )
+            XCTAssertEqual(
+                (after.earthAngularVelocityDegrees - before.earthAngularVelocityDegrees)
+                    / (2 * epsilon),
+                0,
+                accuracy: 0.001
+            )
         }
     }
 
@@ -332,8 +393,12 @@ final class TimeTests: XCTestCase {
             BootOrbitalScenePreset.trailSatelliteCount
         )
         XCTAssertGreaterThan(Set(first.satellites.map(\.inclination)).count, 12)
-        XCTAssertTrue(first.satellites.contains { $0.direction < 0 })
-        XCTAssertTrue(first.satellites.contains { $0.direction > 0 })
+        XCTAssertTrue(first.satellites.allSatisfy { $0.direction == 1 })
+        XCTAssertTrue(first.satellites.contains { $0.inclination > .pi / 2 })
+        XCTAssertEqual(first.satellites.filter { $0.population == .constellation }.count, 3_404)
+        XCTAssertEqual(first.satellites.filter { $0.population == .equatorial }.count, 828)
+        XCTAssertEqual(first.satellites.filter { $0.population == .highInclination }.count, 368)
+        XCTAssertEqual(Set(first.satellites.filter(\.hasTrail).map(\.population)).count, 3)
 
         let positions = first.satellites.map {
             first.position(of: $0, phaseTime: 2.4)
@@ -363,8 +428,22 @@ final class TimeTests: XCTestCase {
                 satellite.displayRadius,
                 SkyOverviewView.maximumOrbitDisplayRadius
             )
-            XCTAssertTrue(0.065 ... 0.12 ~= satellite.turnsPerSecond)
+            switch satellite.population {
+            case .constellation:
+                XCTAssertTrue(0.085 ... 0.14 ~= satellite.turnsPerSecond)
+                XCTAssertLessThanOrEqual(satellite.displayRadius, 0.665)
+                XCTAssertTrue(
+                    42 ... 44 ~= satellite.inclination * 180 / .pi
+                        || 52 ... 54 ~= satellite.inclination * 180 / .pi
+                )
+            case .equatorial:
+                XCTAssertTrue(0.055 ... 0.08 ~= satellite.turnsPerSecond)
+                XCTAssertLessThan(satellite.inclination * 180 / .pi, 12)
+            case .highInclination:
+                XCTAssertTrue(0.065 ... 0.095 ~= satellite.turnsPerSecond)
+            }
         }
+        XCTAssertTrue(BootOrbitalScenePreset(count: -1).satellites.isEmpty)
     }
 
     func testOverviewCoastlinesRemainAvailableDuringInteraction() {

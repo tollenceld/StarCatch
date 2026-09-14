@@ -1501,7 +1501,9 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry,
         zoom: CGFloat,
         front: Bool,
-        simplified: Bool
+        simplified: Bool,
+        tint: Color = Palette.networkTint,
+        emphasis: Double = 1
     ) where S.Element == Projected3D {
         var rearShell: [CGPoint] = []
         var globeCrossing: [CGPoint] = []
@@ -1541,8 +1543,8 @@ struct SkyOverviewView: View {
             SkyRenderer.drawTargetField(
                 context,
                 points: rearShell,
-                tint: Palette.networkTint,
-                opacity: 0.095,
+                tint: tint,
+                opacity: 0.095 * emphasis,
                 coreRadius: 0.3,
                 haloStrength: 0
             )
@@ -1554,16 +1556,16 @@ struct SkyOverviewView: View {
         SkyRenderer.drawTargetField(
             context,
             points: globeCrossing,
-            tint: Palette.networkTint,
-            opacity: 0.16,
+            tint: tint,
+            opacity: 0.16 * emphasis,
             coreRadius: 0.31,
             haloStrength: 0
         )
         SkyRenderer.drawTargetField(
             context,
             points: orbitalShell,
-            tint: Palette.networkTint,
-            opacity: 0.3,
+            tint: tint,
+            opacity: 0.3 * emphasis,
             coreRadius: 0.43,
             haloStrength: 0
         )
@@ -1571,7 +1573,7 @@ struct SkyOverviewView: View {
             context,
             points: foreground,
             tint: Palette.inkHigh,
-            opacity: 0.5,
+            opacity: 0.5 * emphasis,
             coreRadius: 0.62,
             haloStrength: simplified ? 0 : 0.018
         )

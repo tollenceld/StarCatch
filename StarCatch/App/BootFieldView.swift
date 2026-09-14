@@ -31,7 +31,8 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     static let cruiseTransitionDuration: TimeInterval = 0.8
 
     private static let satelliteCruiseSpeed = 0.12
-    private static let earthPeakVelocityDegrees = 5.5
+    private static let satelliteSweepSpeed = 1.6
+    private static let earthPeakVelocityDegrees = 22.0
     private static let earthCruiseVelocityDegrees = 1.2
 
     let elapsed: TimeInterval
@@ -75,22 +76,30 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     /// resume a restrained cruise only when real preparation takes longer.
     var satelliteSpeedMultiplier: Double {
         guard !reducedMotion else { return 0 }
+        return Self.satelliteSweepSpeed * gestureSpeed
+            + Self.satelliteCruiseSpeed * cruiseSpeed
+    }
+
+    private var gestureSpeed: Double {
         if elapsed <= Self.establishEnd { return 0 }
         if elapsed <= Self.sweepPeak {
-            return Self.smoothstep(
+            return Self.smootherstep(
                 (elapsed - Self.establishEnd)
                     / (Self.sweepPeak - Self.establishEnd)
             )
         }
         if elapsed <= Self.sweepRelease { return 1 }
         if elapsed <= Self.settleEnd {
-            return 1 - Self.smoothstep(
+            return 1 - Self.smootherstep(
                 (elapsed - Self.sweepRelease)
                     / (Self.settleEnd - Self.sweepRelease)
             )
         }
-        if elapsed <= Self.minimumPresentationDuration { return 0 }
-        return Self.satelliteCruiseSpeed * Self.smoothstep(
+        return 0
+    }
+
+    private var cruiseSpeed: Double {
+        Self.smootherstep(
             (elapsed - Self.minimumPresentationDuration)
                 / Self.cruiseTransitionDuration
         )
@@ -99,7 +108,17 @@ struct BootOrbitalTimeline: Equatable, Sendable {
     /// Analytic integral of `satelliteSpeedMultiplier`. Both position and velocity
     /// are continuous across every beat, including the deliberate full stop.
     var satellitePhaseTime: TimeInterval {
-        guard !reducedMotion else { return 1.08 }
+        guard !reducedMotion else { return Self.satelliteSweepSpeed * Self.gestureDuration }
+        return Self.satelliteSweepSpeed * gesturePhase
+            + Self.satelliteCruiseSpeed * cruisePhase
+    }
+
+    private static var gestureDuration: TimeInterval {
+        (sweepPeak - establishEnd) / 2 + sweepRelease - sweepPeak
+            + (settleEnd - sweepRelease) / 2
+    }
+
+    private var gesturePhase: TimeInterval {
         let rise = Self.integratedRamp(
             at: elapsed,
             from: Self.establishEnd,
@@ -118,79 +137,38 @@ struct BootOrbitalTimeline: Equatable, Sendable {
             startValue: 1,
             endValue: 0
         )
+        return rise + sweep + braking
+    }
+
+    private var cruisePhase: TimeInterval {
         let cruiseRamp = Self.integratedRamp(
             at: elapsed,
             from: Self.minimumPresentationDuration,
             to: Self.minimumPresentationDuration + Self.cruiseTransitionDuration,
             startValue: 0,
-            endValue: Self.satelliteCruiseSpeed
+            endValue: 1
         )
         let cruise = max(
             0,
             elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
-        ) * Self.satelliteCruiseSpeed
-        return rise + sweep + braking + cruiseRamp + cruise
+        )
+        return cruiseRamp + cruise
     }
 
     var earthAngularVelocityDegrees: Double {
         guard !reducedMotion else { return 0 }
-        if elapsed <= Self.establishEnd { return 0 }
-        if elapsed <= Self.sweepPeak {
-            return Self.earthPeakVelocityDegrees * Self.smoothstep(
-                (elapsed - Self.establishEnd)
-                    / (Self.sweepPeak - Self.establishEnd)
-            )
-        }
-        if elapsed <= Self.sweepRelease {
-            return Self.earthPeakVelocityDegrees
-        }
-        if elapsed <= Self.settleEnd {
-            return Self.earthPeakVelocityDegrees * (1 - Self.smoothstep(
-                (elapsed - Self.sweepRelease)
-                    / (Self.settleEnd - Self.sweepRelease)
-            ))
-        }
-        if elapsed <= Self.minimumPresentationDuration { return 0 }
-        return Self.earthCruiseVelocityDegrees * Self.smoothstep(
-            (elapsed - Self.minimumPresentationDuration)
-                / Self.cruiseTransitionDuration
-        )
+        return Self.earthPeakVelocityDegrees * gestureSpeed
+            + Self.earthCruiseVelocityDegrees * cruiseSpeed
     }
 
-    /// The globe shares the satellite beats at a much smaller amplitude. It turns
-    /// about five degrees, resolves to stillness, and never snaps at handoff.
+    /// Roughly twenty degrees of travel, resolving at zero so the held frame
+    /// centers Shanghai. The reduced-motion frame uses that same composition.
     var earthRotationRadians: Double {
-        guard !reducedMotion else { return 0.32 }
-        let rise = Self.integratedRamp(
-            at: elapsed,
-            from: Self.establishEnd,
-            to: Self.sweepPeak,
-            startValue: 0,
-            endValue: Self.earthPeakVelocityDegrees
-        )
-        let sweep = max(
-            0,
-            min(elapsed, Self.sweepRelease) - Self.sweepPeak
-        ) * Self.earthPeakVelocityDegrees
-        let braking = Self.integratedRamp(
-            at: elapsed,
-            from: Self.sweepRelease,
-            to: Self.settleEnd,
-            startValue: Self.earthPeakVelocityDegrees,
-            endValue: 0
-        )
-        let cruiseRamp = Self.integratedRamp(
-            at: elapsed,
-            from: Self.minimumPresentationDuration,
-            to: Self.minimumPresentationDuration + Self.cruiseTransitionDuration,
-            startValue: 0,
-            endValue: Self.earthCruiseVelocityDegrees
-        )
-        let cruise = max(
-            0,
-            elapsed - Self.minimumPresentationDuration - Self.cruiseTransitionDuration
-        ) * Self.earthCruiseVelocityDegrees
-        return (rise + sweep + braking + cruiseRamp + cruise) * .pi / 180
+        guard !reducedMotion else { return 0 }
+        return (
+            Self.earthPeakVelocityDegrees * (gesturePhase - Self.gestureDuration)
+                + Self.earthCruiseVelocityDegrees * cruisePhase
+        ) * .pi / 180
     }
 
     var isCruising: Bool {
@@ -202,10 +180,17 @@ struct BootOrbitalTimeline: Equatable, Sendable {
         return value * value * (3 - 2 * value)
     }
 
-    /// Integral of smoothstep from zero to `value`, clamped to one interval.
+    /// Quintic speed ramps have zero acceleration and jerk at both endpoints;
+    /// their steeper middle makes the sweep distinct from the hold.
+    private static func smootherstep(_ value: Double) -> Double {
+        let x = min(1, max(0, value))
+        return x * x * x * (10 + x * (-15 + 6 * x))
+    }
+
+    /// Exact integral of quintic smootherstep, not frame-delta accumulation.
     private static func integratedSmoothstep(_ value: Double) -> Double {
-        let value = min(1, max(0, value))
-        return value * value * value - 0.5 * pow(value, 4)
+        let x = min(1, max(0, value))
+        return x * x * x * x * (2.5 + x * (-3 + x))
     }
 
     private static func integratedRamp(
@@ -242,8 +227,13 @@ enum BootCompletionPolicy {
 /// Immutable analytic orbit set. It is intentionally unrelated to CatalogObject,
 /// SatelliteKit, the real star catalogue, location, or observation time.
 struct BootOrbitalScenePreset: Equatable, Sendable {
+    enum Population: Hashable, Sendable {
+        case constellation, equatorial, highInclination
+    }
+
     struct Satellite: Identifiable, Equatable, Sendable {
         let id: Int
+        let population: Population
         let inclination: Double
         let ascendingNode: Double
         let initialPhase: Double
@@ -270,24 +260,55 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
         seed: UInt64 = 0xB007_0B17_A15
     ) {
         var random = SplitMix64(seed: seed)
-        let inclinationBands = [18.0, 42.0, 53.0, 63.4, 82.0, 98.0]
         satellites = (0 ..< max(0, count)).map { index in
-            let band = inclinationBands[index % inclinationBands.count]
-            let jitter = (Double(random.nextUnit()) - 0.5) * 8
+            // An authored population, NOT catalog objects or physical altitudes.
+            // Dominant 43°/53° shells echo broadband constellations. The 18%
+            // near-equatorial belt is deliberately exaggerated for legibility;
+            // it must not be presented as Starlink's actual orbital distribution.
+            let bucket = (index * 37) % 100
+            let population: Population
+            let band: Double
+            let radius: Double
+            let speed: Double
+            if bucket < 74 {
+                population = .constellation
+                band = bucket < 30 ? 43 : 53
+                radius = 0.61 + Double(random.nextUnit()) * 0.055
+                speed = 0.085 + Double(random.nextUnit()) * 0.055
+            } else if bucket < 92 {
+                population = .equatorial
+                band = 6
+                radius = 0.74 + Double(random.nextUnit()) * 0.08
+                speed = 0.055 + Double(random.nextUnit()) * 0.025
+            } else {
+                population = .highInclination
+                band = bucket < 96 ? 70 : 97.3
+                radius = 0.65 + Double(random.nextUnit()) * 0.23
+                speed = 0.065 + Double(random.nextUnit()) * 0.03
+            }
+            let jitter = (Double(random.nextUnit()) - 0.5)
+                * (population == .equatorial ? 10 : 2)
             let inclination = (band + jitter) * .pi / 180
-            let ascendingNode = Double(random.nextUnit()) * 2 * .pi
+            // Stable orbital planes give the main shells a coherent band instead
+            // of a uniformly scattered spherical halo. Precomputed once.
+            let ascendingNode = population == .constellation
+                ? Double((index / 100) % 24) * 2 * .pi / 24
+                    + (Double(random.nextUnit()) - 0.5) * 0.025
+                : Double(random.nextUnit()) * 2 * .pi
             let nodeCosine = cos(ascendingNode)
             let nodeSine = sin(ascendingNode)
             let inclinationCosine = cos(inclination)
             let inclinationSine = sin(inclination)
             return Satellite(
                 id: index,
+                population: population,
                 inclination: inclination,
                 ascendingNode: ascendingNode,
                 initialPhase: Double(random.nextUnit()) * 2 * .pi,
-                displayRadius: 0.61 + Double(random.nextUnit()) * 0.27,
-                turnsPerSecond: 0.065 + Double(random.nextUnit()) * 0.055,
-                direction: index.isMultiple(of: 7) ? -1 : 1,
+                displayRadius: radius,
+                turnsPerSecond: speed,
+                // Retrograde motion is already encoded by inclination > 90°.
+                direction: 1,
                 tintIndex: index % 4,
                 hasTrail: index < min(trailCount, count),
                 orbitBasisX: SIMD3(nodeCosine, nodeSine, 0),
@@ -314,6 +335,28 @@ struct BootOrbitalScenePreset: Equatable, Sendable {
                 + satellite.orbitBasisY * sin(angle)
         ) * satellite.displayRadius
     }
+}
+
+/// Boot-specific camera parameters, using the global globe's exact projection.
+/// Roll is applied in camera space; spin remains about the geographic polar axis.
+enum BootGlobePresentation {
+    static let latitude = 31.2304
+    static let longitude = 121.4737
+    static let rollRadians = -14.0 * Double.pi / 180
+
+    static func orientation(rotation: Double) -> simd_quatd {
+        simd_normalize(
+            simd_quatd(angle: rollRadians, axis: SIMD3(0, 0, 1))
+                * baseOrientation
+                * simd_quatd(angle: rotation, axis: SIMD3(0, 0, 1))
+        )
+    }
+
+    private static let baseOrientation = SkyOverviewView.presentationOrientation(
+        latitude: latitude,
+        longitude: longitude,
+        siderealRadians: 0
+    )
 }
 
 /// Lightweight boot-only orbital scene. The 30fps path evaluates a bounded analytic
@@ -487,7 +530,9 @@ struct BootOrbitalFieldView: View {
             geometry: globeGeometry,
             zoom: zoom,
             front: front,
-            simplified: false
+            simplified: false,
+            tint: Palette.inkHigh,
+            emphasis: 1.35
         )
         context.fill(
             highlighted,
@@ -501,11 +546,12 @@ struct BootOrbitalFieldView: View {
     ) -> [ProjectedSatellite] {
         var result: [ProjectedSatellite] = []
         result.reserveCapacity(preset.satellites.count)
+        let phaseTime = timeline.satellitePhaseTime
         for satellite in preset.satellites {
             let projected = project(
                 preset.position(
                     of: satellite,
-                    phaseTime: timeline.satellitePhaseTime
+                    phaseTime: phaseTime
                 ),
                 geometry: geometry,
                 orientation: orientation
@@ -637,17 +683,8 @@ struct BootOrbitalFieldView: View {
         )
     }
 
-    private static let baseViewOrientation = SkyOverviewView.presentationOrientation(
-        latitude: 0,
-        longitude: 121.4737,
-        siderealRadians: 0
-    )
-
     private static func viewOrientation(rotation: Double) -> simd_quatd {
-        simd_normalize(
-            baseViewOrientation
-                * simd_quatd(angle: rotation, axis: SIMD3(0, 0, 1))
-        )
+        BootGlobePresentation.orientation(rotation: rotation)
     }
 
 }
