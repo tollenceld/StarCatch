@@ -19,58 +19,50 @@ struct TargetMicroLabel: View {
             .foregroundStyle(Palette.inkHigh.opacity(0.92))
             .lineLimit(1)
             .minimumScaleFactor(0.78)
-        .padding(.horizontal, 9)
-        .frame(height: 27)
-        .background(
-            .ultraThinMaterial,
-            in: Capsule()
-        )
-        .background(
-            Palette.voidBlack.opacity(0.48),
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(object.identityTint.opacity(0.26), lineWidth: 0.5)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            L10n.format(
-                "accessibility.micro_label",
-                table: "SatelliteText",
-                object.name,
-                ephemeris.map { String(format: "%.0f KM", $0.rangeKm) }
-                    ?? L10n.text("value.unknown", table: "SatelliteText"),
-                object.orbitClass
+            .padding(.horizontal, 9)
+            .frame(height: 27)
+            .background(.ultraThinMaterial, in: Capsule())
+            .background(Palette.voidBlack.opacity(0.48), in: Capsule())
+            .overlay {
+                Capsule()
+                    .stroke(object.identityTint.opacity(0.26), lineWidth: 0.5)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(
+                L10n.format(
+                    "accessibility.micro_label",
+                    table: "SatelliteText",
+                    object.name,
+                    ephemeris.map { String(format: "%.0f KM", $0.rangeKm) }
+                        ?? L10n.text("value.unknown", table: "SatelliteText"),
+                    object.orbitClass
+                )
             )
-        )
     }
-
 }
 
-/// 稳定锁定后的底部摘要。
-///
-/// 主视野只保留身份、任务意义与三项关键遥测；完整轨道参数和故事进入深入档案。
+/// 自动锁定后的持久目标摘要。移动准星不会改变或关闭它；右上角叉号是唯一可见退出入口。
 struct ArchiveOverlay: View {
     let object: CatalogObject
     let ephemeris: Ephemeris?
-    let insight: SatelliteInsightSnapshot?
-    let revealed: Bool
-    var retainedByInteraction: Bool = false
-    var releaseProgress: Double = 0
+    var dismissalProgress: Double = 0
     var onOpenArchive: () -> Void = {}
-    var onInteraction: () -> Void = {}
-    var onToggleRetention: () -> Void = {}
-    var onRelease: () -> Void = {}
     var onDismiss: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var presentationVisible = false
-    @GestureState private var dismissTranslation: CGFloat = 0
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
-    private var clampedReleaseProgress: Double { min(1, max(0, releaseProgress)) }
+    private var reduceTransparency: Bool {
+        systemReduceTransparency || previewReduceTransparency
+    }
+    private var clampedDismissalProgress: Double {
+        min(1, max(0, dismissalProgress))
+    }
     private var language: SupportedLanguage { .current }
 
     private func copy(_ key: String) -> String {
@@ -79,7 +71,7 @@ struct ArchiveOverlay: View {
 
     private var statusText: String {
         switch object.status {
-        case .active: copy("status.cataloged")
+        case .active: copy("status.active")
         case .silent: copy("status.silent")
         case .derelict: copy("status.derelict")
         case .debris: copy("status.debris")
@@ -90,82 +82,73 @@ struct ArchiveOverlay: View {
         object.status.isActive ? Palette.activeTint : Palette.derelictTint
     }
 
-    private var fallbackInsight: String {
-        let fingerprint = object.orbitFingerprint
-        if fingerprint.eccentricity >= 0.08 {
-            return L10n.format(
-                "insight.orbit.elliptical",
-                table: "SatelliteText",
-                language: language,
-                fingerprint.apogeeKm - fingerprint.perigeeKm
-            )
+    private var missionRoleKey: String? {
+        switch object.kind {
+        case "telescope": "telescope"
+        case "station": "station"
+        case "nav": "navigation"
+        case "comms": "communications"
+        case "weather": "weather"
+        case "science": "science"
+        case "debris", "rocket_body": "orbital_remnant"
+        default: nil
         }
-        return L10n.format(
-            "insight.orbit.summary",
-            table: "SatelliteText",
-            language: language,
-            fingerprint.periodMinutes,
-            fingerprint.inclinationDegrees
-        )
+    }
+
+    private var missionRoleTitle: String {
+        missionRoleKey.map { copy("archive.role.\($0).title") }
+            ?? object.category.title(language: language)
+    }
+
+    private var missionRoleSummary: String {
+        missionRoleKey.map { copy("target.role.\($0).summary") }
+            ?? object.category.subtitle(language: language)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) {
-                identityHeader
+            Text(object.name)
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                .foregroundStyle(Palette.inkHigh.opacity(0.97))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .padding(.trailing, 48)
 
-                Text(object.name)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Palette.inkHigh.opacity(0.96))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                    .padding(.top, 7)
+            identityHeader
+                .padding(.top, 8)
 
-                Text(
-                    insight?.headline(
-                        relativeTo: insight?.observationTime ?? Date(),
-                        language: language
-                    )
-                        ?? fallbackInsight
-                )
-                    .font(.system(size: 11.5, weight: .regular))
-                    .foregroundStyle(Palette.inkMid.opacity(0.92))
-                    .lineSpacing(1.5)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
+            Text(missionRoleSummary)
+                .font(.system(size: 12.5, weight: .regular))
+                .foregroundStyle(Palette.inkMid.opacity(0.9))
+                .lineSpacing(2)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
 
-                insightGraphic
-                    .padding(.top, 8)
-
-                telemetry
-                    .padding(.top, 8)
-            }
-            .contentShape(Rectangle())
-            .onTapGesture(perform: onInteraction)
+            telemetry
+                .padding(.top, 10)
 
             archiveAction
-                .padding(.top, 9)
+                .padding(.top, 10)
         }
         .padding(.horizontal, 15)
-        .padding(.top, 13)
+        .padding(.top, 15)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(glassSurface)
         .overlay(alignment: .topTrailing) {
-            headerControls
+            closeControl
                 .padding(.top, 2)
                 .padding(.trailing, 2)
         }
-        .opacity(presentationVisible ? 1 - 0.38 * clampedReleaseProgress : 0)
+        .opacity(presentationVisible ? 1 - clampedDismissalProgress : 0)
         .offset(
-            y: max(0, dismissTranslation)
-                + (suppressMotion ? 0 : (presentationVisible ? 0 : 12) + 5 * clampedReleaseProgress)
+            y: suppressMotion
+                ? 0
+                : (presentationVisible ? 0 : 12) + 8 * clampedDismissalProgress
         )
-        .simultaneousGesture(dismissGesture)
         .accessibilityElement(children: .contain)
-        .accessibilityAction(named: Text(copy("accessibility.retain_detail")), onInteraction)
-        .accessibilityAction(named: Text(copy("accessibility.collapse_detail")), onDismiss)
+        .accessibilityAction(.escape) { onDismiss() }
         .task(id: object.id) {
             presentationVisible = false
             await Task.yield()
@@ -173,37 +156,9 @@ struct ArchiveOverlay: View {
             withAnimation(
                 suppressMotion
                     ? .easeOut(duration: 0.12)
-                    : .spring(response: 0.38, dampingFraction: 0.88)
+                    : Motion.interfaceExpand
             ) {
-                presentationVisible = revealed
-            }
-        }
-        .onChange(of: revealed) { _, visible in
-            withAnimation(.easeOut(duration: suppressMotion ? 0.1 : 0.2)) {
-                presentationVisible = visible
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var insightGraphic: some View {
-        if let insight,
-           let pass = insight.pass,
-           pass.phase != .stationary {
-            SatelliteInsightGraphic(
-                insight: insight,
-                tint: object.identityTint,
-                compact: true
-            )
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                Palette.voidBlack.opacity(0.16),
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Palette.inkFaint.opacity(0.2), lineWidth: 0.5)
+                presentationVisible = true
             }
         }
     }
@@ -217,78 +172,35 @@ struct ArchiveOverlay: View {
             Text(statusText)
                 .foregroundStyle(statusColor.opacity(0.9))
 
-            Rectangle()
-                .fill(Palette.inkFaint.opacity(0.34))
-                .frame(width: 0.5, height: 9)
+            metadataDivider
 
-            Text(object.category.title(language: language))
+            Text(missionRoleTitle)
                 .foregroundStyle(Palette.inkMid.opacity(0.83))
 
-            Rectangle()
-                .fill(Palette.inkFaint.opacity(0.34))
-                .frame(width: 0.5, height: 9)
+            metadataDivider
 
             Text(object.orbitClass)
                 .foregroundStyle(Palette.inkLow.opacity(0.78))
 
             Spacer(minLength: 8)
-
         }
         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
         .tracking(0.7)
-        .padding(.trailing, 156)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
     }
 
-    private var headerControls: some View {
-        HStack(spacing: 2) {
-            Button(action: onToggleRetention) {
-                Image(systemName: retainedByInteraction ? "pin.fill" : "pin")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(
-                        retainedByInteraction
-                            ? object.identityTint.opacity(0.96)
-                            : Palette.inkMid.opacity(0.8)
-                    )
-                    .frame(width: 34, height: 34)
-                    .background(
-                        retainedByInteraction
-                            ? object.identityTint.opacity(0.11)
-                            : Palette.voidBlack.opacity(0.2),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(
-                                retainedByInteraction
-                                    ? object.identityTint.opacity(0.48)
-                                    : Palette.inkFaint.opacity(0.26),
-                                lineWidth: retainedByInteraction ? 0.7 : 0.5
-                            )
-                    }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                copy(retainedByInteraction ? "accessibility.unpin_detail" : "accessibility.pin_detail")
-            )
-            .accessibilityHint(
-                retainedByInteraction
-                    ? copy("accessibility.unpin_detail.hint")
-                    : copy("accessibility.pin_detail.hint")
-            )
-
-            releaseControl
-            collapseControl
-        }
+    private var metadataDivider: some View {
+        Rectangle()
+            .fill(Palette.inkFaint.opacity(0.34))
+            .frame(width: 0.5, height: 9)
     }
 
-    /// 摘要接管底部 Dock 时仍保留明确释放，不要求用户先收起卡片再寻找动作。
-    private var releaseControl: some View {
-        Button(action: onRelease) {
+    private var closeControl: some View {
+        Button(action: onDismiss) {
             Image(systemName: "xmark")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Palette.inkMid.opacity(0.82))
+                .foregroundStyle(Palette.inkMid.opacity(0.84))
                 .frame(width: 34, height: 34)
                 .background(
                     Palette.voidBlack.opacity(0.2),
@@ -302,36 +214,8 @@ struct ArchiveOverlay: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(L10n.text("capture.cancel"))
-        .accessibilityHint(L10n.text("capture.cancel.hint"))
-    }
-
-    /// 收起只隐藏资料卡，不解除卫星锁定。图标和文字组合提高可发现性，
-    /// 同时保留 44pt 热区和向下滑动这一直接操控。
-    private var collapseControl: some View {
-        Button(action: onDismiss) {
-            HStack(spacing: 5) {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-                Text(copy("action.collapse"))
-                    .font(.system(size: 9.5, weight: .medium))
-            }
-            .foregroundStyle(Palette.inkHigh.opacity(0.88))
-            .frame(width: 58, height: 34)
-            .background(
-                Palette.inkHigh.opacity(0.045),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.55)
-            }
-            .frame(minWidth: 64, minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(copy("accessibility.collapse_detail"))
-        .accessibilityHint(copy("accessibility.collapse_detail.hint"))
+        .accessibilityLabel(copy("accessibility.close_detail"))
+        .accessibilityHint(copy("accessibility.close_detail.hint"))
     }
 
     private var telemetry: some View {
@@ -427,30 +311,16 @@ struct ArchiveOverlay: View {
         }
     }
 
-    private var dismissGesture: some Gesture {
-        DragGesture(minimumDistance: 8)
-            .updating($dismissTranslation) { value, state, _ in
-                guard value.translation.height > 0,
-                      abs(value.translation.height) > abs(value.translation.width)
-                else { return }
-                state = value.translation.height
-            }
-            .onEnded { value in
-                let vertical = max(
-                    value.translation.height,
-                    value.predictedEndTranslation.height * 0.72
-                )
-                guard vertical > 58,
-                      abs(value.translation.height) > abs(value.translation.width)
-                else { return }
-                onDismiss()
-            }
-    }
-
     @ViewBuilder
     private var glassSurface: some View {
         let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
-        if #available(iOS 26.0, *) {
+        if reduceTransparency {
+            shape
+                .fill(Palette.sheetBackground)
+                .overlay {
+                    shape.stroke(Palette.inkFaint.opacity(0.5), lineWidth: 0.6)
+                }
+        } else if #available(iOS 26.0, *), !forceLegacyMaterial {
             shape
                 .fill(.clear)
                 .glassEffect(

@@ -35,6 +35,38 @@
         }
       }
     },
+    "accessibility.close_detail" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.close_detail.hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move the reticle away before focusing this object again"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次聚焦此目标前，需要先将准星移开"
+          }
+        }
+      }
+    },
     "accessibility.external_browser" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2262,6 +2294,38 @@
         }
       }
     },
+    "guide.capture.auto" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold the reticle on a target to lock its archive automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让准星持续对准目标，档案会自动锁定。"
+          }
+        }
+      }
+    },
+    "status.active" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ACTIVE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在役"
+          }
+        }
+      }
+    },
     "status.cataloged" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2326,6 +2390,118 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "静默记录"
+          }
+        }
+      }
+    },
+    "target.role.communications.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carries voices and data along an orbital bridge between distant places."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把声音与数据托付给轨道，让遥远之地在天际相连。"
+          }
+        }
+      }
+    },
+    "target.role.navigation.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measures Earth with precise time, lending direction to every journey below."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以精密时钟丈量地球，为地面上的每一次抵达指明方向。"
+          }
+        }
+      }
+    },
+    "target.role.orbital_remnant.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its mission has fallen silent, yet it still crosses today's sky on an older path."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务已经沉默，它仍沿旧日轨道穿过今天的天空。"
+          }
+        }
+      }
+    },
+    "target.role.science.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carries experiments beyond the atmosphere, asking new questions on every orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把实验带到大气之外，在绕行地球的途中继续追问。"
+          }
+        }
+      }
+    },
+    "target.role.station.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A workshop circling Earth, where daily life, research, and distance meet."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一间环绕地球的工作室，让生活、研究与远方在轨道相遇。"
+          }
+        }
+      }
+    },
+    "target.role.telescope.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beyond the atmosphere's shimmer, it carries our gaze deeper into the universe."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "越过大气的扰动，把人类的目光送向更深的宇宙。"
+          }
+        }
+      }
+    },
+    "target.role.weather.summary" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reads clouds, seas, and land from orbit, tracing a planet that never stands still."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从轨道俯读云层与海陆，记录一颗不断变化的地球。"
           }
         }
       }

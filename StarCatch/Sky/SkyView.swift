@@ -6,7 +6,7 @@ import UIKit
 /// 主渲染视图：TimelineView + Canvas，30fps。
 /// 完整层序：星尘 → 拖影 → 轨迹弧 → 点位/刻度环/扫描 → vignette → 锁定信标 → 十字丝 → 微型标签 → 颗粒 shader。
 ///
-/// 两个观测维度：主天空负责指向与明确捕获，全局星图中的 TimeDial 负责选择观测时刻。
+/// 两个观测维度：主天空负责指向与自动锁定，全局星图中的 TimeDial 负责选择观测时刻。
 /// 非 LIVE 时全部对象按观测时刻推算；拨动时间时点位留下拖影 —— 时间方向的视觉痕迹。
 struct SkyView: View {
     @ObservedObject var session: SkySession
@@ -60,15 +60,6 @@ struct SkyView: View {
     @State private var overviewInteractionActive = false
     @State private var overviewIdleBeganAt: Date?
     @State private var transientOverlay: SkyTransientOverlay?
-    /// 锁定事实与详情可见性相互独立：收起摘要不会释放目标。
-    @State private var lockedDetailPresented = true
-    /// 阅读面板拥有独立于准星捕获状态的短期记忆。默认识别离开阈值后，状态机可以
-    /// 立即恢复探索，但卡片仍保留一小段时间，避免手持抖动打断阅读。
-    @State private var retainedDetailObjectID: String?
-    @State private var detailGraceDeadline: Date?
-    @State private var detailPinnedByInteraction = false
-    /// 设置关闭时只做随准星出现/消失的即时识别；开启后才呈现底部确认控件。
-    @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
     @State private var lastOverviewTrailSample: TimeInterval = -.infinity
     @State private var lastCaptureSample: TimeInterval = -.infinity
     @State private var lastAcquisitionPulse: Date?
@@ -125,12 +116,6 @@ struct SkyView: View {
         SkyChromeState(
             presentationMode: presentationMode,
             capturePhase: capture.phase,
-            captureConfirmationEnabled: captureConfirmationEnabled,
-            recognitionReady: capture.recognitionReady,
-            replacementObjectID: capture.replacementObjectId,
-            acquisitionProgress: capture.acquisitionProgress,
-            replacementProgress: capture.replacementProgress,
-            targetSummaryVisible: lockedDetailPresented && retainedDetailObjectID != nil,
             localFieldResetAvailable: localFieldResetAvailable
         )
     }
@@ -189,7 +174,6 @@ struct SkyView: View {
         .contentShape(Rectangle())
         .gesture(dragGesture)
         .simultaneousGesture(fieldMagnificationGesture)
-        .simultaneousGesture(lockedTargetTapGesture)
         .overlay { transientDismissLayer }
         .overlay(alignment: .top) {
             pointingReadout
@@ -204,10 +188,12 @@ struct SkyView: View {
             satelliteStoryLayer
         }
         .accessibilityAction(.escape) {
-            guard presentationMode == .global,
-                  presentedStoryObjectID == nil
-            else { return }
-            exitOverviewToLocal()
+            if capture.isLocked, presentedStoryObjectID == nil {
+                dismissLockedTarget()
+            } else if presentationMode == .global,
+                      presentedStoryObjectID == nil {
+                exitOverviewToLocal()
+            }
         }
     }
 
@@ -226,22 +212,12 @@ struct SkyView: View {
                 overviewIdleBeganAt = Date()
                 onInitialOverviewHandled()
             }
-            if !captureConfirmationEnabled {
-                if capture.isLocked {
-                    requestRelease()
-                } else {
-                    capture.returnToExploring()
-                }
-            }
             #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("--previewFocusStage")
-                || arguments.contains("--previewLockedTarget") {
-                captureConfirmationEnabled = true
-                capture.returnToExploring()
-            } else if arguments.contains("--previewSensing") {
-                captureConfirmationEnabled = false
-                capture.returnToExploring()
+                || arguments.contains("--previewLockedTarget")
+                || arguments.contains("--previewSensing") {
+                capture.cancelAcquisition()
             }
             if arguments.contains("--openObservationWing") {
                 Task { @MainActor in
@@ -256,14 +232,6 @@ struct SkyView: View {
             }
             if arguments.contains("--filterObservation") {
                 session.toggleCatalogFilter(.humanScience)
-            }
-            if arguments.contains("--previewLockedTarget") {
-                Task { @MainActor in
-                    try? await Task.sleep(for: .milliseconds(1400))
-                    if capture.isAcquiring {
-                        _ = capture.confirmAcquisition()
-                    }
-                }
             }
             if let transitionArgument = arguments.first(where: {
                 $0.hasPrefix("--previewOverviewProgress=")
@@ -316,25 +284,7 @@ struct SkyView: View {
         .task(id: presentedStoryObjectID) {
             await preparePresentedForecast(for: presentedStoryObjectID)
         }
-        .task(id: detailGraceDeadline) {
-            guard let deadline = detailGraceDeadline else { return }
-            let remaining = deadline.timeIntervalSinceNow
-            if remaining > 0 {
-                try? await Task.sleep(
-                    nanoseconds: UInt64(remaining * 1_000_000_000)
-                )
-            }
-            guard !Task.isCancelled,
-                  TargetDetailRetentionPolicy.shouldDismiss(
-                      now: Date(),
-                      deadline: detailGraceDeadline,
-                      isPinned: detailPinnedByInteraction,
-                      isCaptureActive: archivePresentationReady
-                  )
-            else { return }
-            dismissRetainedDetail()
-        }
-        .onChange(of: capture.phase) { oldPhase, newPhase in
+        .onChange(of: capture.phase) { _, newPhase in
             switch newPhase {
             case .acquiring:
                 dismissTransientOverlay()
@@ -342,7 +292,6 @@ struct SkyView: View {
                 acquisitionEntryHaptic()
             case .locked(let objectId):
                 lockedAt = Date()
-                presentDetail(for: objectId)
                 hasEverLocked = true
                 lastAcquisitionPulse = nil
                 lockHaptic()
@@ -367,34 +316,11 @@ struct SkyView: View {
             case .exploring:
                 lockedAt = nil
                 lastAcquisitionPulse = nil
-                if oldPhase.isReleasing {
-                    // 主动解除锁定是明确退出，不保留已经失效的摘要。
-                    dismissRetainedDetail()
-                } else {
-                    beginDetailGracePeriod()
-                }
-            case .releasing:
+            case .dismissing:
                 lastAcquisitionPulse = nil
-                releaseHintVisible = false
             }
         }
         .onChange(of: capture.acquisitionProgress) { _, progress in
-            updateAcquisitionHaptic(progress: progress)
-        }
-        .onChange(of: capture.recognitionReady) { _, ready in
-            if ready, let objectID = capture.engagedObjectId {
-                lockedAt = Date()
-                presentDetail(for: objectID)
-                hasEverLocked = true
-                recognitionCompleteHaptic()
-            }
-        }
-        .onChange(of: capture.replacementObjectId) { _, objectID in
-            guard objectID != nil else { return }
-            lastAcquisitionPulse = Date()
-            acquisitionEntryHaptic()
-        }
-        .onChange(of: capture.replacementProgress) { _, progress in
             updateAcquisitionHaptic(progress: progress)
         }
         .onChange(of: capture.engagedObjectId) { _, _ in
@@ -438,24 +364,16 @@ struct SkyView: View {
             )
         }
         .onChange(of: session.catalogScope) { _, _ in
-            capture.returnToExploring()
+            capture.cancelAcquisition()
             screenTrails.clear()
             overviewTrails.clear()
             overviewAmbientTrails.clear()
         }
         .onChange(of: session.catalogFilters) { _, _ in
-            capture.returnToExploring()
+            capture.cancelAcquisition()
             screenTrails.clear()
             overviewTrails.clear()
             overviewAmbientTrails.clear()
-        }
-        .onChange(of: captureConfirmationEnabled) { _, enabled in
-            guard !enabled else { return }
-            if capture.isLocked {
-                requestRelease()
-            } else {
-                capture.returnToExploring()
-            }
         }
         .onChange(of: isUtilityPagePresented) { _, presented in
             if presented {
@@ -501,6 +419,11 @@ struct SkyView: View {
            capture.isAcquiring {
             return
         }
+        if ProcessInfo.processInfo.arguments.contains("--previewFocusStage"),
+           capture.isAcquiring,
+           capture.acquisitionProgress >= 0.72 {
+            return
+        }
         #endif
         let sample: CaptureSample
         switch session.pointingAvailability {
@@ -513,7 +436,6 @@ struct SkyView: View {
         capture.update(
             nearest: sample.nearest,
             trackedDistance: sample.trackedDistance,
-            captureEnabled: captureConfirmationEnabled,
             now: frameDate
         )
     }
@@ -525,7 +447,7 @@ struct SkyView: View {
 
     /// 捕获环收缩时，脉冲间隔随进度缩短；亮度和触觉使用同一进度源。
     private func updateAcquisitionHaptic(progress: Double) {
-        guard capture.isAcquiring || capture.isAcquiringReplacement else { return }
+        guard capture.isAcquiring else { return }
         let now = Date()
         let p = min(1, max(0, progress))
         // 最后一拍留给完成反馈，避免两个触觉在同一帧叠加。
@@ -537,129 +459,21 @@ struct SkyView: View {
         ObservationHaptics.shared.softImpact(intensity: 0.2 + 0.28 * p)
     }
 
-    /// 默认识别完成：捕获环闭合与完整档案出现共用一次明确的刚性确认。
-    private func recognitionCompleteHaptic() {
-        ObservationHaptics.shared.rigidImpact(intensity: 0.86)
-    }
-
-    /// 手动锁定与默认识别完成保持同一种触觉语义。
+    /// 自动锁定与捕获环闭合共用一次明确的刚性确认。
     private func lockHaptic() {
         ObservationHaptics.shared.rigidImpact(intensity: 0.86)
     }
 
-    /// 所有主动退出入口汇入同一个动作：先给一次极轻的“松开”触觉，再启动统一回收序列。
-    private func requestRelease() {
-        guard capture.isLocked || capture.recognitionReady else { return }
-        releaseHintVisible = false
+    /// 叉号与 VoiceOver Escape 共用同一个关闭入口。
+    private func dismissLockedTarget() {
+        guard capture.isLocked else { return }
         ObservationHaptics.shared.softImpact(intensity: 0.32)
-        capture.releaseSignal()
-    }
-
-    private func hideLockedDetail() {
-        guard retainedDetailObjectID != nil else { return }
-        withAnimation(
-            suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceCollapse
-        ) {
-            lockedDetailPresented = false
-            detailGraceDeadline = nil
-            detailPinnedByInteraction = false
-            // 已确认锁定仍需允许用户点目标或顶部状态重新展开；即时识别已经失效时
-            // 则不保留一个无法再访问的旧对象引用。
-            if !archivePresentationReady {
-                retainedDetailObjectID = nil
-            }
-        }
-    }
-
-    private func showLockedDetail() {
-        guard retainedDetailObjectID != nil else { return }
-        withAnimation(
-            suppressMotion ? .easeOut(duration: 0.12) : Motion.interfaceExpand
-        ) {
-            transientOverlay = nil
-            lockedDetailPresented = true
-        }
-    }
-
-    /// 捕获完成时建立新的阅读对象。重新对准同一对象只取消离焦倒计时，不会撤销
-    /// 用户通过点按建立的保持态；明确捕获另一对象时才开始一张新卡片。
-    private func presentDetail(for objectID: String) {
-        // 用户明确固定了一张资料卡后，新的准星候选不能静默替换阅读对象。
-        // 取消固定时再追上当前捕获目标，保证“锁住的是这张面板”语义稳定。
-        if detailPinnedByInteraction,
-           let retainedDetailObjectID,
-           retainedDetailObjectID != objectID {
-            return
-        }
-        let isNewObject = retainedDetailObjectID != objectID
-        retainedDetailObjectID = objectID
-        detailGraceDeadline = nil
-        if isNewObject {
-            detailPinnedByInteraction = false
-        }
-        lockedDetailPresented = true
-    }
-
-    /// 准星移开只启动阅读宽限，不延长对焦状态机本身。这样新目标仍能即时感应，
-    /// 当前卡片则有足够时间承受一次正常的手部晃动。
-    private func beginDetailGracePeriod(now: Date = Date()) {
-        guard retainedDetailObjectID != nil else { return }
-        guard lockedDetailPresented else {
-            dismissRetainedDetail()
-            return
-        }
-        guard !detailPinnedByInteraction else { return }
-        detailGraceDeadline = TargetDetailRetentionPolicy.deadline(after: now)
-    }
-
-    /// 点按卡片代表用户已经从“观测”进入“阅读”，此时不再依据准星位置自动收起。
-    /// 关闭、下滑或主动解除锁定仍然是明确退出入口。
-    private func keepDetailVisible() {
-        guard retainedDetailObjectID != nil,
-              lockedDetailPresented
-        else { return }
-        detailPinnedByInteraction = true
-        detailGraceDeadline = nil
-    }
-
-    /// 底部锁图标只管理阅读面板的固定状态，不再解除卫星捕获。取消固定时，
-    /// 若准星已经离开目标，则重新给用户完整的阅读宽限，而不是立刻收走面板。
-    private func toggleDetailRetention() {
-        guard retainedDetailObjectID != nil,
-              lockedDetailPresented
-        else { return }
-        detailPinnedByInteraction.toggle()
-        if detailPinnedByInteraction {
-            detailGraceDeadline = nil
-            ObservationHaptics.shared.rigidImpact(intensity: 0.38)
-        } else {
-            detailGraceDeadline = TargetDetailRetentionPolicy.deadlineAfterUnpin(
-                now: Date(),
-                isCaptureActive: archivePresentationReady
-            )
-            ObservationHaptics.shared.softImpact(intensity: 0.26)
-            if archivePresentationReady,
-               let currentObjectID = capture.engagedObjectId,
-               currentObjectID != retainedDetailObjectID {
-                presentDetail(for: currentObjectID)
-            }
-        }
-    }
-
-    private func dismissRetainedDetail() {
-        lockedDetailPresented = false
-        retainedDetailObjectID = nil
-        detailGraceDeadline = nil
-        detailPinnedByInteraction = false
+        capture.dismissCurrentTarget()
     }
 
     private func handleStatusWingTap() {
-        guard !overviewCommitted else { return }
-        if archivePresentationReady {
-            showLockedDetail()
-        } else {
-            toggleTransientOverlay(.observationStatus)
-        }
+        guard !overviewCommitted, !archivePresentationReady else { return }
+        toggleTransientOverlay(.observationStatus)
     }
 
     // MARK: - 底部观测动作 / 全局常驻时间标尺
@@ -683,7 +497,7 @@ struct SkyView: View {
             if presentationMode == .local {
                 Group {
                     if chromeState.dockMode == .targetSummary,
-                       let id = retainedDetailObjectID,
+                       let id = capture.engagedObjectId,
                        let object = session.catalog.objectsByID[id] {
                         lockedSummaryCard(object: object, objectID: id)
                     } else {
@@ -704,25 +518,26 @@ struct SkyView: View {
         object: CatalogObject,
         objectID: String
     ) -> some View {
-        ArchiveOverlay(
-            object: object,
-            ephemeris: engagedDisplayEphemeris(for: objectID),
-            insight: engagedInsight?.objectID == objectID ? engagedInsight : nil,
-            revealed: lockedDetailPresented,
-            retainedByInteraction: detailPinnedByInteraction,
-            releaseProgress: releasePresentationProgress(at: Date()),
-            onOpenArchive: {
-                if object.hasDeepArchive {
-                    presentDeepArchive(for: object)
-                } else {
-                    onOpenArchive()
-                }
-            },
-            onInteraction: keepDetailVisible,
-            onToggleRetention: toggleDetailRetention,
-            onRelease: requestRelease,
-            onDismiss: hideLockedDetail,
-        )
+        TimelineView(
+            .animation(
+                minimumInterval: 1.0 / 30.0,
+                paused: !isDismissing
+            )
+        ) { timeline in
+            ArchiveOverlay(
+                object: object,
+                ephemeris: engagedDisplayEphemeris(for: objectID),
+                dismissalProgress: dismissalPresentationProgress(at: timeline.date),
+                onOpenArchive: {
+                    if object.hasDeepArchive {
+                        presentDeepArchive(for: object)
+                    } else {
+                        onOpenArchive()
+                    }
+                },
+                onDismiss: dismissLockedTarget
+            )
+        }
         .id(objectID)
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
@@ -744,7 +559,6 @@ struct SkyView: View {
                 onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
                 onOpenSettings: openInstrument,
-                onPrimaryAction: performPrimaryAction,
                 showsSurface: !isUtilityPagePresented
             )
             .background {
@@ -770,19 +584,6 @@ struct SkyView: View {
         ) {
             presentedStoryObjectID = object.id
             onStoryPresentationChanged(true)
-        }
-    }
-
-    private func performPrimaryAction(_ action: SkyChromeState.PrimaryAction) {
-        switch action {
-        case .replace:
-            _ = capture.confirmReplacement()
-        case .confirm:
-            _ = capture.confirmAcquisition()
-        case .release:
-            requestRelease()
-        case .releasing:
-            break
         }
     }
 
@@ -830,23 +631,14 @@ struct SkyView: View {
         }
     }
 
-    /// 顶部详情和锁定摘要共享同一块空白关闭层；卡片与顶部控件绘制在
-    /// 这一层之上，因此点击内容仍执行自身动作，点击天空空白则只收起当前浮层。
+    /// 顶部临时仪表仍可点击天空收起；稳定目标摘要只能使用自身叉号关闭。
     @ViewBuilder
     private var transientDismissLayer: some View {
-        if transientOverlay != nil
-            || (lockedDetailPresented
-                && retainedDetailObjectID != nil
-                && !overviewChromeVisible) {
+        if transientOverlay != nil {
             Color.black.opacity(0.001)
                 .ignoresSafeArea()
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    if lockedDetailPresented,
-                       retainedDetailObjectID != nil,
-                       !overviewChromeVisible {
-                        hideLockedDetail()
-                    }
                     dismissTransientOverlay()
                 }
                 .accessibilityHidden(true)
@@ -1075,9 +867,6 @@ struct SkyView: View {
         if archivePresentationReady,
            let id = capture.engagedObjectId,
            let object = session.catalog.objectsByID[id] {
-            if isReleasing {
-                return .releasing(identifier: object.cosparId)
-            }
             return .locked(identifier: object.cosparId, confirmedAt: lockedAt)
         }
         if capture.isAcquiring {
@@ -1109,7 +898,9 @@ struct SkyView: View {
     }
 
     private var statusActivation: Double {
-        if isReleasing { return 1 - releasePresentationProgress(at: frozenFrameDate ?? Date()) }
+        if isDismissing {
+            return 1 - dismissalPresentationProgress(at: frozenFrameDate ?? Date())
+        }
         if archivePresentationReady { return 1 }
         if capture.isAcquiring { return capture.acquisitionProgress }
         return 0
@@ -1329,7 +1120,7 @@ struct SkyView: View {
         var nearestID: String?
         var nearestCosine = -1.0
         var trackedCosine: Double?
-        let trackedID = capture.engagedObjectId
+        let trackedID = capture.trackedObjectId
         let fadeEndCosine = cos(Projection.fadeEnd)
 
         func consider(_ object: CatalogObject) {
@@ -1378,17 +1169,20 @@ struct SkyView: View {
         return CaptureSample(nearest: nearest, trackedDistance: trackedDistance)
     }
 
-    /// 锁定结构、联系线和档案外壳共享同一确认进度，避免各自使用不一致的动画时钟。
+    /// 锁定结构、顶部信号和档案外壳共享同一建立进度，避免各自使用不一致的动画时钟。
     private func lockPresentationProgress(at date: Date) -> Double {
         guard let lockedAt else { return 0 }
         let raw = min(1, max(0, date.timeIntervalSince(lockedAt) / Motion.lockConfirmationDuration))
         return 1 - pow(1 - raw, 3)
     }
 
-    /// 主动归还共享同一平滑进度；文字、线与标记只在各自区间内响应它。
-    private func releasePresentationProgress(at date: Date) -> Double {
-        guard case .releasing(_, let startedAt) = capture.phase else { return 0 }
-        let raw = min(1, max(0, date.timeIntervalSince(startedAt) / Motion.releaseDuration))
+    /// 叉号关闭时，档案、目标结构与顶部反馈共用一段短促的收束进度。
+    private func dismissalPresentationProgress(at date: Date) -> Double {
+        guard case .dismissing(_, let startedAt) = capture.phase else { return 0 }
+        let raw = min(
+            1,
+            max(0, date.timeIntervalSince(startedAt) / Motion.interfaceCollapseDuration)
+        )
         return raw * raw * (3 - 2 * raw)
     }
 
@@ -1566,7 +1360,7 @@ struct SkyView: View {
         Canvas { context, size in
             let frameDate = startDate.addingTimeInterval(time)
             let lockProgress = lockPresentationProgress(at: frameDate)
-            let releaseProgress = releasePresentationProgress(at: frameDate)
+            let dismissalProgress = dismissalPresentationProgress(at: frameDate)
             // REDUCED MOTION：冻结呼吸/漂移的时间轴（点位仍随指向移动）
             let motionTime = reducedMotion || systemReducedMotion ? 0 : time
             context.fill(
@@ -1621,7 +1415,7 @@ struct SkyView: View {
             let cueBounds = relationshipBounds(in: size)
             let relationship: RelationshipTarget?
             if let engagedId,
-               capture.isAcquiring || capture.isLocked || isReleasing {
+               capture.isAcquiring || capture.isLocked || isDismissing {
                 relationship = relationshipTarget(
                     objectID: engagedId,
                     observation: observation,
@@ -1630,7 +1424,6 @@ struct SkyView: View {
             } else {
                 relationship = nil
             }
-            let replacementId = capture.replacementObjectId
             @MainActor func projectObject(_ object: CatalogObject) {
                 guard let eph = session.ephemeris.cachedEphemeris(object.id, at: observation, live: live),
                       eph.elevation > 0 else { return }
@@ -1679,7 +1472,7 @@ struct SkyView: View {
             let widePointScale = CGFloat(1 - 0.28 * wideFieldProgress)
             let widePointOpacity = 1 - 0.14 * wideFieldProgress
 
-            // 轨迹弧（锁定/释放中的对象；观测时刻为中心 ±3min）
+            // 轨迹弧（锁定/关闭消隐中的对象；观测时刻为中心 ±3min）
             if let id = engagedId, archivePresentationReady {
                 let points = session.tracks.track(
                     for: id, observer: session.observer.coordinates, at: observation
@@ -1720,7 +1513,6 @@ struct SkyView: View {
             familyTiers.reserveCapacity(CatalogFamily.allCases.count)
             for (object, proj, magnitude) in projected
             where object.id != engagedId
-                && object.id != replacementId
                 && !object.isCurated
                 && !object.isFeatured {
                 let sample = SkyRenderer.SatellitePoint(
@@ -1776,9 +1568,7 @@ struct SkyView: View {
             // 精选与当前捕捉对象保留呼吸、光晕和刻度细节。
             for (object, proj, magnitude) in projected {
                 let isEngaged = object.id == engagedId
-                let isReplacement = object.id == replacementId
                 guard isEngaged
-                    || isReplacement
                     || object.isFeatured
                     || (object.isCurated && object.family == nil)
                 else { continue }
@@ -1789,8 +1579,6 @@ struct SkyView: View {
                 let brightness: Double
                 if isEngaged {
                     brightness = (0.3 + 0.7 * strength) * proj.visibility
-                } else if isReplacement {
-                    brightness = (0.38 + 0.5 * capture.replacementProgress) * proj.visibility
                 } else {
                     brightness = magnitudeFloor * proj.visibility
                 }
@@ -1803,22 +1591,17 @@ struct SkyView: View {
                     breathPhase: Double(object.id.hashValue % 628) / 100.0,
                     focusProgress: isEngaged
                         ? (archivePresentationReady ? 1 : capture.acquisitionProgress)
-                        : (isReplacement ? capture.replacementProgress : 0),
+                        : 0,
                     locked: isEngaged && archivePresentationReady,
-                    breathes: isEngaged || isReplacement,
-                    haloStrength: (isEngaged || isReplacement ? 1 : 0.34)
+                    breathes: isEngaged,
+                    haloStrength: (isEngaged ? 1 : 0.34)
                         * (1 - 0.38 * wideFieldProgress),
                     visualScale: widePointScale
                 )
 
-                if (isEngaged && capture.isAcquiring && !archivePresentationReady)
-                    || isReplacement {
-                    let progress = isReplacement
-                        ? capture.replacementProgress
-                        : capture.acquisitionProgress
-                    let presence = isReplacement
-                        ? max(0.3, capture.replacementProgress)
-                        : max(0.24, strength)
+                if isEngaged && capture.isAcquiring && !archivePresentationReady {
+                    let progress = capture.acquisitionProgress
+                    let presence = max(0.24, strength)
                     SkyRenderer.drawAcquisitionRing(
                         context,
                         at: proj.point,
@@ -1845,7 +1628,7 @@ struct SkyView: View {
                let object = session.catalog.objectsByID[id],
                let relationship {
                 let marker = relationship.marker
-                let releaseVisibility = 1 - unitSmoothstep((releaseProgress - 0.46) / 0.54)
+                let dismissalVisibility = 1 - unitSmoothstep(dismissalProgress)
                 SkyRenderer.drawLockedMarker(
                     context,
                     at: marker.point,
@@ -1855,9 +1638,9 @@ struct SkyView: View {
                     tint: object.identityTint,
                     time: motionTime,
                     confirmationProgress: lockProgress,
-                    releaseProgress: releaseProgress,
+                    dismissalProgress: dismissalProgress,
                     showsDirectionCue: marker.isOffscreen,
-                    alpha: isReleasing ? releaseVisibility : max(0.76, strength)
+                    alpha: isDismissing ? dismissalVisibility : max(0.76, strength)
                 )
             }
 
@@ -1887,7 +1670,7 @@ struct SkyView: View {
                 center: center,
                 emphasis: capture.isAcquiring
                     ? capture.strength
-                    : capture.replacementProgress,
+                    : 0,
                 focusProgress: focusProgress,
                 response: response,
                 locked: archivePresentationReady,
@@ -2072,37 +1855,28 @@ struct SkyView: View {
         return current
     }
 
-    private var isReleasing: Bool {
-        if case .releasing = capture.phase { return true }
+    private var isDismissing: Bool {
+        if case .dismissing = capture.phase { return true }
         return false
     }
 
-    /// 面板只有两种状态：隐藏，或完整显示。默认模式等待圆环完全收束；
-    /// 手动确认模式等待用户真正锁定，不再在 acquiring 中插入半张档案。
+    /// 摘要只在自动锁定完成后显示，并在叉号触发的短收束期间保持同一对象。
     private var archivePresentationReady: Bool {
-        capture.isLocked
-            || isReleasing
-            || (!captureConfirmationEnabled && capture.recognitionReady)
+        capture.isLocked || isDismissing
     }
 
     // MARK: - 引导层
 
     @State private var lockedAt: Date?
     @AppStorage("hasEverLocked") private var hasEverLocked = false
-    @AppStorage("releaseHintShown") private var releaseHintShown = 0
     @State private var guideVisible = false
-    @State private var releaseHintVisible = false
 
     @ViewBuilder
     private var guideLayer: some View {
         if !hasEverLocked {
             VStack {
                 Spacer()
-                Text(
-                    captureConfirmationEnabled
-                        ? L10n.text("guide.capture.confirm")
-                        : L10n.text("guide.capture.direct")
-                )
+                Text(L10n.text("guide.capture.auto", table: "SatelliteText"))
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking)
                     .foregroundStyle(Palette.inkLow.opacity(guideVisible ? Palette.Level.present : 0))
@@ -2115,60 +1889,12 @@ struct SkyView: View {
                 try? await Task.sleep(for: .seconds(6))
                 if !hasEverLocked { guideVisible = true }
             }
-        } else if releaseHintShown < 3 {
-            // 释放提示：锁定驻留 6s 后浮现，教一次观测语言。最多出现三次。
-            VStack {
-                Spacer()
-                Text(L10n.text("guide.capture.switch"))
-                    .font(Typography.guide)
-                    .tracking(Typography.guideTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(releaseHintVisible ? Palette.Level.faint : 0))
-                    .animation(.easeOut(duration: 2.4), value: releaseHintVisible)
-                    .padding(.bottom, 190)
-            }
-            .frame(maxWidth: .infinity)
-            .allowsHitTesting(false)
-            .onChange(of: capture.isLocked) { _, locked in
-                if !locked { releaseHintVisible = false }
-            }
-            .task(id: capture.isLocked) {
-                guard capture.isLocked else { return }
-                try? await Task.sleep(for: .seconds(6))
-                if capture.isLocked {
-                    releaseHintVisible = true
-                    releaseHintShown += 1
-                }
-            }
         }
     }
 
     // MARK: - 拖拽（模拟器指向）
 
     @State private var lastTranslation = CGSize.zero
-
-    private var lockedTargetTapGesture: some Gesture {
-        SpatialTapGesture()
-            .onEnded { value in
-                guard archivePresentationReady,
-                      !lockedDetailPresented,
-                      !overviewCommitted,
-                      let objectID = capture.engagedObjectId,
-                      viewportSize != .zero,
-                      let projected = relationshipTarget(
-                          objectID: objectID,
-                          observation: clock.observationTime(),
-                          in: viewportSize
-                      )?.projected?.point
-                else { return }
-
-                let distance = hypot(
-                    value.location.x - projected.x,
-                    value.location.y - projected.y
-                )
-                guard distance <= 36 else { return }
-                showLockedDetail()
-            }
-    }
 
     private var dragGesture: some Gesture {
         DragGesture(minimumDistance: 1)
@@ -2304,35 +2030,6 @@ struct SkyView: View {
                     globalEntryGateProgress = 0
                 }
             }
-    }
-}
-
-/// 详情阅读的短暂离焦容忍。它是纯值策略，避免把阅读寿命重新耦合到捕获阈值。
-enum TargetDetailRetentionPolicy {
-    static let graceDuration: TimeInterval = 3
-
-    static func deadline(after date: Date) -> Date {
-        date.addingTimeInterval(graceDuration)
-    }
-
-    static func deadlineAfterUnpin(
-        now: Date,
-        isCaptureActive: Bool
-    ) -> Date? {
-        isCaptureActive ? nil : deadline(after: now)
-    }
-
-    static func shouldDismiss(
-        now: Date,
-        deadline: Date?,
-        isPinned: Bool,
-        isCaptureActive: Bool
-    ) -> Bool {
-        guard !isPinned,
-              !isCaptureActive,
-              let deadline
-        else { return false }
-        return now >= deadline
     }
 }
 

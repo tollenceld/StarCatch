@@ -412,7 +412,7 @@ struct RootView: View {
     /// --previewOverviewInteraction 固定为交互降级材质，用于确认大陆基础轮廓持续存在；
     /// --previewOverviewMode 自动演示常驻星图进入与退出；
     /// --previewReturnToLive 自动从一小时偏移回归 LIVE；
-    /// --autoReleaseAfter <秒> 用于验证完整锁定/释放动画。
+    /// --autoDismissAfter <秒> 用于验证锁定详情的叉号收束动画。
     private func applyDebugArgs() {
         guard let session else { return }
         let args = ProcessInfo.processInfo.arguments
@@ -536,12 +536,12 @@ struct RootView: View {
                 clock.returnToLive()
             }
         }
-        if let idx = args.firstIndex(of: "--autoReleaseAfter"),
+        if let idx = args.firstIndex(of: "--autoDismissAfter"),
            idx + 1 < args.count,
            let seconds = Double(args[idx + 1]) {
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(seconds))
-                capture.releaseSignal()
+                capture.dismissCurrentTarget()
             }
         }
     }

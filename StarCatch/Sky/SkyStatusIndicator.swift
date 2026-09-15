@@ -256,7 +256,6 @@ struct SkyStatusIndicator: View {
         case sensing
         case focusing
         case locked(identifier: String, confirmedAt: Date?)
-        case releasing(identifier: String)
         case field(timeLabel: String)
         case degraded(reason: String)
 
@@ -272,7 +271,6 @@ struct SkyStatusIndicator: View {
                 } else {
                     identifier
                 }
-            case .releasing: L10n.text("sky.status.releasing")
             case .field: L10n.text("sky.status.global")
             case .degraded: L10n.text("sky.status.degraded")
             }
@@ -282,7 +280,6 @@ struct SkyStatusIndicator: View {
             switch self {
             case .field(let timeLabel): timeLabel
             case .degraded(let reason): reason
-            case .releasing(let identifier): L10n.format("sky.status.release_object", identifier)
             default: label(at: Date())
             }
         }
@@ -291,13 +288,8 @@ struct SkyStatusIndicator: View {
             switch self {
             case .observing, .field, .degraded: .red
             case .sensing, .focusing: .yellow
-            case .locked, .releasing: .green
+            case .locked: .green
             }
-        }
-
-        var isReleasing: Bool {
-            if case .releasing = self { return true }
-            return false
         }
 
         var breathes: Bool {
@@ -309,7 +301,7 @@ struct SkyStatusIndicator: View {
 
         var isEvent: Bool {
             switch self {
-            case .sensing, .focusing, .locked, .releasing: true
+            case .sensing, .focusing, .locked: true
             default: false
             }
         }
@@ -521,7 +513,7 @@ struct SkyStatusIndicator: View {
 
     private func indicator(breath: Double) -> some View {
         let tint = mode.signal.tint
-        let brightness = mode.isReleasing ? 0.25 + 0.75 * activation : 1
+        let brightness = mode.isLocked ? 0.25 + 0.75 * activation : 1
         return ZStack {
             Circle()
                 .fill(Palette.voidBlack)

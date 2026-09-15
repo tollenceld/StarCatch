@@ -44,10 +44,6 @@ enum Motion {
     static let breathPeriod: Double = 3.6
     static let breathAmplitude: Double = 0.12
 
-    /// 主动归还：文字先收束，联系线向目标回撤，锁定结构最后松开。
-    static let release = Animation.timingCurve(0.36, 0, 0.72, 0.24, duration: 0.86)
-    static let releaseDuration: Double = 0.86
-
     /// 天空球跟随手指进入；松手后的镜头回退连续、可读、无弹跳。
     static let skyOverviewExit = Animation.timingCurve(0.2, 0.66, 0.22, 1, duration: 0.82)
 

@@ -57,7 +57,7 @@ struct SkyCommandConfiguration: Equatable {
                 activeItems: activeItems
             )
 
-        case .sensing, .capture, .targetSummary, .hidden:
+        case .sensing, .targetSummary, .hidden:
             return nil
         }
     }
@@ -72,7 +72,6 @@ struct SkyCommandDock: View {
     let onOpenObservations: () -> Void
     let onEnterGlobal: () -> Void
     let onOpenSettings: () -> Void
-    let onPrimaryAction: (SkyChromeState.PrimaryAction) -> Void
     var showsSurface = true
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -95,15 +94,9 @@ struct SkyCommandDock: View {
                 commandSurface(configuration)
                     .matchedGeometryEffect(id: "command-surface", in: dockNamespace)
             } else {
-                switch state.dockMode {
-                case .capture(let action):
-                    primaryAction(action)
-                        .matchedGeometryEffect(id: "command-surface", in: dockNamespace)
-                case .exploration, .sensing, .targetSummary, .hidden:
-                    Color.clear
-                        .frame(height: AppChromeMetrics.commandRailHeight)
-                        .accessibilityHidden(true)
-                }
+                Color.clear
+                    .frame(height: AppChromeMetrics.commandRailHeight)
+                    .accessibilityHidden(true)
             }
         }
         .frame(maxWidth: .infinity)
@@ -133,26 +126,6 @@ struct SkyCommandDock: View {
         }
     }
 
-    @ViewBuilder
-    private func primaryAction(_ action: SkyChromeState.PrimaryAction) -> some View {
-        switch action {
-        case .confirm(let progress):
-            FocusActionControl(mode: .confirm(progress: progress)) {
-                onPrimaryAction(action)
-            }
-        case .replace(let progress):
-            FocusActionControl(mode: .replace(progress: progress)) {
-                onPrimaryAction(action)
-            }
-        case .release:
-            CaptureSecondaryControl(mode: .cancelCapture) {
-                onPrimaryAction(action)
-            }
-        case .releasing:
-            CaptureSecondaryControl(mode: .cancelling) {}
-        }
-    }
-
     private var dockAnimation: Animation {
         if suppressMotion {
             return .easeOut(
@@ -165,7 +138,7 @@ struct SkyCommandDock: View {
         switch state.dockMode {
         case .exploration:
             return Motion.interfaceExpand
-        case .sensing, .capture, .targetSummary, .hidden:
+        case .sensing, .targetSummary, .hidden:
             return Motion.interfaceCollapse
         }
     }

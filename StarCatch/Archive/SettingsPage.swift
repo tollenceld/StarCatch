@@ -18,7 +18,6 @@ struct SettingsPage: View {
 
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
-    @AppStorage("captureConfirmationEnabled") private var captureConfirmationEnabled = false
     @State private var path: [SettingsRoute]
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion || previewReducedMotion }
@@ -145,12 +144,6 @@ struct SettingsPage: View {
                 title: copy("settings.motion.title"),
                 caption: copy("settings.motion.caption"),
                 isOn: $reducedMotion
-            )
-            hairline
-            toggleRow(
-                title: copy("settings.capture.title"),
-                caption: copy("settings.capture.caption"),
-                isOn: $captureConfirmationEnabled
             )
         }
         .overlay(alignment: .top) { hairline }

@@ -14,16 +14,8 @@ struct SkyChromeState: Equatable {
     enum DockMode: Equatable {
         case exploration
         case sensing
-        case capture(PrimaryAction)
         case targetSummary
         case hidden
-    }
-
-    enum PrimaryAction: Equatable {
-        case confirm(progress: Double)
-        case replace(progress: Double)
-        case release
-        case releasing
     }
 
     enum ResetAction: Equatable {
@@ -37,12 +29,6 @@ struct SkyChromeState: Equatable {
     init(
         presentationMode: SkyPresentationMode,
         capturePhase: CaptureStateMachine.Phase,
-        captureConfirmationEnabled: Bool,
-        recognitionReady: Bool,
-        replacementObjectID: String?,
-        acquisitionProgress: Double,
-        replacementProgress: Double,
-        targetSummaryVisible: Bool,
         localFieldResetAvailable: Bool
     ) {
         switch presentationMode {
@@ -59,13 +45,7 @@ struct SkyChromeState: Equatable {
         case .local:
             scene = .local
             let resolvedDock = Self.resolveLocalDock(
-                capturePhase: capturePhase,
-                captureConfirmationEnabled: captureConfirmationEnabled,
-                recognitionReady: recognitionReady,
-                replacementObjectID: replacementObjectID,
-                acquisitionProgress: acquisitionProgress,
-                replacementProgress: replacementProgress,
-                targetSummaryVisible: targetSummaryVisible
+                capturePhase: capturePhase
             )
             dockMode = resolvedDock
             resetAction = resolvedDock == .exploration && localFieldResetAvailable
@@ -75,39 +55,18 @@ struct SkyChromeState: Equatable {
     }
 
     private static func resolveLocalDock(
-        capturePhase: CaptureStateMachine.Phase,
-        captureConfirmationEnabled: Bool,
-        recognitionReady: Bool,
-        replacementObjectID: String?,
-        acquisitionProgress: Double,
-        replacementProgress: Double,
-        targetSummaryVisible: Bool
+        capturePhase: CaptureStateMachine.Phase
     ) -> DockMode {
         switch capturePhase {
         case .exploring:
             return .exploration
 
         case .acquiring:
-            if recognitionReady {
-                return targetSummaryVisible ? .targetSummary : .capture(.release)
-            }
-            guard captureConfirmationEnabled else { return .sensing }
-            return .capture(.confirm(progress: clamped(acquisitionProgress)))
+            return .sensing
 
-        case .locked:
-            if targetSummaryVisible { return .targetSummary }
-            if replacementObjectID != nil {
-                return .capture(.replace(progress: clamped(replacementProgress)))
-            }
-            return .capture(.release)
-
-        case .releasing:
-            return targetSummaryVisible ? .targetSummary : .capture(.releasing)
+        case .locked, .dismissing:
+            return .targetSummary
         }
-    }
-
-    private static func clamped(_ progress: Double) -> Double {
-        min(1, max(0, progress))
     }
 }
 

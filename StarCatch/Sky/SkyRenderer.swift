@@ -663,26 +663,26 @@ enum SkyRenderer {
         tint: Color,
         time: TimeInterval,
         confirmationProgress: Double,
-        releaseProgress: Double,
+        dismissalProgress: Double,
         showsDirectionCue: Bool,
         alpha: Double
     ) {
         let edge = min(1, max(0, edgeProgress))
         let edgeCGFloat = CGFloat(edge)
         let confirmation = min(1, max(0, confirmationProgress))
-        let release = min(1, max(0, releaseProgress))
-        let releaseCGFloat = CGFloat(release)
+        let dismissal = min(1, max(0, dismissalProgress))
+        let dismissalCGFloat = CGFloat(dismissal)
         let visibility = min(1, max(0, alpha))
         guard visibility > 0.01 else { return }
         let breath = Motion.breath(at: time, phase: 0.7)
         var clipped = context
         clipped.clip(to: Path(bounds))
 
-        // 捕获环抵达目标后只做极小的精度校准；主动归还时四段结构向外松开。
+        // 捕获环抵达目标后只做极小的精度校准；叉号关闭时四段结构向外松开。
         let radius: CGFloat = 14 - 0.5 * CGFloat(confirmation)
-            - 0.8 * edgeCGFloat + 4.5 * releaseCGFloat
-        let sweep = 76.0 - 9.0 * confirmation - 7.0 * edge - 22.0 * release
-        let rotation = 5.0 * release
+            - 0.8 * edgeCGFloat + 4.5 * dismissalCGFloat
+        let sweep = 76.0 - 9.0 * confirmation - 7.0 * edge - 22.0 * dismissal
+        let rotation = 5.0 * dismissal
         for i in 0 ..< 4 {
             let start = Angle.degrees(Double(i) * 90 + 45 + rotation - sweep / 2)
             var arc = Path()
@@ -696,14 +696,14 @@ enum SkyRenderer {
             clipped.stroke(
                 arc,
                 with: .color(tint.opacity(
-                    (0.42 + 0.08 * edge) * visibility * breath * (1 - 0.34 * release)
+                    (0.42 + 0.08 * edge) * visibility * breath * (1 - 0.34 * dismissal)
                 )),
                 style: StrokeStyle(lineWidth: 0.65, lineCap: .butt)
             )
         }
 
         // 一次性的确认回声：从原锁定环轻轻外扩，不形成瞄准或爆炸感。
-        if confirmation > 0, confirmation < 1, release < 0.01 {
+        if confirmation > 0, confirmation < 1, dismissal < 0.01 {
             let echoAlpha = sin(confirmation * .pi) * 0.28 * visibility
             let echoRadius = 14 + 13 * CGFloat(confirmation)
             let echoSweep = 46.0 - 12.0 * confirmation
@@ -744,7 +744,7 @@ enum SkyRenderer {
                 calibration,
                 with: .color(Palette.signal.opacity(
                     (showsDirectionCue ? 0.68 : 0.4)
-                        * edge * visibility * breath * (1 - 0.5 * release)
+                        * edge * visibility * breath * (1 - 0.5 * dismissal)
                 )),
                 style: StrokeStyle(
                     lineWidth: showsDirectionCue ? 0.85 : 0.55,
@@ -772,7 +772,7 @@ enum SkyRenderer {
                 ))
                 clipped.stroke(
                     chevron,
-                    with: .color(tint.opacity(0.76 * visibility * (1 - 0.45 * release))),
+                    with: .color(tint.opacity(0.76 * visibility * (1 - 0.45 * dismissal))),
                     style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round)
                 )
 
