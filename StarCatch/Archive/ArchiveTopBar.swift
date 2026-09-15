@@ -37,6 +37,58 @@ enum AppChromeSurfaceMode: Equatable {
     }
 }
 
+/// 底部四个入口的根页面共享同一种收回语义。工具面板和全球轨道虽然使用
+/// 不同表面，左侧入口都从同一位置向下返回天空；普通详情页才使用左箭头。
+enum AppNavigationControlRole: Equatable {
+    case back
+    case dismissToSky
+
+    var systemImage: String {
+        switch self {
+        case .back: "chevron.left"
+        case .dismissToSky: "chevron.down"
+        }
+    }
+}
+
+/// 全 App 共用的返回 / 收回入口。图标语义由页面层级决定，文字、44pt 热区、
+/// 字体、颜色和无障碍朗读保持一致。
+struct AppNavigationControl: View {
+    let title: String
+    let role: AppNavigationControlRole
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: ContentTopBarMetrics.itemSpacing) {
+                    navigationIcon
+                    Text(title)
+                        .lineLimit(1)
+                }
+                navigationIcon
+            }
+            .font(Typography.guide)
+            .tracking(Typography.guideTracking)
+            .foregroundStyle(Palette.signal.opacity(Palette.Level.full))
+            .frame(
+                minWidth: ContentTopBarMetrics.controlHeight,
+                minHeight: ContentTopBarMetrics.controlHeight,
+                alignment: .leading
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L10n.format("navigation.back", title))
+    }
+
+    private var navigationIcon: some View {
+        Image(systemName: role.systemImage)
+            .font(.caption.weight(.semibold))
+            .frame(width: ContentTopBarMetrics.iconWidth)
+    }
+}
+
 /// 筛选、记录与设置面板共用的顶部导航。页面标题固定靠右，左侧始终是
 /// 指向上一层的明确返回入口。
 struct AppPageHeader: View {
@@ -47,22 +99,12 @@ struct AppPageHeader: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: onBack) {
-                HStack(spacing: ContentTopBarMetrics.itemSpacing) {
-                    Image(systemName: collapsesToSky ? "chevron.down" : "chevron.left")
-                        .font(.caption.weight(.semibold))
-                    Text(backTitle)
-                        .lineLimit(1)
-                }
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.signal.opacity(Palette.Level.full))
-                .fixedSize(horizontal: true, vertical: false)
-                .frame(minHeight: ContentTopBarMetrics.controlHeight)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.format("navigation.back", backTitle))
+            AppNavigationControl(
+                title: backTitle,
+                role: collapsesToSky ? .dismissToSky : .back,
+                action: onBack
+            )
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 12)
 
@@ -121,14 +163,7 @@ struct AppPageShell<Content: View>: View {
             )
             .opacity(DockMorphMetrics.headerReveal(progress))
             .offset(y: suppressMotion ? 0 : 12 * (1 - DockMorphMetrics.headerReveal(progress)))
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 16).onEnded { value in
-                    if isRoot, DockMorphMetrics.shouldDismiss(
-                        translation: value.translation,
-                        predicted: value.predictedEndTranslation
-                    ) { onBack() }
-                }
-            )
+            .appRootDismissGesture(enabled: isRoot, action: onBack)
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .opacity(DockMorphMetrics.contentReveal(progress))
@@ -159,39 +194,36 @@ struct ContentHairline: View {
     }
 }
 
-/// 全 App 共用的返回入口。可见内容保持轻量，但触控区始终满足 44pt。
+/// 普通详情页返回入口。根页面统一使用 `AppNavigationControl.dismissToSky`。
 struct AppBackControl: View {
     let title: String
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: ContentTopBarMetrics.itemSpacing) {
-                    backIcon
-                    Text(title)
-                        .lineLimit(1)
-                }
-                backIcon
-            }
-            .font(Typography.guide)
-            .tracking(Typography.guideTracking)
-            .foregroundStyle(Palette.signal.opacity(Palette.Level.full))
-            .frame(
-                minWidth: ContentTopBarMetrics.controlHeight,
-                minHeight: ContentTopBarMetrics.controlHeight,
-                alignment: .leading
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(L10n.format("navigation.back", title))
+        AppNavigationControl(title: title, role: .back, action: action)
     }
+}
 
-    private var backIcon: some View {
-        Image(systemName: "chevron.left")
-            .font(.caption.weight(.semibold))
-            .frame(width: ContentTopBarMetrics.iconWidth)
+/// 根页面顶部下拉的共同命中规则。只挂在标题栏上，避免争抢列表滚动、时间轴
+/// 拖动和地球旋转；四个入口均把它解释为“收回到天空”。
+struct AppRootDismissGestureModifier: ViewModifier {
+    let enabled: Bool
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content.simultaneousGesture(
+                DragGesture(minimumDistance: 16).onEnded { value in
+                    guard DockMorphMetrics.shouldDismiss(
+                        translation: value.translation,
+                        predicted: value.predictedEndTranslation
+                    ) else { return }
+                    action()
+                }
+            )
+        } else {
+            content
+        }
     }
 }
 
@@ -249,6 +281,13 @@ struct AppEdgeBackGestureModifier: ViewModifier {
 }
 
 extension View {
+    func appRootDismissGesture(
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        modifier(AppRootDismissGestureModifier(enabled: enabled, action: action))
+    }
+
     func appEdgeBackGesture(
         enabled: Bool = true,
         action: @escaping () -> Void

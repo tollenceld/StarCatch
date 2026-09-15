@@ -102,42 +102,48 @@ struct GlobalOrbitHeader: View {
             )
         }
         .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape, onBack)
+        .appRootDismissGesture(action: onBack)
     }
 
     private var headerContent: some View {
         HStack(spacing: 10) {
-            AppBackControl(title: L10n.text("navigation.sky"), action: onBack)
+            AppNavigationControl(
+                title: L10n.text("navigation.sky"),
+                role: .dismissToSky,
+                action: onBack
+            )
                 .fixedSize(horizontal: true, vertical: false)
 
-            Rectangle()
-                .fill(Palette.inkFaint.opacity(0.34))
-                .frame(width: 0.5, height: 18)
-                .accessibilityHidden(true)
+            Spacer(minLength: 12)
 
-            Text(L10n.text("overview.header.title"))
-                .font(Typography.guide)
-                .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Spacer(minLength: 6)
-
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Palette.signal.opacity(0.78))
-                    .frame(width: 4, height: 4)
-                Text(timeLabel)
-                    .font(Typography.statusTag)
-                    .tracking(0.7)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+            HStack(spacing: 10) {
+                Text(L10n.text("overview.header.title"))
+                    .font(Typography.guide)
+                    .tracking(Typography.guideTracking)
+                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(Palette.signal.opacity(0.78))
+                        .frame(width: 4, height: 4)
+                    Text(timeLabel)
+                        .font(Typography.statusTag)
+                        .tracking(0.7)
+                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
             }
             .accessibilityElement(children: .combine)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .layoutPriority(1)
         }
-        .padding(.horizontal, 10)
-        .frame(height: AppChromeMetrics.controlHeight)
+        // 与工具面板相同：表面距屏幕 18pt，控件再内收 18pt。
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .frame(height: ContentTopBarMetrics.height)
         .contentShape(headerShape)
     }
 

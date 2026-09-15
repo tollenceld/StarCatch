@@ -74,6 +74,11 @@ final class TimeTests: XCTestCase {
         XCTAssertFalse(DockMorphMetrics.shouldDismiss(translation: CGSize(width: 0, height: 20), predicted: CGSize(width: 0, height: 200)))
     }
 
+    func testRootDestinationsShareDismissToSkyNavigationRole() {
+        XCTAssertEqual(AppNavigationControlRole.dismissToSky.systemImage, "chevron.down")
+        XCTAssertEqual(AppNavigationControlRole.back.systemImage, "chevron.left")
+    }
+
     func testPanelLifecycleSettlesOnBackgroundAndRejectsOldCompletions() {
         var lifecycle = UtilityPanelLifecycle()
         let first = lifecycle.begin(expanding: true)
