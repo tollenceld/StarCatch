@@ -32,7 +32,7 @@ struct SkyChromeState: Equatable {
         localFieldResetAvailable: Bool
     ) {
         switch presentationMode {
-        case .enteringGlobal, .exitingGlobal:
+        case .previewingGlobal, .cancellingGlobal, .enteringGlobal, .exitingGlobal:
             scene = .transitioning
             dockMode = .hidden
             resetAction = nil

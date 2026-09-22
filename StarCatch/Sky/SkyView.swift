@@ -59,17 +59,12 @@ struct SkyView: View {
         minimumPointDistance: 0
     )
     @State private var viewportSize: CGSize = .zero
-    /// 局部天空与全局轨道使用互斥模式。缩放手势只在当前模式内部工作，
-    /// 只有入口按钮和返回按钮能够改变模式。
+    /// Mode owns interaction; one shared progress owns every spatial/UI handoff.
     @State private var presentationMode: SkyPresentationMode = .local
-    @State private var persistentOverviewProgress: Double = 0
-    @State private var overviewTransitionElapsed = 0.0
-    @State private var overviewTransitionLastTick: Double?
+    @State private var scaleJourney = ScaleJourneyProgress()
+    @State private var journeyContext: ObservationJourneyContext?
     @State private var overviewReturnFrame: ObservationSceneFrame?
     @State private var overviewReturnOffset = 0.0
-    @State private var globalEntryGateProgress: Double = 0
-    @State private var globalEntryArmed = false
-    @State private var globalEntryHapticSent = false
     @State private var overviewEntryPointing: Pointing?
     @State private var overviewCelestialFrame: CelestialViewFrame?
     @State private var overviewInteractionActive = false
@@ -115,12 +110,6 @@ struct SkyView: View {
     private var localSkyPresence: Double {
         1
     }
-    private var localSkyScale: CGFloat {
-        guard !suppressMotion else { return 1 }
-        return GlobalEntryGatePolicy.elasticScale(
-                progress: globalEntryGateProgress
-            )
-    }
     private var localFieldResetAvailable: Bool {
         fieldResetPolicy.isAvailable(interacting: clock.isScrubbing || fieldMagnificationActive)
     }
@@ -156,7 +145,6 @@ struct SkyView: View {
                     } else {
                         canvasLayer(time: time, observation: obsTime)
                         .contentShape(Rectangle())
-                        .scaleEffect(localSkyScale)
                         .opacity(localSkyPresence)
                     }
                     crosshairLayer
@@ -236,9 +224,12 @@ struct SkyView: View {
             frozenFrameDate = suspended ? Date() : nil
             dockActivity.restart()
         }
-        .onChange(of: scenePhase) { _, _ in
+        .onChange(of: scenePhase) { _, phase in
             dockActivity.restart()
-            overviewTransitionLastTick = nil
+            if phase != .active, presentationMode == .previewingGlobal {
+                finishScalePreview()
+            }
+            scaleJourney.pause()
         }
         .onChange(of: establishment == nil) { _, live in
             if live { lastCaptureSample = -.infinity; capture.resumeSampling() }
@@ -255,7 +246,7 @@ struct SkyView: View {
             EarthCoastlineStore.shared.prepare()
             if initialOverviewPresented {
                 presentationMode = .global
-                persistentOverviewProgress = 1
+                scaleJourney.seek(1)
                 overviewEntryPointing = session.pointing
                 overviewCelestialFrame = makeCelestialViewFrame()
                 overviewIdleBeganAt = Date()
@@ -292,13 +283,14 @@ struct SkyView: View {
             ) {
                 fieldMagnification = ObservationScale.minimumLocalMagnification
                 settledFieldMagnification = fieldMagnification
-                presentationMode = progress >= 1 ? .global : .enteringGlobal
-                persistentOverviewProgress = min(1, max(0, progress))
+                presentationMode = progress >= 1 ? .global : .previewingGlobal
+                scaleJourney.seek(progress)
+                journeyContext = makeJourneyContext()
                 overviewEntryPointing = session.pointing
                 overviewCelestialFrame = makeCelestialViewFrame()
             } else if arguments.contains("--openOverview") {
                 presentationMode = .global
-                persistentOverviewProgress = 1
+                scaleJourney.seek(1)
                 overviewEntryPointing = session.pointing
                 overviewCelestialFrame = makeCelestialViewFrame()
                 overviewIdleBeganAt = Date()
@@ -309,11 +301,11 @@ struct SkyView: View {
                         || arguments.contains("--previewGlobalEntry") {
                 fieldMagnification = ObservationScale.minimumLocalMagnification
                 settledFieldMagnification = fieldMagnification
-                globalEntryArmed = true
+                beginScalePreview()
+                scaleJourney.seek(0.5)
             } else if arguments.contains("--previewOverviewMode") {
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(550))
-                    globalEntryArmed = true
                     togglePersistentOverview()
                     try? await Task.sleep(for: .milliseconds(2400))
                     togglePersistentOverview()
@@ -400,9 +392,12 @@ struct SkyView: View {
             dockActivity.restart()
             dismissTransientOverlay()
             session.setOverviewPropagationActive(
-                newMode == .global || newMode == .enteringGlobal
-                    || (newMode == .exitingGlobal && !clock.isLive) || globalEntryArmed
+                newMode.presentsOverview
             )
+            if newMode == .local {
+                capture.resumeSampling()
+                lastCaptureSample = -.infinity
+            }
             if !oldMode.presentsOverview, newMode.presentsOverview {
                 overviewTrails.clear()
                 overviewAmbientTrails.clear()
@@ -415,11 +410,6 @@ struct SkyView: View {
                 overviewAmbientTrails.clear()
                 overviewIdleBeganAt = nil
             }
-        }
-        .onChange(of: globalEntryArmed) { _, armed in
-            session.setOverviewPropagationActive(
-                presentationMode.presentsOverview || armed
-            )
         }
         .onChange(of: session.catalogScope) { _, _ in
             capture.cancelAcquisition()
@@ -624,7 +614,7 @@ struct SkyView: View {
             SkyCommandDock(
                 state: chromeState,
                 filtersActive: session.activeCatalogFilterCount > 0,
-                globalEntryEmphasized: globalEntryArmed,
+                globalEntryEmphasized: false,
                 onOpenFilters: openFilters,
                 onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
@@ -710,10 +700,7 @@ struct SkyView: View {
 
         fieldMagnificationActive = false
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
-        globalEntryArmed = false
-        globalEntryGateProgress = 0
-        globalEntryHapticSent = false
-        persistentOverviewProgress = 0
+        scaleJourney.seek(0)
         overviewEntryPointing = nil
         overviewCelestialFrame = nil
         withAnimation(suppressMotion ? .easeOut(duration: 0.14) : Motion.fieldReset) {
@@ -762,7 +749,7 @@ struct SkyView: View {
             enterGlobalOverview()
         case .global:
             exitOverviewToLocal()
-        case .enteringGlobal, .exitingGlobal:
+        case .previewingGlobal, .cancellingGlobal, .enteringGlobal, .exitingGlobal:
             break
         }
     }
@@ -770,28 +757,51 @@ struct SkyView: View {
     private func enterGlobalOverview() {
         guard presentationMode == .local else { return }
         ObservationHaptics.shared.mediumImpact(intensity: 0.72)
-        globalEntryArmed = false
-        globalEntryGateProgress = 0
-        globalEntryHapticSent = false
+        prepareScaleJourney()
+        presentationMode = .enteringGlobal
+        scaleJourney.settle(to: 1, reducedMotion: suppressMotion)
+    }
+
+    private func makeJourneyContext() -> ObservationJourneyContext {
+        ObservationJourneyContext(pointing: session.pointing, verticalFOV: fieldVerticalFOV,
+                                  observer: session.observer.coordinates)
+    }
+
+    private func prepareScaleJourney() {
+        journeyContext = makeJourneyContext()
         overviewEntryPointing = session.pointing
         overviewCelestialFrame = makeCelestialViewFrame()
         session.observer.holdForPresentation()
         overviewAmbientTrails.clear()
         overviewIdleBeganAt = nil
-        persistentOverviewProgress = 0
-        presentationMode = .enteringGlobal
+        scaleJourney.seek(0)
         dismissTransientOverlay()
-        overviewTransitionElapsed = 0
-        overviewTransitionLastTick = nil
+    }
+
+    private func beginScalePreview() {
+        prepareScaleJourney()
+        presentationMode = .previewingGlobal
+    }
+
+    private func finishScalePreview() {
+        guard presentationMode == .previewingGlobal else { return }
+        fieldMagnificationActive = false
+        let commits = ScaleJourneyPolicy.commits(scaleJourney.progress)
+        if !commits { journeyContext?.returnHandoffStart = max(0.8, 1 - scaleJourney.progress) }
+        presentationMode = commits ? .enteringGlobal : .cancellingGlobal
+        if commits { ObservationHaptics.shared.rigidImpact(intensity: 0.38) }
+        if suppressMotion { scaleJourney.seek(0) }
+        scaleJourney.settle(to: commits ? 1 : 0, reducedMotion: suppressMotion)
+        settledFieldMagnification = fieldMagnification
     }
 
     private func exitOverviewToLocal() {
         guard presentationMode == .global else { return }
         session.observer.holdForPresentation()
+        journeyContext = makeJourneyContext()
+        journeyContext?.destinationVerticalFOV = Projection.baseVerticalFOV
+        fieldMagnification = ObservationScale.defaultLocalMagnification
         presentationMode = .exitingGlobal
-        globalEntryArmed = false
-        globalEntryGateProgress = 0
-        globalEntryHapticSent = false
         if !clock.isLive {
             overviewReturnFrame = session.sceneFrame(at: clock.observationTime(), live: false,
                                                      focusedObjectID: capture.engagedObjectId)
@@ -799,33 +809,17 @@ struct SkyView: View {
             returnToLiveFromOverview()
         }
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
-        overviewTransitionElapsed = 0
-        overviewTransitionLastTick = nil
+        scaleJourney.settle(to: 0, reducedMotion: suppressMotion)
         if clock.isLive { session.setOverviewPropagationActive(false) }
     }
 
     private func advanceOverviewTransition(at uptime: Double) {
-        guard presentationMode.isTransitioning, scenePhase == .active, !renderingSuspended else {
-            overviewTransitionLastTick = nil
-            return
-        }
-        // Historical return finishes on the existing clock before spatial descent.
-        guard presentationMode != .exitingGlobal || clock.isLive else {
-            overviewTransitionLastTick = nil
-            return
-        }
-        if presentationMode == .exitingGlobal { session.setOverviewPropagationActive(false) }
-        if let last = overviewTransitionLastTick { overviewTransitionElapsed += max(0, uptime - last) }
-        overviewTransitionLastTick = uptime
-        let duration = suppressMotion ? 0.16 : 1.05
-        let p = min(1, overviewTransitionElapsed / duration)
-        persistentOverviewProgress = presentationMode == .enteringGlobal ? p : 1 - p
-        if presentationMode == .exitingGlobal {
-            fieldMagnification = ObservationScale.defaultLocalMagnification
-        }
-        guard p >= 1 else { return }
+        let ready = presentationMode.isTransitioning && presentationMode != .previewingGlobal
+            && scenePhase == .active && !renderingSuspended
+            && (presentationMode != .exitingGlobal || clock.isLive)
+        if ready, presentationMode == .exitingGlobal { session.setOverviewPropagationActive(false) }
+        guard scaleJourney.advance(at: uptime, ready: ready) else { return }
         overviewReturnFrame = nil
-        overviewTransitionLastTick = nil
         session.observer.releasePresentationHold()
         if presentationMode == .enteringGlobal { presentationMode = .global }
         else {
@@ -836,6 +830,7 @@ struct SkyView: View {
             overviewInteractionActive = false
             overviewIdleBeganAt = nil
         }
+        journeyContext = nil
     }
 
     private func makeCelestialViewFrame() -> CelestialViewFrame {
@@ -852,10 +847,6 @@ struct SkyView: View {
         overviewInteractionActive = active
         overviewAmbientTrails.clear()
         overviewIdleBeganAt = active ? nil : Date()
-    }
-
-    private func globalEntryThresholdHaptic() {
-        ObservationHaptics.shared.rigidImpact(intensity: 0.38)
     }
 
     // MARK: - 指向读数
@@ -1410,7 +1401,8 @@ struct SkyView: View {
     }
 
     private var overviewPresentationProgress: Double {
-        presentationMode.presentsOverview ? persistentOverviewProgress : easedScrubProgress
+        if suppressMotion, presentationMode == .previewingGlobal { return 0 }
+        return presentationMode.presentsOverview ? scaleJourney.progress : easedScrubProgress
     }
 
     @ViewBuilder
@@ -1444,7 +1436,9 @@ struct SkyView: View {
                 onInteractionStateChanged: setOverviewInteractionActive,
                 localVerticalFOV: fieldVerticalFOV,
                 returnFrame: overviewReturnFrame,
-                returnProgress: overviewReturnOffset > 0 ? 1 - abs(clock.offset) / overviewReturnOffset : 1
+                returnProgress: overviewReturnOffset > 0 ? 1 - abs(clock.offset) / overviewReturnOffset : 1,
+                journeyContext: journeyContext,
+                returningToSky: presentationMode == .exitingGlobal || presentationMode == .cancellingGlobal
             )
             .opacity(suppressMotion ? globePresence : 1)
             .transition(
@@ -2055,17 +2049,14 @@ struct SkyView: View {
             }
     }
 
-    /// 统一尺度手势：先在局部天空 0.52×…4× 内连续缩放；越过最广视场后，
-    /// 多余行程转换为带阻力的全局转场进度。松手未越阈值会退回局部天空。
+    /// Beyond the wide field, the same pinch owns reversible world-camera travel.
     private var fieldMagnificationGesture: some Gesture {
         MagnificationGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
-                guard presentationMode == .local, !clock.isScrubbing else { return }
+                guard (presentationMode == .local || presentationMode == .previewingGlobal),
+                      !clock.isScrubbing else { return }
                 dockActivity.touch(bottom: false, accessible: keepsDockVisible)
                 if !fieldMagnificationActive {
-                    if !globalEntryArmed {
-                        globalEntryHapticSent = false
-                    }
                     dismissTransientOverlay()
                     fieldScaleGestureSample = value
                     fieldScaleGestureSampleDate = Date()
@@ -2093,32 +2084,22 @@ struct SkyView: View {
                     settled: settledFieldMagnification,
                     gestureScale: value
                 )
-                let gateProgress = GlobalEntryGatePolicy.progress(
-                    settled: settledFieldMagnification,
-                    gestureScale: value
-                )
-                globalEntryGateProgress = gateProgress
-
-                if globalEntryArmed,
-                   GlobalEntryGatePolicy.shouldDismiss(
-                       magnification: fieldMagnification
-                   ) {
-                    withAnimation(Motion.interfaceCollapse) {
-                        globalEntryArmed = false
-                    }
-                    globalEntryHapticSent = false
-                } else if GlobalEntryGatePolicy.shouldArm(progress: gateProgress),
-                          !globalEntryArmed {
-                    globalEntryArmed = true
-                    if !globalEntryHapticSent {
-                        globalEntryHapticSent = true
-                        globalEntryThresholdHaptic()
-                    }
+                let progress = ScaleJourneyPolicy.progress(rawMagnification: settledFieldMagnification * value)
+                if presentationMode == .local, progress > 0, capture.phase == .exploring {
+                    beginScalePreview()
+                }
+                if presentationMode == .previewingGlobal {
+                    scaleJourney.seek(progress)
+                    fieldMagnification = ObservationScale.minimumLocalMagnification
                 }
             }
             .onEnded { _ in
                 guard fieldMagnificationActive else { return }
                 fieldMagnificationActive = false
+                if presentationMode == .previewingGlobal {
+                    finishScalePreview()
+                    return
+                }
                 let projected = SpatialMotion.projectedScale(
                     current: fieldMagnification,
                     logarithmicVelocity: fieldScaleLogarithmicVelocity,
@@ -2131,10 +2112,6 @@ struct SkyView: View {
                     ? ObservationScale.defaultLocalMagnification
                     : projected
                 settledFieldMagnification = target
-                if GlobalEntryGatePolicy.shouldDismiss(magnification: target) {
-                    globalEntryArmed = false
-                    globalEntryHapticSent = false
-                }
                 withAnimation(
                     suppressMotion
                         ? .easeOut(duration: 0.12)
@@ -2149,7 +2126,6 @@ struct SkyView: View {
                         )
                 ) {
                     fieldMagnification = target
-                    globalEntryGateProgress = 0
                 }
             }
     }

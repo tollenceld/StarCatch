@@ -513,14 +513,14 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(unsupported.directionWingWidth, unsupported.statusWingWidth)
     }
 
-    func testGlobalEntryGateRequiresOverscrollBeyondTheWideField() {
+    func testScaleJourneyRequiresOverscrollBeyondTheWideField() {
         let wideField = ObservationScale.localMagnification(
             settled: 1,
             gestureScale: 0.7
         )
         XCTAssertEqual(wideField, 0.7, accuracy: 0.0001)
         XCTAssertEqual(
-            GlobalEntryGatePolicy.progress(settled: 1, gestureScale: 0.7),
+            ScaleJourneyPolicy.progress(rawMagnification: 0.7),
             0,
             accuracy: 0.0001
         )
@@ -529,29 +529,16 @@ final class TimeTests: XCTestCase {
             Projection.verticalFOV(forMagnification: 1)
         )
 
-        let threshold = GlobalEntryGatePolicy.progress(
-            settled: ObservationScale.minimumLocalMagnification,
-            gestureScale: (
-                ObservationScale.minimumLocalMagnification
-                    - GlobalEntryGatePolicy.revealOverscroll
-            ) / ObservationScale.minimumLocalMagnification
-        )
-        XCTAssertEqual(threshold, 1, accuracy: 0.0001)
-        XCTAssertTrue(GlobalEntryGatePolicy.shouldArm(progress: threshold))
-        XCTAssertEqual(
-            GlobalEntryGatePolicy.elasticScale(progress: threshold),
-            0.98,
-            accuracy: 0.0001
-        )
+        XCTAssertEqual(ScaleJourneyPolicy.progress(rawMagnification: 0.52), 0)
+        let threshold = ScaleJourneyPolicy.progress(rawMagnification: 0.42)
+        XCTAssertEqual(threshold, 0.5, accuracy: 0.0001)
+        XCTAssertTrue(ScaleJourneyPolicy.commits(threshold))
+        XCTAssertFalse(ScaleJourneyPolicy.commits(0.49))
+        XCTAssertEqual(ScaleJourneyPolicy.progress(rawMagnification: 0.32), 1)
+        XCTAssertEqual(ScaleJourneyPolicy.progress(rawMagnification: 0.1), 1)
     }
 
-    func testGlobalEntryGateUsesHysteresisAndGlobalZoomHasIndependentBounds() {
-        XCTAssertFalse(
-            GlobalEntryGatePolicy.shouldDismiss(magnification: 0.59)
-        )
-        XCTAssertTrue(
-            GlobalEntryGatePolicy.shouldDismiss(magnification: 0.61)
-        )
+    func testScaleJourneyLeavesGlobalZoomIndependent() {
         XCTAssertEqual(ObservationScale.defaultLocalMagnification, 1)
         XCTAssertEqual(ObservationScale.minimumOverviewZoom, 0.72)
         XCTAssertEqual(ObservationScale.defaultOverviewZoom, 0.82)
@@ -578,6 +565,12 @@ final class TimeTests: XCTestCase {
         XCTAssertTrue(SkyPresentationMode.global.ownsGlobalInteraction)
         XCTAssertFalse(SkyPresentationMode.exitingGlobal.ownsGlobalInteraction)
         XCTAssertTrue(SkyPresentationMode.exitingGlobal.presentsOverview)
+        for mode in [SkyPresentationMode.previewingGlobal, .cancellingGlobal] {
+            XCTAssertTrue(mode.isTransitioning)
+            XCTAssertFalse(mode.ownsGlobalInteraction)
+            XCTAssertEqual(SkyChromeState(presentationMode: mode, capturePhase: .exploring,
+                                         localFieldResetAvailable: true).dockMode, .hidden)
+        }
     }
 
     func testObservationScaleCrossfadeHandsVisualPriorityToGlobe() {

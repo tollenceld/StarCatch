@@ -8,6 +8,7 @@ struct ObservationEstablishment {
     private(set) var networkStartedAt: Double?
     private(set) var observerStartedAt: Double?
     private(set) var observer: ObserverLocation.Coordinates?
+    private(set) var entryPointing: Pointing?
     private(set) var phase: Phase = .signal
     private(set) var confirmed = false
     private var lastTick: Double?
@@ -25,7 +26,8 @@ struct ObservationEstablishment {
     /// Returns one confirmation event, never a Canvas side effect.
     mutating func advance(at uptime: Double, active: Bool, sessionReady: Bool,
                           frameReady: Bool, locating: Bool, coordinates: ObserverLocation.Coordinates,
-                          failed: Bool = false, reduced: Bool = false) -> Bool {
+                          failed: Bool = false, reduced: Bool = false,
+                          pointing: Pointing = .initial) -> Bool {
         guard active, !isComplete else { lastTick = nil; return false }
         if let lastTick { elapsed += max(0, uptime - lastTick) }
         lastTick = uptime
@@ -40,6 +42,7 @@ struct ObservationEstablishment {
                 if elapsed - (locationWaitStartedAt ?? elapsed) < 0.8 { phase = .network; return false }
             }
             observer = coordinates
+            entryPointing = pointing
             observerStartedAt = elapsed
         }
         if let observerStartedAt {
@@ -101,10 +104,14 @@ struct ObservationEstablishmentField: View {
             } ?? 0
             let geometry = SkyOverviewView.GlobeGeometry(center: base.center, radius: base.radius,
                 orientation: simd_slerp(orbitOrientation, focus, alignment))
+            let journey = ObservationJourneyContext(pointing: establishment.entryPointing ?? frame.pointing,
+                verticalFOV: Projection.baseVerticalFOV, observer: frame.observer)
+            let pointing = journey.resolvedPointing(latest: frame.pointing,
+                localProgress: establishment.localProgress, returning: true)
             let camera = ObservationCameraState(size: size, geometry: geometry,
                 zoom: ObservationScale.defaultOverviewZoom, localProgress: establishment.reducedMotion ? 0 : establishment.localProgress,
-                observer: frame.observer, pointing: frame.pointing, observation: frame.observation)
-            ObservationSceneRenderer.drawBackground(context, size: size, pointing: frame.pointing,
+                observer: frame.observer, pointing: pointing, observation: frame.observation)
+            ObservationSceneRenderer.drawBackground(context, size: size, pointing: camera.pointing,
                 presence: ObservationSceneMath.ease((establishment.elapsed - 0.4) / 0.9))
             ObservationSceneRenderer.draw(context, camera: camera, frame: frame,
                 reveal: establishment.reveal, landStore: coastlines)

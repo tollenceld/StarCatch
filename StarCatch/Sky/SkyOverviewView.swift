@@ -218,6 +218,9 @@ struct SkyOverviewView: View {
     var localVerticalFOV: Double = Projection.baseVerticalFOV
     var returnFrame: ObservationSceneFrame? = nil
     var returnProgress = 1.0
+    var journeyContext: ObservationJourneyContext? = nil
+    var returningToSky = false
+    @State private var journeyGlobePose: ObservationGlobePose?
 
     /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
     /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
@@ -341,17 +344,27 @@ struct SkyOverviewView: View {
                 )
 
                 let baseGeometry = Self.globeGeometry(in: size)
-                let geometry = renderedGeometry(in: size, at: ProcessInfo.processInfo.systemUptime)
+                let rendered = renderedGeometry(in: size, at: ProcessInfo.processInfo.systemUptime)
+                let geometry = GlobeGeometry(center: rendered.center, radius: rendered.radius,
+                    orientation: journeyGlobePose?.orientation ?? rendered.orientation)
+                let sceneZoom = journeyGlobePose?.zoom ?? zoom
                 let local = 1 - transitionProgress
                 let current = session.sceneFrame(at: returnFrame == nil ? observation : Date(),
                     live: returnFrame != nil || clock.isLive, includeLocal: local > 0.65,
                     focusedObjectID: focusedObjectId)
                 let frame = returnFrame.map { current.returning(from: $0, progress: returnProgress) } ?? current
-                let camera = ObservationCameraState(size: size, geometry: geometry, zoom: zoom,
-                    localProgress: transitionMotionEnabled ? local : 0, observer: frame.observer,
-                    pointing: frame.pointing, observation: frame.observation, verticalFOV: localVerticalFOV)
-                ObservationSceneRenderer.drawBackground(context, size: size, pointing: frame.pointing,
-                    verticalFOV: localVerticalFOV)
+                let pointing = transitionMotionEnabled
+                    ? journeyContext?.resolvedPointing(latest: frame.pointing,
+                        localProgress: local, returning: returningToSky) ?? frame.pointing
+                    : journeyContext?.pointing ?? frame.pointing
+                let fov = journeyContext?.resolvedVerticalFOV(localProgress: transitionMotionEnabled ? local : 0)
+                    ?? localVerticalFOV
+                let camera = ObservationCameraState(size: size, geometry: geometry, zoom: sceneZoom,
+                    localProgress: transitionMotionEnabled ? local : 0,
+                    observer: journeyContext?.observer ?? frame.observer,
+                    pointing: pointing, observation: frame.observation, verticalFOV: fov)
+                ObservationSceneRenderer.drawBackground(context, size: size, pointing: camera.pointing,
+                    verticalFOV: fov)
                 ObservationSceneRenderer.draw(context, camera: camera, frame: frame,
                     landStore: coastlineStore, focusedObjectID: focusedObjectId,
                     showsObserverCoordinates: observerLabelEmphasized)
@@ -420,6 +433,7 @@ struct SkyOverviewView: View {
                     renderDetailsSettled = false
                 }
                 #endif
+                if !interactive { freezeJourneyPose() }
             }
             .onChange(of: renderingSimplified) { _, active in
                 onInteractionStateChanged(active)
@@ -451,8 +465,14 @@ struct SkyOverviewView: View {
                 }
             }
             .onChange(of: interactive) { _, active in
-                if active { scheduleShowcaseRotationResume() }
-                else { cancelSpatialInertia(); pauseShowcaseRotation() }
+                if active {
+                    journeyGlobePose = nil
+                    scheduleShowcaseRotationResume()
+                } else {
+                    freezeJourneyPose()
+                    cancelSpatialInertia()
+                    pauseShowcaseRotation()
+                }
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active, interactive { scheduleShowcaseRotationResume() }
@@ -471,6 +491,11 @@ struct SkyOverviewView: View {
     }
 
     // MARK: - 交互
+
+    private func freezeJourneyPose() {
+        journeyGlobePose = ObservationGlobePose(
+            orientation: renderedOrientation(at: ProcessInfo.processInfo.systemUptime), zoom: zoom)
+    }
 
     private func orbitGesture(in size: CGSize) -> some Gesture {
         DragGesture(minimumDistance: 3)

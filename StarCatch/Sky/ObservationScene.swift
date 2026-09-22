@@ -50,6 +50,53 @@ enum ObservationSceneCoordinates {
     }
 }
 
+/// Presentation-only snapshot: never writes back into sensors or the observer.
+struct ObservationJourneyContext {
+    let pointing: Pointing
+    let verticalFOV: Double
+    let observer: ObserverLocation.Coordinates
+    var destinationVerticalFOV: Double? = nil
+    var returnHandoffStart = 0.8
+
+    func resolvedVerticalFOV(localProgress: Double) -> Double {
+        guard let destinationVerticalFOV else { return verticalFOV }
+        return verticalFOV + (destinationVerticalFOV - verticalFOV) * ObservationSceneMath.ease(localProgress)
+    }
+
+    func resolvedPointing(latest: Pointing, localProgress: Double, returning: Bool) -> Pointing {
+        if returning, localProgress >= 1 { return latest }
+        if !returning, localProgress <= 0 { return latest }
+        let blend = ObservationSceneMath.ease(returning
+            ? (localProgress - returnHandoffStart) / max(0.000_001, 1 - returnHandoffStart)
+            : (0.2 - localProgress) / 0.2)
+        return Self.interpolate(pointing, latest, fraction: blend)
+    }
+
+    static func interpolate(_ from: Pointing, _ to: Pointing, fraction: Double) -> Pointing {
+        if fraction <= 0 { return from }
+        if fraction >= 1 { return to }
+        let rotation = simd_quatd(from: from.unitVector, to: to.unitVector)
+        let direction = simd_slerp(simd_quatd(angle: 0, axis: SIMD3(0, 0, 1)), rotation, fraction)
+            .act(from.unitVector)
+        let rollDelta = atan2(sin(to.roll - from.roll), cos(to.roll - from.roll))
+        return Pointing(azimuth: atan2(direction.x, direction.y),
+                        elevation: asin(min(1, max(-1, direction.z))),
+                        roll: from.roll + rollDelta * fraction)
+    }
+
+    static func guidedPointing(_ pointing: Pointing, localProgress: Double) -> Pointing {
+        let guide = ObservationSceneMath.ease((localProgress - 0.42) / 0.28)
+            * (1 - ObservationSceneMath.ease((localProgress - 0.78) / 0.22))
+        return interpolate(pointing,
+            Pointing(azimuth: pointing.azimuth, elevation: 12 * .pi / 180, roll: 0), fraction: guide)
+    }
+}
+
+struct ObservationGlobePose {
+    let orientation: simd_quatd
+    let zoom: CGFloat
+}
+
 enum ObservationSceneMath {
     static func ease(_ value: Double) -> Double {
         let x = min(1, max(0, value))
@@ -100,6 +147,8 @@ struct ObservationCameraState {
     private let projectionScale: Double
     private let projectionCenter: CGPoint
     private let cameraDistance: Double
+    let surfaceSphereRadius: Double
+    var eyeRadius: Double { simd_length(eye) }
 
     init(size: CGSize, geometry: SkyOverviewView.GlobeGeometry, zoom: CGFloat,
          localProgress: Double, observer: ObserverLocation.Coordinates,
@@ -110,6 +159,7 @@ struct ObservationCameraState {
         self.zoom = zoom
         self.localProgress = min(1, max(0, localProgress))
         self.observer = observer
+        let pointing = ObservationJourneyContext.guidedPointing(pointing, localProgress: self.localProgress)
         self.pointing = pointing
         sidereal = zeroMeanSiderealTime(julianDate: observation.julianDate) * .pi / 180
         let longitude = observer.longitude * .pi / 180 + sidereal
@@ -145,6 +195,12 @@ struct ObservationCameraState {
         cameraOffset = cameraOrientation.act(approachAxis)
         cameraDistance = travel > 0.000001 ? (1 - travel) / travel : 0
         eye = observerPosition / 6378.137 * travel + approachAxis * ((1 - travel) / max(0.000001, travel))
+        // Match the local WGS84 surface at arrival, rather than flying below a
+        // fixed equatorial sphere at higher latitudes. Global geometry is unchanged.
+        let sea = geo2eci(julianDays: observation.julianDate,
+                         geodetic: LatLonAlt(observer.latitude, observer.longitude, 0))
+        let localSurface = min(simd_length(SIMD3(sea.x, sea.y, sea.z)), simd_length(observerPosition)) / 6378.137
+        surfaceSphereRadius = 1 + (localSurface - 1) * travel
         projectionScale = Double(geometry.radius * zoom) * SkyOverviewView.earthDisplayRadius * (1 - travel) + pixelScale * travel
         projectionCenter = CGPoint(x: geometry.center.x + (size.width / 2 - geometry.center.x) * travel,
                                    y: geometry.center.y + (size.height / 2 - geometry.center.y) * travel)
@@ -154,7 +210,7 @@ struct ObservationCameraState {
         let radius = simd_length(position)
         guard radius > 0, radius.isFinite else { return nil }
         let globalRadius = surface ? 1 : ObservationSceneMath.displayRadius(radius) / SkyOverviewView.earthDisplayRadius
-        let worldRadius = globalRadius + (radius / 6378.137 - globalRadius) * travel
+        let worldRadius = surface ? surfaceSphereRadius : globalRadius + (radius / 6378.137 - globalRadius) * travel
         let world = position / radius * worldRadius
         let camera = cameraOrientation.act(world - observerPosition / 6378.137 * travel)
         let offset = cameraOffset
@@ -185,11 +241,12 @@ struct ObservationCameraState {
     /// this keeps the eye outside Earth instead of cutting through it during pitch.
     func surfaceOutline() -> Path {
         let distance = simd_length(eye)
-        guard distance > 1 else { return Path() }
+        let sphere = surfaceSphereRadius
+        guard distance > sphere else { return Path() }
         let normal = eye / distance
         let tangent = simd_normalize(simd_cross(normal, abs(normal.z) < 0.9 ? SIMD3(0, 0, 1) : SIMD3(0, 1, 0)))
         let bitangent = simd_cross(normal, tangent)
-        let radius = sqrt(1 - 1 / (distance * distance))
+        let radius = sphere * sqrt(1 - sphere * sphere / (distance * distance))
         let scale = Double(geometry.radius * zoom) * SkyOverviewView.earthDisplayRadius * (1 - travel) + pixelScale * travel
         let center = SIMD2(Double(geometry.center.x) * (1 - travel) + Double(size.width) / 2 * travel,
                            Double(geometry.center.y) * (1 - travel) + Double(size.height) / 2 * travel)
@@ -197,7 +254,7 @@ struct ObservationCameraState {
         let shift = travel > 0.000001 ? (1 - travel) / travel : 0
         var polygon = (0..<128).map { index -> SIMD3<Double> in
             let angle = Double(index) * 2 * .pi / 128
-            let world = normal / distance + radius * (tangent * cos(angle) + bitangent * sin(angle))
+            let world = normal * (sphere * sphere / distance) + radius * (tangent * cos(angle) + bitangent * sin(angle))
             let v = cameraOrientation.act(world - observerPosition / 6378.137 * travel)
             let w = (1 - travel) * offset.z - travel * v.z
             return SIMD3(center.x * w + (v.x - offset.x * shift) * scale,

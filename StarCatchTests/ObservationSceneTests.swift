@@ -10,6 +10,96 @@ final class ObservationSceneTests: XCTestCase {
     private let size = CGSize(width: 393, height: 852)
     private static let catalog = CatalogStore()
 
+    func testInteractiveTravelReversesAndSettlesWithoutRestartingProgress() {
+        var travel = ScaleJourneyProgress()
+        travel.seek(0.72)
+        travel.seek(0.24)
+        XCTAssertFalse(ScaleJourneyPolicy.commits(travel.progress))
+        travel.settle(to: 0, reducedMotion: false)
+        XCTAssertFalse(travel.advance(at: 10, ready: true))
+        XCTAssertEqual(travel.progress, 0.24)
+        var previous = travel.progress
+        for tick in 1...30 {
+            _ = travel.advance(at: 10 + Double(tick) / 60, ready: true)
+            XCTAssertLessThanOrEqual(travel.progress, previous)
+            XCTAssertGreaterThanOrEqual(travel.progress, 0)
+            previous = travel.progress
+        }
+        XCTAssertEqual(travel.progress, 0)
+        travel.seek(0.65)
+        travel.settle(to: 1, reducedMotion: false)
+        _ = travel.advance(at: 20, ready: true)
+        XCTAssertEqual(travel.progress, 0.65)
+        XCTAssertTrue(travel.advance(at: 21, ready: true))
+        XCTAssertEqual(travel.progress, 1)
+    }
+
+    func testJourneyWaitsForForegroundAndLiveClockThenResumes() {
+        var travel = ScaleJourneyProgress()
+        travel.seek(1)
+        travel.settle(to: 0, reducedMotion: false)
+        XCTAssertFalse(travel.advance(at: 0, ready: false))
+        XCTAssertFalse(travel.advance(at: 10, ready: false))
+        XCTAssertEqual(travel.progress, 1, "Historical return does not descend early")
+        _ = travel.advance(at: 11, ready: true)
+        _ = travel.advance(at: 11.2, ready: true)
+        let before = travel.progress
+        travel.pause()
+        _ = travel.advance(at: 100, ready: true)
+        XCTAssertEqual(travel.progress, before)
+        XCTAssertTrue(travel.advance(at: 101, ready: true))
+        XCTAssertEqual(travel.progress, 0)
+    }
+
+    func testReducedJourneyCompletesWithShortFadeAndSameDestinationRule() {
+        var travel = ScaleJourneyProgress()
+        travel.seek(ScaleJourneyPolicy.progress(rawMagnification: 0.4))
+        let commits = ScaleJourneyPolicy.commits(travel.progress)
+        travel.seek(0) // Reduced Motion does not reveal the interactive camera.
+        travel.settle(to: commits ? 1 : 0, reducedMotion: true)
+        _ = travel.advance(at: 0, ready: true)
+        XCTAssertFalse(travel.advance(at: 0.15, ready: true))
+        XCTAssertTrue(travel.advance(at: 0.16, ready: true))
+        XCTAssertEqual(travel.progress, 1)
+    }
+
+    func testJourneyContextFreezesOriginButHandsBackToLatestPointing() {
+        let start = Pointing(azimuth: 359 * .pi / 180, elevation: 1.2, roll: 0.4)
+        let latest = Pointing(azimuth: 1 * .pi / 180, elevation: 0.8, roll: -0.2)
+        let context = ObservationJourneyContext(pointing: start, verticalFOV: 0.8,
+                                                observer: ObserverLocation.fallback)
+        XCTAssertEqual(context.resolvedPointing(latest: latest, localProgress: 1, returning: false), start)
+        XCTAssertEqual(context.resolvedPointing(latest: latest, localProgress: 1, returning: true), latest)
+        let mid = context.resolvedPointing(latest: latest, localProgress: 0.9, returning: true)
+        XCTAssertLessThan(abs(mid.azimuth), 0.03, "Azimuth follows the short path across north")
+        XCTAssertEqual(ObservationJourneyContext.guidedPointing(start, localProgress: 1), start)
+        let horizon = ObservationJourneyContext.guidedPointing(start, localProgress: 0.75)
+        XCTAssertEqual(horizon.elevation, 12 * .pi / 180, accuracy: 0.0001)
+        XCTAssertEqual(horizon.roll, 0, accuracy: 0.0001)
+        var returning = context
+        returning.returnHandoffStart = 0.9
+        XCTAssertEqual(returning.resolvedPointing(latest: latest, localProgress: 0.9, returning: true), start)
+        returning.destinationVerticalFOV = Projection.baseVerticalFOV
+        XCTAssertEqual(returning.resolvedVerticalFOV(localProgress: 0), context.verticalFOV)
+        XCTAssertEqual(returning.resolvedVerticalFOV(localProgress: 1), Projection.baseVerticalFOV)
+    }
+
+    func testGuidedCameraRemainsOutsideLocalSurfaceThroughoutTravel() {
+        for latitude in [-80.0, 0, 31.2, 80] {
+            var observer = ObserverLocation.fallback
+            observer.latitude = latitude
+            for step in 0..<100 {
+                let camera = ObservationCameraState(size: size,
+                    geometry: SkyOverviewView.GlobeGeometry(center: .zero, radius: 200,
+                        orientation: SkyOverviewView.orientation(yaw: 2.8, pitch: -1.2, roll: 0.7)),
+                    zoom: 2.2, localProgress: Double(step) / 100,
+                    observer: observer, pointing: Pointing(azimuth: 1.2, elevation: .pi / 2, roll: 0.8),
+                    observation: date)
+                XCTAssertGreaterThanOrEqual(camera.eyeRadius, camera.surfaceSphereRadius)
+            }
+        }
+    }
+
     func testGlobalEndpointMatchesExistingProjectionAtArbitraryOrientationAndZoom() {
         let geometry = SkyOverviewView.GlobeGeometry(center: CGPoint(x: 180, y: 360), radius: 210,
             orientation: SkyOverviewView.orientation(yaw: 1.2, pitch: -0.7, roll: 0.3))

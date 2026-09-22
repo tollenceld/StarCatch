@@ -411,7 +411,7 @@ struct RootView: View {
                 locating: session?.observer.isLocating == true,
                 coordinates: session?.observer.coordinates ?? ObserverLocation.fallback,
                 failed: session?.catalog.objects.isEmpty == true,
-                reduced: suppressMotion)
+                reduced: suppressMotion, pointing: session?.pointing ?? .initial)
             #if DEBUG
             if previousPhase != establishment.phase {
                 print("[ObservationStartup] \(establishment.phase) at \(establishment.elapsed), frame: \(session?.ephemeris.hasUsableFrame == true)")

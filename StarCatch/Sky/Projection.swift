@@ -5,7 +5,7 @@ import simd
 /// 局部天空与全局轨道场共享的连续尺度规则。
 ///
 /// 1× 以上是局部长焦；1× 到 `minimumLocalMagnification` 是扩展天空；
-/// 再继续缩小只积累带阻力的入口揭示进度，不继续扩大平面投影。
+/// 再继续缩小直接驱动共享相机，不继续扩大平面投影。
 enum ObservationScale {
     static let defaultLocalMagnification: CGFloat = 1
     static let minimumLocalMagnification: CGFloat = 0.52
@@ -93,49 +93,66 @@ enum ObservationScale {
     }
 }
 
-/// 局部天空和全局轨道是两个明确模式。捏合只改变各自模式内的尺度，
-/// 只有显式入口与返回动作能够推进这里的状态。
+/// 单向捏合可预览全球；全球内部的捏合仍只改变尺度。
 enum SkyPresentationMode: Equatable {
     case local
+    case previewingGlobal
+    case cancellingGlobal
     case enteringGlobal
     case global
     case exitingGlobal
 
     var presentsOverview: Bool { self != .local }
     var isTransitioning: Bool {
-        self == .enteringGlobal || self == .exitingGlobal
+        self != .local && self != .global
     }
     var ownsGlobalInteraction: Bool { self == .global }
 }
 
-/// 最广局部视场之后的弹性门槛。额外缩小只负责揭示入口，绝不直接驱动地球。
-enum GlobalEntryGatePolicy {
-    static let revealOverscroll: CGFloat = 0.10
-    static let dismissMagnification: CGFloat = 0.60
-    static let maximumElasticReduction: CGFloat = 0.02
-
-    nonisolated static func progress(
-        settled: CGFloat,
-        gestureScale: CGFloat
-    ) -> Double {
-        let rawMagnification = settled * gestureScale
-        let overscroll = max(
-            0,
-            ObservationScale.minimumLocalMagnification - rawMagnification
-        )
-        return ObservationScale.eased(Double(overscroll / revealOverscroll))
+enum ScaleJourneyPolicy {
+    static func progress(rawMagnification: CGFloat) -> Double {
+        min(1, max(0, Double((ObservationScale.minimumLocalMagnification - rawMagnification) / 0.20)))
     }
 
-    nonisolated static func shouldArm(progress: Double) -> Bool {
-        progress >= 0.999
+    static func commits(_ progress: Double) -> Bool { progress >= 0.5 - 0.000_001 }
+}
+
+/// The only spatial progress clock. Interactive samples and automatic settling
+/// share the same value; pauses never accrue elapsed background/history time.
+struct ScaleJourneyProgress {
+    private(set) var progress = 0.0
+    private var source = 0.0
+    private var target: Double?
+    private var elapsed = 0.0
+    private var duration = 1.05
+    private var lastTick: TimeInterval?
+
+    mutating func seek(_ value: Double) {
+        progress = min(1, max(0, value))
+        target = nil
+        pause()
     }
 
-    nonisolated static func shouldDismiss(magnification: CGFloat) -> Bool {
-        magnification > dismissMagnification
+    mutating func settle(to value: Double, reducedMotion: Bool) {
+        source = progress
+        target = value
+        elapsed = 0
+        duration = reducedMotion ? 0.16 : max(0.18, 1.05 * abs(value - source))
+        pause()
     }
 
-    nonisolated static func elasticScale(progress: Double) -> CGFloat {
-        1 - maximumElasticReduction * CGFloat(min(1, max(0, progress)))
+    mutating func pause() { lastTick = nil }
+
+    mutating func advance(at uptime: TimeInterval, ready: Bool) -> Bool {
+        guard ready, let target else { pause(); return false }
+        if let lastTick { elapsed += max(0, uptime - lastTick) }
+        lastTick = uptime
+        let fraction = min(1, elapsed / duration)
+        progress = source + (target - source) * ObservationScale.eased(fraction)
+        guard fraction >= 1 else { return false }
+        self.target = nil
+        pause()
+        return true
     }
 }
 
