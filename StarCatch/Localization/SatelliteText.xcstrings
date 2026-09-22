@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "accessibility.close_detail" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close object details"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭目标详情"
+          }
+        }
+      }
+    },
+    "accessibility.close_detail.hint" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move the reticle away before focusing this object again"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次聚焦此目标前，需要先将准星移开"
+          }
+        }
+      }
+    },
     "accessibility.collapse_detail" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -31,38 +65,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "目标仍保持锁定，可再次展开"
-          }
-        }
-      }
-    },
-    "accessibility.close_detail" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Close object details"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "关闭目标详情"
-          }
-        }
-      }
-    },
-    "accessibility.close_detail.hint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Move the reticle away before focusing this object again"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "再次聚焦此目标前，需要先将准星移开"
           }
         }
       }
@@ -1920,6 +1922,23 @@
         }
       }
     },
+    "guide.capture.auto" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hold the reticle on a target to lock its archive automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让准星持续对准目标，档案会自动锁定。"
+          }
+        }
+      }
+    },
     "insight.family.higher" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2294,23 +2313,8 @@
         }
       }
     },
-    "guide.capture.auto" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hold the reticle on a target to lock its archive automatically."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "让准星持续对准目标，档案会自动锁定。"
-          }
-        }
-      }
-    },
     "status.active" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2395,6 +2399,7 @@
       }
     },
     "target.role.communications.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2411,6 +2416,7 @@
       }
     },
     "target.role.navigation.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2427,6 +2433,7 @@
       }
     },
     "target.role.orbital_remnant.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2443,6 +2450,7 @@
       }
     },
     "target.role.science.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2459,6 +2467,7 @@
       }
     },
     "target.role.station.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2475,6 +2484,7 @@
       }
     },
     "target.role.telescope.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2491,6 +2501,7 @@
       }
     },
     "target.role.weather.summary" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

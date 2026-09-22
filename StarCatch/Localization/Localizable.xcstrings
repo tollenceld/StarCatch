@@ -3787,278 +3787,6 @@
         }
       }
     },
-    "sky.metric.accuracy" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Accuracy"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "精度"
-          }
-        }
-      }
-    },
-    "sky.metric.altitude" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elevation"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "仰角"
-          }
-        }
-      }
-    },
-    "sky.metric.attitude" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Attitude"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "姿态"
-          }
-        }
-      }
-    },
-    "sky.metric.azimuth" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Azimuth"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "方位"
-          }
-        }
-      }
-    },
-    "sky.metric.field" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Field"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "视场"
-          }
-        }
-      }
-    },
-    "sky.metric.heading_reference" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Heading Reference"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "方位参考"
-          }
-        }
-      }
-    },
-    "sky.metric.location" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Location"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "定位"
-          }
-        }
-      }
-    },
-    "sky.metric.orbit_age" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Orbit Age"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轨道龄期"
-          }
-        }
-      }
-    },
-    "sky.panel.calibration" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View Calibration"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看校准"
-          }
-        }
-      }
-    },
-    "sky.panel.direction" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Direction and Accuracy"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "方向与精度"
-          }
-        }
-      }
-    },
-    "sky.panel.direction.guidance" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "View complete attitude information"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "查看完整姿态信息"
-          }
-        }
-      }
-    },
-    "sky.panel.direction.uncalibrated" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Move in a figure eight to calibrate"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "画 8 字校准并查看详情"
-          }
-        }
-      }
-    },
-    "sky.panel.observation" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Observation Status"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "观测状态"
-          }
-        }
-      }
-    },
-    "sky.panel.status" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Full Status"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "完整状态"
-          }
-        }
-      }
-    },
-    "sky.panel.tag.attitude" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ATTITUDE"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "姿态"
-          }
-        }
-      }
-    },
-    "sky.panel.tag.system" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "SYSTEM"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "系统"
-          }
-        }
-      }
-    },
     "sky.issue.direction" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4208,6 +3936,329 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "轨道数据较旧"
+          }
+        }
+      }
+    },
+    "sky.issue.orbit_preparing" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing orbit data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道数据准备中"
+          }
+        }
+      }
+    },
+    "sky.issue.orbit_preparing.detail" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first local orbit snapshot is not ready yet. You can use the sky controls while preparation continues on this device."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首份本地轨道快照尚未就绪。你可以继续使用天空控件，数据会在设备内继续准备。"
+          }
+        }
+      }
+    },
+    "sky.metric.accuracy" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accuracy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "精度"
+          }
+        }
+      }
+    },
+    "sky.metric.altitude" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elevation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仰角"
+          }
+        }
+      }
+    },
+    "sky.metric.attitude" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attitude"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿态"
+          }
+        }
+      }
+    },
+    "sky.metric.azimuth" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Azimuth"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方位"
+          }
+        }
+      }
+    },
+    "sky.metric.field" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Field"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "视场"
+          }
+        }
+      }
+    },
+    "sky.metric.heading_reference" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Heading Reference"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方位参考"
+          }
+        }
+      }
+    },
+    "sky.metric.location" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定位"
+          }
+        }
+      }
+    },
+    "sky.metric.orbit_age" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbit Age"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道龄期"
+          }
+        }
+      }
+    },
+    "sky.observer.assumed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ASSUMED"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "假定位置"
+          }
+        }
+      }
+    },
+    "sky.panel.calibration" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View Calibration"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看校准"
+          }
+        }
+      }
+    },
+    "sky.panel.direction" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Direction and Accuracy"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方向与精度"
+          }
+        }
+      }
+    },
+    "sky.panel.direction.guidance" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "View complete attitude information"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "查看完整姿态信息"
+          }
+        }
+      }
+    },
+    "sky.panel.direction.uncalibrated" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move in a figure eight to calibrate"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画 8 字校准并查看详情"
+          }
+        }
+      }
+    },
+    "sky.panel.observation" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observation Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观测状态"
+          }
+        }
+      }
+    },
+    "sky.panel.status" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整状态"
+          }
+        }
+      }
+    },
+    "sky.panel.tag.attitude" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ATTITUDE"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿态"
+          }
+        }
+      }
+    },
+    "sky.panel.tag.system" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SYSTEM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统"
           }
         }
       }
@@ -4379,28 +4430,6 @@
             "state" : "translated",
             "value" : "正在感应"
           }
-        }
-      }
-    },
-    "sky.issue.orbit_preparing" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing orbit data" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道数据准备中" } }
-      }
-    },
-    "sky.issue.orbit_preparing.detail" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "The first local orbit snapshot is not ready yet. You can use the sky controls while preparation continues on this device." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "首份本地轨道快照尚未就绪。你可以继续使用天空控件，数据会在设备内继续准备。" } }
-      }
-    },
-    "sky.observer.assumed" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : { "state" : "translated", "value" : "ASSUMED" }
-        },
-        "zh-Hans" : {
-          "stringUnit" : { "state" : "translated", "value" : "假定位置" }
         }
       }
     },
@@ -4609,6 +4638,7 @@
       }
     },
     "STARCATCH" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
