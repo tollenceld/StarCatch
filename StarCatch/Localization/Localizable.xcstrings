@@ -4382,6 +4382,28 @@
         }
       }
     },
+    "sky.issue.orbit_preparing" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preparing orbit data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "轨道数据准备中" } }
+      }
+    },
+    "sky.issue.orbit_preparing.detail" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The first local orbit snapshot is not ready yet. You can use the sky controls while preparation continues on this device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "首份本地轨道快照尚未就绪。你可以继续使用天空控件，数据会在设备内继续准备。" } }
+      }
+    },
+    "sky.observer.assumed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : { "state" : "translated", "value" : "ASSUMED" }
+        },
+        "zh-Hans" : {
+          "stringUnit" : { "state" : "translated", "value" : "假定位置" }
+        }
+      }
+    },
     "sky.value.assumed" : {
       "extractionState" : "stale",
       "localizations" : {

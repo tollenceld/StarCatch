@@ -291,7 +291,7 @@ struct Projection {
     }
 
     /// 切平面基向量：right = bore × worldUp，up = right × bore。
-    private static func screenBasis(
+    static func screenBasis(
         for bore: simd_double3
     ) -> (right: simd_double3, up: simd_double3) {
         let worldUp = simd_double3(0, 0, 1)

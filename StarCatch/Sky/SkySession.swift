@@ -28,6 +28,32 @@ final class SkySession: ObservableObject {
     @Published private(set) var overviewObjects: [CatalogObject] = []
     @Published private(set) var overviewTrailObjects: [CatalogObject] = []
     private var overviewPropagationActive = false
+    private var overviewIDs: Set<String> = []
+    private var revealOrders: [String: Double] = [:]
+
+    func sceneFrame(at date: Date, live: Bool = true, includeLocal: Bool = false,
+                    focusedObjectID: String? = nil) -> ObservationSceneFrame {
+        var objects = includeLocal ? displayObjects : overviewObjects
+        if let focusedObjectID, !objects.contains(where: { $0.id == focusedObjectID }),
+           let focused = catalog.objectsByID[focusedObjectID] { objects.append(focused) }
+        let targets = objects.compactMap { object -> ObservationSceneFrame.Target? in
+            guard let ephemeris = ephemeris.cachedEphemeris(object.id, at: date, live: live) else { return nil }
+            return ObservationSceneFrame.Target(object: object, ephemeris: ephemeris,
+                isOverview: overviewIDs.contains(object.id) || object.id == focusedObjectID,
+                revealOrder: revealOrders[object.id] ?? 0)
+        }
+        return ObservationSceneFrame(observation: date, observer: ephemeris.frameObserver ?? observer.coordinates,
+                                     pointing: pointing, targets: targets)
+    }
+
+    private func prepareSceneIdentity() {
+        overviewIDs = Set(overviewObjects.map(\.id))
+        revealOrders = Dictionary(uniqueKeysWithValues: displayObjects.map { object in
+            // Inclination groups are a stable reveal order, never a substitute orbit.
+            let group = min(5, max(0, floor(object.orbitFingerprint.inclinationDegrees / 30)))
+            return (object.id, (group + ObservationSceneMath.revealOrder(object.id)) / 6)
+        })
+    }
 
     /// TLE 快照龄期（天）—— 档案层的 EPOCH AGE 字段。
     var tleAgeDays: Int {
@@ -78,6 +104,7 @@ final class SkySession: ObservableObject {
         // 首次进入天空只传播确实会绘制、可捕获的目标，避免完整 16k 目录任务
         // 与用户第一次对焦争抢 CPU。进入全局星图前再切换到完整目录。
         ephemeris.setPropagationObjects(displayObjects)
+        prepareSceneIdentity()
 
         observer.$coordinates
             .receive(on: DispatchQueue.main)
@@ -164,7 +191,7 @@ final class SkySession: ObservableObject {
     }
 
     /// 在启动页仍可见时预热首次捕获会用到的“速度精算 + 多时刻轨迹”路径。
-    /// 两项都在 utility 后台执行，完成后主天空才接管，避免第一颗卫星承担冷成本。
+    /// 在 utility 后台执行，不阻塞首份轨道快照或启动镜头推进。
     func prewarmCapturePipeline(at date: Date = Date()) async {
         guard let objectID = displayObjects.first?.id else { return }
         async let precise = ephemeris.preparePreciseEphemeris(
@@ -260,6 +287,7 @@ final class SkySession: ObservableObject {
         visibleObjects = objects
         displayObjects = Self.makeDisplaySample(from: objects, starlinkDivisor: 8)
         overviewObjects = Self.makeOverviewSample(from: displayObjects)
+        prepareSceneIdentity()
         overviewTrailObjects = OverviewAmbientTrailPolicy.select(from: overviewObjects)
         ephemeris.setPropagationObjects(
             overviewPropagationActive ? overviewObjects : displayObjects

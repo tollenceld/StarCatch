@@ -15,6 +15,7 @@ struct SkyView: View {
     /// 工具面板暂停采样与绘制，但保留同一个绘制表面和最后观测时刻。
     var isUtilityPagePresented = false
     var renderingSuspended = false
+    var establishment: ObservationEstablishment? = nil
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
     /// 设置与观测档案由上层负责呈现；观测记录同时作为底部控制栏的稳定入口，
     /// 目标卡仍可按内容直接进入深度档案。
@@ -62,6 +63,10 @@ struct SkyView: View {
     /// 只有入口按钮和返回按钮能够改变模式。
     @State private var presentationMode: SkyPresentationMode = .local
     @State private var persistentOverviewProgress: Double = 0
+    @State private var overviewTransitionElapsed = 0.0
+    @State private var overviewTransitionLastTick: Double?
+    @State private var overviewReturnFrame: ObservationSceneFrame?
+    @State private var overviewReturnOffset = 0.0
     @State private var globalEntryGateProgress: Double = 0
     @State private var globalEntryArmed = false
     @State private var globalEntryHapticSent = false
@@ -108,12 +113,11 @@ struct SkyView: View {
         return wideReduction * (1 - overviewPresentationProgress)
     }
     private var localSkyPresence: Double {
-        overviewTransitionVisuals.localSkyOpacity
+        1
     }
     private var localSkyScale: CGFloat {
         guard !suppressMotion else { return 1 }
-        return overviewTransitionVisuals.localSkyScale
-            * GlobalEntryGatePolicy.elasticScale(
+        return GlobalEntryGatePolicy.elasticScale(
                 progress: globalEntryGateProgress
             )
     }
@@ -135,30 +139,41 @@ struct SkyView: View {
 
     private var renderingSurface: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: renderingSuspended)) { timeline in
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0,
+                paused: renderingSuspended || establishment != nil || scenePhase != .active)) { timeline in
                 let frameDate = frozenFrameDate ?? timeline.date
                 let time = frameDate.timeIntervalSince(startDate)
                 let obsTime = clock.observationTime(realNow: frameDate)
 
                 ZStack(alignment: .topLeading) {
-                    canvasLayer(time: time, observation: obsTime)
+                    if let establishment, !establishment.isComplete {
+                        ObservationEstablishmentField(establishment: establishment,
+                            frame: session.sceneFrame(at: Date(), includeLocal: establishment.localProgress > 0.65))
+                            .opacity(establishment.reducedMotion ? 1 - establishment.localProgress : 1)
+                        if establishment.reducedMotion {
+                            canvasLayer(time: time, observation: obsTime).opacity(establishment.localProgress)
+                        }
+                    } else {
+                        canvasLayer(time: time, observation: obsTime)
                         .contentShape(Rectangle())
                         .scaleEffect(localSkyScale)
                         .opacity(localSkyPresence)
+                    }
                     crosshairLayer
-                        .opacity(localChromePresence)
+                        .opacity(localChromePresence * (establishment?.chromePresence ?? 1))
                     targetMicroLabelLayer(observation: obsTime)
-                        .opacity(localChromePresence)
+                        .opacity(localChromePresence * (establishment?.chromePresence ?? 1))
                     if clock.isLive {
                         guideLayer
+                            .opacity(establishment?.chromePresence ?? 1)
                             .opacity(localChromePresence)
                     }
                     timeOverviewLayer(time: time, observation: obsTime)
                 }
                 .colorEffect(
                     ShaderLibrary.grain(
-                        .float(Float(suppressMotion ? 0 : time)),
-                        .float(grainEnabled ? 0.024 : 0)
+                        .float(Float(suppressMotion ? 0 : establishment?.elapsed ?? time)),
+                        .float(grainEnabled ? Float(0.024 * (establishment.map { ObservationSceneMath.ease($0.elapsed / 0.7) } ?? 1)) : 0)
                     )
                 )
                 .onChange(of: timeline.date) { _, frameDate in
@@ -185,12 +200,14 @@ struct SkyView: View {
         .overlay { transientDismissLayer }
         .overlay(alignment: .top) {
             pointingReadout
+                .opacity(establishment?.chromePresence ?? 1)
                 // 顶部功能翼必须和灵动岛共享同一条水平轴；默认 overlay 会从
                 // 安全区下缘开始布局，结果看起来仍是一条岛下工具栏。
                 .ignoresSafeArea(edges: .top)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomControlBand
+                .opacity(establishment?.chromePresence ?? 1)
         }
         // Observe touches without adding a hit-testing surface over the sky.
         // The 16pt wake band must still belong to the existing sky drag gesture.
@@ -219,11 +236,20 @@ struct SkyView: View {
             frozenFrameDate = suspended ? Date() : nil
             dockActivity.restart()
         }
-        .onChange(of: scenePhase) { _, _ in dockActivity.restart() }
+        .onChange(of: scenePhase) { _, _ in
+            dockActivity.restart()
+            overviewTransitionLastTick = nil
+        }
+        .onChange(of: establishment == nil) { _, live in
+            if live { lastCaptureSample = -.infinity; capture.resumeSampling() }
+        }
         .onChange(of: keepsDockVisible) { _, _ in dockActivity.restart() }
         .onChange(of: fieldMagnification) { _, _ in updateFieldResetAvailability() }
         .onChange(of: session.pointing) { _, _ in updateFieldResetAvailability() }
-        .onDisappear { dockActivity.restart() }
+        .onDisappear {
+            dockActivity.restart()
+            session.observer.releasePresentationHold()
+        }
         .onAppear {
             dockActivity.restart()
             EarthCoastlineStore.shared.prepare()
@@ -308,6 +334,7 @@ struct SkyView: View {
             await preparePresentedForecast(for: presentedStoryObjectID)
         }
         .onChange(of: capture.phase) { oldPhase, newPhase in
+            guard establishment == nil else { return }
             if case .acquiring(let id) = oldPhase, case .exploring = newPhase {
                 retiringCandidate = (id, Date())
             } else {
@@ -373,7 +400,8 @@ struct SkyView: View {
             dockActivity.restart()
             dismissTransientOverlay()
             session.setOverviewPropagationActive(
-                newMode.presentsOverview || globalEntryArmed
+                newMode == .global || newMode == .enteringGlobal
+                    || (newMode == .exitingGlobal && !clock.isLive) || globalEntryArmed
             )
             if !oldMode.presentsOverview, newMode.presentsOverview {
                 overviewTrails.clear()
@@ -423,6 +451,7 @@ struct SkyView: View {
         viewport: CGSize
     ) {
         let frameTime = frameDate.timeIntervalSince(startDate)
+        advanceOverviewTransition(at: ProcessInfo.processInfo.systemUptime)
         if scenePhase == .active, !renderingSuspended, !isUtilityPagePresented,
            presentedStoryObjectID == nil, chromeState.dockMode == .exploration {
             dockActivity.update(
@@ -444,7 +473,9 @@ struct SkyView: View {
             )
         }
 
-        guard !isUtilityPagePresented,
+        guard establishment == nil,
+              scenePhase == .active,
+              !isUtilityPagePresented,
               !clock.isScrubbing,
               presentationMode == .local,
               frameTime - lastCaptureSample
@@ -736,14 +767,6 @@ struct SkyView: View {
         }
     }
 
-    private var overviewModeAnimation: Animation {
-        suppressMotion ? .easeOut(duration: 0.16) : Motion.skyOverviewMode
-    }
-
-    private var overviewModeDuration: Double {
-        suppressMotion ? 0.16 : Motion.skyOverviewModeDuration
-    }
-
     private func enterGlobalOverview() {
         guard presentationMode == .local else { return }
         ObservationHaptics.shared.mediumImpact(intensity: 0.72)
@@ -752,40 +775,60 @@ struct SkyView: View {
         globalEntryHapticSent = false
         overviewEntryPointing = session.pointing
         overviewCelestialFrame = makeCelestialViewFrame()
+        session.observer.holdForPresentation()
         overviewAmbientTrails.clear()
         overviewIdleBeganAt = nil
         persistentOverviewProgress = 0
         presentationMode = .enteringGlobal
         dismissTransientOverlay()
-        DispatchQueue.main.async {
-            withAnimation(overviewModeAnimation) {
-                persistentOverviewProgress = 1
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
-                guard presentationMode == .enteringGlobal else { return }
-                presentationMode = .global
-            }
-        }
+        overviewTransitionElapsed = 0
+        overviewTransitionLastTick = nil
     }
 
     private func exitOverviewToLocal() {
         guard presentationMode == .global else { return }
+        session.observer.holdForPresentation()
         presentationMode = .exitingGlobal
         globalEntryArmed = false
         globalEntryGateProgress = 0
         globalEntryHapticSent = false
         if !clock.isLive {
+            overviewReturnFrame = session.sceneFrame(at: clock.observationTime(), live: false,
+                                                     focusedObjectID: capture.engagedObjectId)
+            overviewReturnOffset = abs(clock.offset)
             returnToLiveFromOverview()
         }
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
-        withAnimation(overviewModeAnimation) {
-            persistentOverviewProgress = 0
+        overviewTransitionElapsed = 0
+        overviewTransitionLastTick = nil
+        if clock.isLive { session.setOverviewPropagationActive(false) }
+    }
+
+    private func advanceOverviewTransition(at uptime: Double) {
+        guard presentationMode.isTransitioning, scenePhase == .active, !renderingSuspended else {
+            overviewTransitionLastTick = nil
+            return
+        }
+        // Historical return finishes on the existing clock before spatial descent.
+        guard presentationMode != .exitingGlobal || clock.isLive else {
+            overviewTransitionLastTick = nil
+            return
+        }
+        if presentationMode == .exitingGlobal { session.setOverviewPropagationActive(false) }
+        if let last = overviewTransitionLastTick { overviewTransitionElapsed += max(0, uptime - last) }
+        overviewTransitionLastTick = uptime
+        let duration = suppressMotion ? 0.16 : 1.05
+        let p = min(1, overviewTransitionElapsed / duration)
+        persistentOverviewProgress = presentationMode == .enteringGlobal ? p : 1 - p
+        if presentationMode == .exitingGlobal {
             fieldMagnification = ObservationScale.defaultLocalMagnification
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + overviewModeDuration) {
-            guard presentationMode == .exitingGlobal,
-                  persistentOverviewProgress < 0.001
-            else { return }
+        guard p >= 1 else { return }
+        overviewReturnFrame = nil
+        overviewTransitionLastTick = nil
+        session.observer.releasePresentationHold()
+        if presentationMode == .enteringGlobal { presentationMode = .global }
+        else {
             presentationMode = .local
             overviewEntryPointing = nil
             overviewCelestialFrame = nil
@@ -1161,7 +1204,8 @@ struct SkyView: View {
             assumed: session.observer.coordinates.assumed,
             accuracy: session.observer.coordinates.horizontalAccuracyMeters,
             confidence: session.confidence,
-            orbitAge: session.tleAgeDays
+            orbitAge: session.tleAgeDays,
+            orbitFrameReady: session.ephemeris.frameRevision > 0
         )
     }
 
@@ -1366,7 +1410,7 @@ struct SkyView: View {
     }
 
     private var overviewPresentationProgress: Double {
-        max(persistentOverviewProgress, easedScrubProgress)
+        presentationMode.presentsOverview ? persistentOverviewProgress : easedScrubProgress
     }
 
     @ViewBuilder
@@ -1397,9 +1441,12 @@ struct SkyView: View {
                 celestialFrame: overviewCelestialFrame,
                 transitionMotionEnabled: !suppressMotion,
                 interactive: presentationMode.ownsGlobalInteraction,
-                onInteractionStateChanged: setOverviewInteractionActive
+                onInteractionStateChanged: setOverviewInteractionActive,
+                localVerticalFOV: fieldVerticalFOV,
+                returnFrame: overviewReturnFrame,
+                returnProgress: overviewReturnOffset > 0 ? 1 - abs(clock.offset) / overviewReturnOffset : 1
             )
-            .opacity(globePresence)
+            .opacity(suppressMotion ? globePresence : 1)
             .transition(
                 suppressMotion
                     ? .opacity
@@ -1443,9 +1490,9 @@ struct SkyView: View {
                 quietObservation: true
             )
 
-            // 全景已完全覆盖屏幕时，底层只保留可用于退场交叉溶解的介质背景；
-            // 不再重复投影同一批 16k 目标。进出动画的中间区间仍完整绘制主天空。
-            if overviewPresentationProgress > 0.985 {
+            // 共享相机拥有整个空间转场。底层保留实例，但不重复投影卫星；
+            // 仅 Reduce Motion 的短淡化需要同时保留就地天空。
+            if persistentOverviewPresented, !suppressMotion {
                 SkyRenderer.drawVignette(context, size: size)
                 return
             }

@@ -43,6 +43,7 @@ final class SkyClock: ObservableObject {
     /// 惯性速度（秒/秒）。
     private var velocity: Double = 0
     private var displayLink: CADisplayLink?
+    private var previousTickTimestamp: TimeInterval?
     private var returnStartOffset: TimeInterval = 0
     private var returnElapsed: TimeInterval = 0
     private var activeReturnDuration: TimeInterval = 0
@@ -140,8 +141,9 @@ final class SkyClock: ObservableObject {
 
     private func startTicking() {
         guard displayLink == nil else { return }
+        previousTickTimestamp = nil
         let link = CADisplayLink(target: self, selector: #selector(tick))
-        link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 60)
+        link.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 30, preferred: 30)
         link.add(to: .main, forMode: .common)
         displayLink = link
     }
@@ -149,10 +151,15 @@ final class SkyClock: ObservableObject {
     private func stopTicking() {
         displayLink?.invalidate()
         displayLink = nil
+        previousTickTimestamp = nil
     }
 
     @objc private func tick(_ link: CADisplayLink) {
-        let dt = link.targetTimestamp - link.timestamp
+        // targetTimestamp - timestamp is the display's nominal interval, not the
+        // elapsed time between callbacks. Using it stretches returns under load.
+        let dt = Self.elapsedFrameTime(previous: previousTickTimestamp, current: link.timestamp,
+                                       fallback: link.targetTimestamp - link.timestamp)
+        previousTickTimestamp = link.timestamp
 
         if isReturningToLive {
             returnElapsed += dt
@@ -173,9 +180,10 @@ final class SkyClock: ObservableObject {
         }
 
         if velocity != 0 {
-            offset = clamp(offset + velocity * dt)
+            let inertiaDelta = min(dt, 1.0 / 15)
+            offset = clamp(offset + velocity * inertiaDelta)
             // 惯性衰减 τ=0.6s
-            velocity *= exp(-dt / 0.6)
+            velocity *= exp(-inertiaDelta / 0.6)
             if abs(velocity) < 20 {
                 velocity = 0
                 isTimeInteractionActive = false
@@ -194,6 +202,11 @@ final class SkyClock: ObservableObject {
 
     private func clamp(_ value: TimeInterval) -> TimeInterval {
         min(Self.maxOffset, max(-Self.maxOffset, value))
+    }
+
+    static func elapsedFrameTime(previous: TimeInterval?, current: TimeInterval,
+                                 fallback: TimeInterval) -> TimeInterval {
+        max(0, previous.map { current - $0 } ?? fallback)
     }
 
     // MARK: - 显示格式

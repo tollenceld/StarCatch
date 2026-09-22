@@ -12,11 +12,11 @@ enum SkyTopBarMetrics {
 
 /// 顶层视图。核心流程：
 ///
-///   1. OrbitalBootView —— 首次与回访共用的轻量预设轨道电影
+///   1. ObservationEstablishment —— 从信号到本地天空的共享空间建立
 ///   2. SkyView —— 主观测视图
 ///   3. ManualBookView —— 从设置按需打开的五页观测手册
 ///
-/// 准备完成后统一交叉淡入 Sky；观测手册继续从设置中按需打开。
+/// Sky 在准备期间挂载并保持身份，镜头抵达后原位接管；后台返回不重播。
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -24,7 +24,8 @@ struct RootView: View {
     /// 11 MB 轨道目录必须在首帧之后于后台解析；同步构造会让系统 Launch Screen
     /// 持续占据屏幕，用户只能看到一段没有反馈的纯黑。
     @State private var session: SkySession?
-    @State private var bootPreparation = BootPreparationState.initial
+    @State private var establishment = ObservationEstablishment()
+    @State private var capturePrewarmTask: Task<Void, Never>?
     @StateObject private var capture = CaptureStateMachine()
     @StateObject private var clock = SkyClock()
 
@@ -82,7 +83,7 @@ struct RootView: View {
             Palette.voidBlack.ignoresSafeArea()
 
             // 工具面板出现时保留同一个天空实例与冻结绘制表面。
-            if stage == .sky, let session {
+            if stage == .sky || stage == .booting, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
                 } else {
@@ -92,6 +93,7 @@ struct RootView: View {
                         clock: clock,
                         isUtilityPagePresented: presentedPage != nil,
                         renderingSuspended: skyRenderingSuspended,
+                        establishment: stage == .booting ? establishment : nil,
                         onOpenFilters: {
                             presentPage(.filters)
                         },
@@ -105,8 +107,8 @@ struct RootView: View {
                             presentPage(.observations)
                         }
                     )
-                        .transition(.opacity)
-                        .allowsHitTesting(presentedPage == nil)
+                        .transition(.identity)
+                        .allowsHitTesting(stage == .sky && presentedPage == nil)
                         .accessibilityHidden(presentedPage != nil)
                 }
             }
@@ -130,17 +132,9 @@ struct RootView: View {
             }
 
             // 启动序列
-            if stage == .booting {
-                OrbitalBootView(preparation: bootPreparation) {
-                    withAnimation(
-                        suppressMotion
-                            ? .easeOut(duration: 0.16)
-                            : Motion.bootHandoff
-                    ) {
-                        stage = .sky
-                    }
-                }
-                    .transition(.opacity)
+            if stage == .booting, session == nil {
+                OrbitalBootView(establishment: establishment)
+                    .transition(.identity)
             }
 
             if stage == .privacy {
@@ -183,6 +177,8 @@ struct RootView: View {
             }
         }
         .task { await prepareSession() }
+        .task(id: scenePhase) { await establishObservation() }
+        .onChange(of: session != nil) { _, _ in synchronizeSessionActivity() }
         .task(id: stage == .sky) {
             #if DEBUG
             guard stage == .sky,
@@ -219,6 +215,7 @@ struct RootView: View {
                 synchronizeSessionActivity()
                 if settingsReturnPending { reopenSettingsAfterFullScreenReturn() }
             case .inactive, .background:
+                establishment.pause()
                 settlePanelTransition()
                 settingsReturnTask?.cancel()
                 session?.stop()
@@ -230,6 +227,7 @@ struct RootView: View {
         .onDisappear {
             cancelPanelTransition()
             settingsReturnTask?.cancel()
+            capturePrewarmTask?.cancel()
         }
         .environment(\.forceLegacyMaterial, forceLegacyMaterial)
         .environment(\.chromePreviewReducedMotion, debugFlag("--previewReduceMotion"))
@@ -352,36 +350,35 @@ struct RootView: View {
 
     private func synchronizeSessionActivity() {
         guard let session else { return }
-        if stage == .sky, presentedPage == nil, scenePhase == .active {
+        if (stage == .sky || stage == .booting), presentedPage == nil, scenePhase == .active {
             session.start()
-            session.requestObserverAccess()
+            if stage == .sky { session.requestObserverAccess() }
         } else {
             session.stop()
         }
     }
 
-    /// 第一帧只绘制启动品牌信息。轨道 JSON、SatelliteKit 对象和筛选索引全部在
+    /// 第一帧只绘制微弱信号。轨道 JSON、SatelliteKit 对象和筛选索引全部在
     /// userInitiated 后台任务中完成，避免阻塞 SwiftUI 建立首个窗口。
     private func prepareSession() async {
         guard session == nil else { return }
         let catalog = await Task.detached(priority: .userInitiated) {
-            let catalog = CatalogStore()
-            // 深度档案索引约 9 MB；在启动叙事期间完成首次映射与解码，避免用户
-            // 第一次进入感应/筛选路径时触发静态库初始化。
-            _ = SatelliteStoryCatalog.storyCount
-            _ = SatelliteStoryCatalog.familyStoryCount
-            return catalog
+            CatalogStore()
         }.value
         guard !Task.isCancelled else { return }
-        bootPreparation.catalogReady = true
-
         let preparedSession = SkySession(catalog: catalog)
-        bootPreparation.orbitEngineReady = true
-        await preparedSession.prewarmCapturePipeline()
-        guard !Task.isCancelled else { return }
-        bootPreparation.observationModelReady = true
         session = preparedSession
-        // 启动文字仍在屏幕上时预热触觉管线。第一次卫星进入准星不再承担
+        synchronizeSessionActivity()
+        preparedSession.observer.requestIfAuthorized()
+        capturePrewarmTask = Task {
+            await Task.detached(priority: .utility) {
+                _ = SatelliteStoryCatalog.storyCount
+                _ = SatelliteStoryCatalog.familyStoryCount
+            }.value
+            guard !Task.isCancelled else { return }
+            await preparedSession.prewarmCapturePipeline()
+        }
+        // 建立空间时预热触觉管线。第一次卫星进入准星不再承担
         // UIImpactFeedbackGenerator 的冷启动成本。
         ObservationHaptics.shared.prepare()
 
@@ -389,6 +386,47 @@ struct RootView: View {
         applyDebugArgs()
         #endif
 
+    }
+
+    private func establishObservation() async {
+        while !Task.isCancelled, stage == .booting {
+            let previousPhase = establishment.phase
+            // This task is keyed by scenePhase, so its environment is current.
+            if scenePhase == .active { session?.start() }
+            let hadObserver = establishment.observer != nil
+            var ready = session?.ephemeris.hasUsableFrame == true
+                && session?.ephemeris.frameObserver == session?.observer.coordinates
+            var uptime = ProcessInfo.processInfo.systemUptime
+            #if DEBUG
+            let arguments = ProcessInfo.processInfo.arguments
+            if let index = arguments.firstIndex(of: "--previewStartupDelay"), index + 1 < arguments.count,
+               let delay = Double(arguments[index + 1]) { ready = ready && establishment.elapsed >= delay }
+            if let index = arguments.firstIndex(of: "--previewStartupRate"), index + 1 < arguments.count,
+               let rate = Double(arguments[index + 1]) { uptime *= min(1, max(0.1, rate)) }
+            #endif
+            let confirmation = establishment.advance(
+                at: uptime, active: scenePhase == .active,
+                sessionReady: session != nil,
+                frameReady: ready,
+                locating: session?.observer.isLocating == true,
+                coordinates: session?.observer.coordinates ?? ObserverLocation.fallback,
+                failed: session?.catalog.objects.isEmpty == true,
+                reduced: suppressMotion)
+            #if DEBUG
+            if previousPhase != establishment.phase {
+                print("[ObservationStartup] \(establishment.phase) at \(establishment.elapsed), frame: \(session?.ephemeris.hasUsableFrame == true)")
+            }
+            #endif
+            if !hadObserver, establishment.observer != nil { session?.observer.holdForPresentation() }
+            if confirmation { ObservationHaptics.shared.softImpact(intensity: 0.25) }
+            if establishment.isComplete {
+                session?.observer.releasePresentationHold()
+                stage = .sky
+                return
+            }
+            do { try await Task.sleep(for: .milliseconds(33)) }
+            catch { return }
+        }
     }
 
     #if DEBUG

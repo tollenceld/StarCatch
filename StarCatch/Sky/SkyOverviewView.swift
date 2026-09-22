@@ -55,6 +55,7 @@ struct OverviewShowcaseRotation: Equatable {
 /// 沉浸式三维地球与轨道场。所有点位来自与主视野相同的 ECI 传播帧；
 /// 地球、观察者、地表可见区域和轨道目标共享同一套旋转与缩放。
 struct SkyOverviewView: View {
+    @Environment(\.scenePhase) private var scenePhase
     /// 启动电影与全局地球共享同一套视觉半径，避免两处镜头比例逐渐漂移。
     nonisolated static let earthDisplayRadius: Double = 0.57
     nonisolated static let maximumOrbitDisplayRadius: Double = 0.88
@@ -200,7 +201,6 @@ struct SkyOverviewView: View {
     @ObservedObject var session: SkySession
     @ObservedObject var clock: SkyClock
     @ObservedObject private var coastlineStore = EarthCoastlineStore.shared
-    @ObservedObject private var brightStarStore = BrightStarStore.shared
 
     let observation: Date
     let frameTime: TimeInterval
@@ -215,6 +215,9 @@ struct SkyOverviewView: View {
     let transitionMotionEnabled: Bool
     let interactive: Bool
     let onInteractionStateChanged: (Bool) -> Void
+    var localVerticalFOV: Double = Projection.baseVerticalFOV
+    var returnFrame: ObservationSceneFrame? = nil
+    var returnProgress = 1.0
 
     /// 地球姿态使用单一四元数，不再拆成带俯仰边界的 yaw / pitch / roll。
     /// 单指拖动因此是无死角的 Arcball，连续越过两极也不会碰到人为限位。
@@ -238,7 +241,6 @@ struct SkyOverviewView: View {
     @State private var observerLabelEmphasized = false
     @State private var observerLabelEvent = 0
     @State private var transientGestureHintVisible = true
-    @State private var projectedBrightStars: [ProjectedBrightStar] = []
     @State private var showcaseRotation = OverviewShowcaseRotation()
     @State private var showcaseResumeEvent = 0
     @AppStorage("overviewGestureHintsSeen") private var gestureHintsSeen = false
@@ -339,124 +341,33 @@ struct SkyOverviewView: View {
                 )
 
                 let baseGeometry = Self.globeGeometry(in: size)
-                let geometry = renderedGeometry(
-                    in: size,
-                    at: ProcessInfo.processInfo.systemUptime
-                )
-                context.drawLayer { starField in
-                    starField.opacity = transitionVisuals.orbitalPresence
-                    drawBrightStarField(starField)
-                }
-                Self.drawGlobeAmbient(
-                    context,
-                    geometry: geometry,
-                    zoom: zoom,
-                    simplified: renderingSimplified
-                )
-
-                let focusedObject = focusedObjectId.flatMap { session.catalog.objectsByID[$0] }
-                let live = clock.isLive
-                // 全局点云使用会话级稳定样本。交互前后集合完全一致；完整目录
-                // 数量只用于图例，不再在 30fps Canvas 中逐颗投影。
-                let renderObjects = session.overviewObjects
-
-                var samples: [RenderSample] = []
-                samples.reserveCapacity(renderObjects.count + 1)
-                @MainActor func appendSample(_ object: CatalogObject) {
-                    guard let ephemeris = session.ephemeris.cachedEphemeris(
-                        object.id,
-                        at: observation,
-                        live: live
-                    ), let projected = Self.project(
-                        orbitalPosition: ephemeris.orbitalPosition,
-                        center: geometry.center,
-                        radius: geometry.radius,
-                        orientation: geometry.orientation,
-                        zoom: zoom
-                    ) else { return }
-                    samples.append(RenderSample(
-                        object: object,
-                        projected: projected
-                    ))
-                }
-                for object in renderObjects {
-                    appendSample(object)
-                }
-                if let focusedObject,
-                   !renderObjects.contains(where: { $0.id == focusedObject.id }) {
-                    appendSample(focusedObject)
-                }
-
-                context.drawLayer { backField in
-                    backField.opacity = transitionVisuals.orbitalPresence
-                    if !renderingSimplified {
-                        drawOrbitGuides(backField, geometry: geometry)
+                let geometry = renderedGeometry(in: size, at: ProcessInfo.processInfo.systemUptime)
+                let local = 1 - transitionProgress
+                let current = session.sceneFrame(at: returnFrame == nil ? observation : Date(),
+                    live: returnFrame != nil || clock.isLive, includeLocal: local > 0.65,
+                    focusedObjectID: focusedObjectId)
+                let frame = returnFrame.map { current.returning(from: $0, progress: returnProgress) } ?? current
+                let camera = ObservationCameraState(size: size, geometry: geometry, zoom: zoom,
+                    localProgress: transitionMotionEnabled ? local : 0, observer: frame.observer,
+                    pointing: frame.pointing, observation: frame.observation, verticalFOV: localVerticalFOV)
+                ObservationSceneRenderer.drawBackground(context, size: size, pointing: frame.pointing,
+                    verticalFOV: localVerticalFOV)
+                ObservationSceneRenderer.draw(context, camera: camera, frame: frame,
+                    landStore: coastlineStore, focusedObjectID: focusedObjectId,
+                    showsObserverCoordinates: observerLabelEmphasized)
+                if transitionProgress > 0.98 {
+                    let samples: [RenderSample] = frame.targets.compactMap { target in
+                        guard let projected = Self.project(orbitalPosition: target.ephemeris.orbitalPosition,
+                            center: geometry.center, radius: geometry.radius,
+                            orientation: geometry.orientation, zoom: zoom) else { return nil }
+                        return RenderSample(object: target.object, projected: projected)
                     }
-                    drawAmbientSpatialTrails(
-                        backField,
-                        geometry: geometry,
-                        front: false
-                    )
-                    drawSpatialTrails(
-                        backField,
-                        geometry: geometry,
-                        front: false,
-                        simplified: renderingSimplified
-                    )
-                    drawField(
-                        backField,
-                        samples: samples,
-                        geometry: geometry,
-                        front: false,
-                        simplified: renderingSimplified
-                    )
-                }
-                context.drawLayer { earthLayer in
-                    drawEarth(
-                        earthLayer,
-                        geometry: geometry,
-                        simplified: renderingSimplified
-                    )
-                }
-                context.drawLayer { frontField in
-                    frontField.opacity = transitionVisuals.orbitalPresence
-                    drawAmbientSpatialTrails(
-                        frontField,
-                        geometry: geometry,
-                        front: true
-                    )
-                    drawSpatialTrails(
-                        frontField,
-                        geometry: geometry,
-                        front: true,
-                        simplified: renderingSimplified
-                    )
-                    drawField(
-                        frontField,
-                        samples: samples,
-                        geometry: geometry,
-                        front: true,
-                        simplified: renderingSimplified
-                    )
-                    drawFocusedObject(frontField, samples: samples)
-                }
-                context.drawLayer { surfaceOverlay in
-                    Self.drawGlobeForegroundRim(
-                        surfaceOverlay,
-                        geometry: geometry,
-                        zoom: zoom,
-                        presence: surfaceDetailPresence
-                    )
-                    drawObserverVisibilityOverlay(
-                        surfaceOverlay,
-                        geometry: geometry,
-                        simplified: renderingSimplified
-                    )
-                    drawObserver(
-                        surfaceOverlay,
-                        geometry: geometry,
-                        simplified: renderingSimplified
-                    )
+                    var detail = context
+                    detail.opacity = ObservationSceneMath.ease((transitionProgress - 0.98) / 0.02)
+                    drawSatelliteSignatures(detail, samples: samples, geometry: geometry, simplified: renderingSimplified)
+                    drawFocusedObject(detail, samples: samples)
+                    drawAmbientSpatialTrails(detail, geometry: geometry, front: true)
+                    drawSpatialTrails(detail, geometry: geometry, front: true, simplified: renderingSimplified)
                 }
 
                 drawGestureHint(
@@ -488,12 +399,11 @@ struct SkyOverviewView: View {
             }
             .onAppear {
                 coastlineStore.prepare()
-                brightStarStore.prepare()
                 establishDefaultOrientationIfNeeded()
                 showcaseRotation.reset(
                     at: ProcessInfo.processInfo.systemUptime,
                     motionEnabled: transitionMotionEnabled
-                        && !clock.isTimeInteractionActive
+                        && interactive && scenePhase == .active && !clock.isTimeInteractionActive
                 )
                 #if DEBUG
                 let arguments = ProcessInfo.processInfo.arguments
@@ -510,9 +420,6 @@ struct SkyOverviewView: View {
                     renderDetailsSettled = false
                 }
                 #endif
-            }
-            .task(id: celestialProjectionKey(size: proxy.size)) {
-                await updateBrightStarProjection(size: proxy.size)
             }
             .onChange(of: renderingSimplified) { _, active in
                 onInteractionStateChanged(active)
@@ -542,6 +449,14 @@ struct SkyOverviewView: View {
                 } else {
                     pauseShowcaseRotation()
                 }
+            }
+            .onChange(of: interactive) { _, active in
+                if active { scheduleShowcaseRotationResume() }
+                else { cancelSpatialInertia(); pauseShowcaseRotation() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active, interactive { scheduleShowcaseRotationResume() }
+                else { cancelSpatialInertia(); pauseShowcaseRotation() }
             }
             .onDisappear {
                 showcaseResumeEvent &+= 1
@@ -904,6 +819,7 @@ struct SkyOverviewView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(OverviewShowcaseRotation.resumeDelay))
             guard event == showcaseResumeEvent,
+                  scenePhase == .active, interactive,
                   !orbitGestureActive,
                   !scaleGestureActive,
                   !rotationGestureActive,
@@ -1160,13 +1076,9 @@ struct SkyOverviewView: View {
         at time: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) -> GlobeGeometry {
         let base = Self.globeGeometry(in: size)
-        let scale = transitionMotionEnabled ? transitionVisuals.globeScale : 1
-        let offset = transitionMotionEnabled
-            ? size.height * transitionVisuals.globeVerticalOffset
-            : 0
         return GlobeGeometry(
-            center: CGPoint(x: base.center.x, y: base.center.y + offset),
-            radius: base.radius * scale,
+            center: base.center,
+            radius: base.radius,
             orientation: renderedOrientation(at: time)
         )
     }
@@ -1243,87 +1155,6 @@ struct SkyOverviewView: View {
         sqrt(value.x * value.x + value.y * value.y + value.z * value.z)
     }
 
-    private func celestialProjectionKey(size: CGSize) -> BrightStarProjectionKey? {
-        guard let celestialFrame, !brightStarStore.stars.isEmpty else { return nil }
-        return BrightStarProjectionKey(
-            frame: celestialFrame,
-            size: size,
-            catalogCount: brightStarStore.stars.count
-        )
-    }
-
-    @MainActor
-    private func updateBrightStarProjection(size: CGSize) async {
-        guard let celestialFrame, !brightStarStore.stars.isEmpty else {
-            projectedBrightStars = []
-            return
-        }
-        let stars = brightStarStore.stars
-        let projection = await Task.detached(priority: .userInitiated) {
-            BrightStarProjector.project(
-                stars: stars,
-                frame: celestialFrame,
-                size: size
-            )
-        }.value
-        guard !Task.isCancelled else { return }
-        projectedBrightStars = projection
-    }
-
-    // MARK: - 绘制
-
-    /// Fixed inertial star field. All J2000 projection work is cached outside Canvas;
-    /// this function only batches already projected ellipses by luminance and tint.
-    private func drawBrightStarField(_ context: GraphicsContext) {
-        guard !projectedBrightStars.isEmpty else { return }
-        var faint = Path()
-        var cool = Path()
-        var neutral = Path()
-        var warm = Path()
-        var halo = Path()
-        var glints = Path()
-
-        for star in projectedBrightStars {
-            let diameter = star.radius * 2
-            let rect = CGRect(
-                x: star.point.x - star.radius,
-                y: star.point.y - star.radius,
-                width: diameter,
-                height: diameter
-            )
-            if star.opacity < 0.48 {
-                faint.addEllipse(in: rect)
-            } else if star.temperature > 0.22 {
-                cool.addEllipse(in: rect)
-            } else if star.temperature < -0.22 {
-                warm.addEllipse(in: rect)
-            } else {
-                neutral.addEllipse(in: rect)
-            }
-            if star.radius > 1.05 {
-                halo.addEllipse(in: rect.insetBy(dx: -2.2, dy: -2.2))
-                let span = 2.1 + star.radius * 1.25
-                glints.move(to: CGPoint(x: star.point.x - span, y: star.point.y))
-                glints.addLine(to: CGPoint(x: star.point.x + span, y: star.point.y))
-                glints.move(to: CGPoint(x: star.point.x, y: star.point.y - span * 0.62))
-                glints.addLine(to: CGPoint(x: star.point.x, y: star.point.y + span * 0.62))
-            }
-        }
-
-        context.fill(faint, with: .color(Palette.inkHigh.opacity(0.18)))
-        context.fill(cool, with: .color(Color(red: 0.76, green: 0.86, blue: 1).opacity(0.62)))
-        context.fill(neutral, with: .color(Palette.inkHigh.opacity(0.62)))
-        context.fill(warm, with: .color(Color(red: 0.94, green: 0.86, blue: 0.7).opacity(0.6)))
-        context.drawLayer { glow in
-            glow.addFilter(.blur(radius: 2.4))
-            glow.fill(halo, with: .color(Palette.inkHigh.opacity(0.08)))
-        }
-        context.stroke(
-            glints,
-            with: .color(Palette.inkHigh.opacity(0.26)),
-            style: StrokeStyle(lineWidth: 0.38, lineCap: .round)
-        )
-    }
 
     /// 启动电影与全局页共用的球体环境光。调用方只提供几何和当前细节档位，
     /// 不读取会话、目录或任何可变业务状态。
@@ -1896,20 +1727,25 @@ struct SkyOverviewView: View {
         detailedCoastlines: [[SIMD2<Float>]],
         fallbackCoastlines: [[Float]],
         presence: Double,
-        simplified: Bool
+        simplified: Bool,
+        gridPresence: Double? = nil,
+        camera: ObservationCameraState? = nil
     ) {
-        let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
-        let earthRect = CGRect(
-            x: geometry.center.x - earthRadius,
-            y: geometry.center.y - earthRadius,
-            width: earthRadius * 2,
-            height: earthRadius * 2
+        let baseRadius = geometry.radius * zoom * Self.earthDisplayRadius
+        let baseRect = CGRect(
+            x: geometry.center.x - baseRadius,
+            y: geometry.center.y - baseRadius,
+            width: baseRadius * 2,
+            height: baseRadius * 2
         )
-        let earth = Path(ellipseIn: earthRect)
+        let earth = camera?.surfaceOutline() ?? Path(ellipseIn: baseRect)
+        guard !earth.isEmpty else { return }
+        let earthRect = camera == nil ? baseRect : earth.boundingRect
+        let earthRadius = max(1, max(earthRect.width, earthRect.height) / 2)
         context.drawLayer { atmosphere in
             atmosphere.addFilter(.blur(radius: 8))
             atmosphere.stroke(
-                Path(ellipseIn: earthRect.insetBy(dx: -3.2, dy: -3.2)),
+                earth,
                 with: .color(Palette.observationTint.opacity(0.14)),
                 style: StrokeStyle(lineWidth: 3.8)
             )
@@ -1932,8 +1768,8 @@ struct SkyOverviewView: View {
                     ),
                 ]),
                 center: CGPoint(
-                    x: geometry.center.x - earthRadius * 0.34,
-                    y: geometry.center.y - earthRadius * 0.28
+                    x: earthRect.midX - earthRadius * 0.34,
+                    y: earthRect.midY - earthRadius * 0.28
                 ),
                 startRadius: 0,
                 endRadius: earthRadius * 1.42
@@ -1978,15 +1814,17 @@ struct SkyOverviewView: View {
             earth: earth,
             earthRect: earthRect,
             earthRadius: earthRadius,
-            simplified: simplified
+            simplified: simplified,
+            projective: camera != nil
         )
 
         drawEarthGrid(
             context,
             geometry: geometry,
             zoom: zoom,
-            presence: presence,
-            simplified: simplified
+            presence: gridPresence ?? presence,
+            simplified: simplified,
+            camera: camera
         )
         if landDots.isEmpty {
             drawEarthCoastlines(
@@ -1997,7 +1835,8 @@ struct SkyOverviewView: View {
                 detailedCoastlines: detailedCoastlines,
                 fallbackCoastlines: fallbackCoastlines,
                 presence: presence,
-                simplified: simplified
+                simplified: simplified,
+                camera: camera
             )
         } else {
             drawEarthLandDots(
@@ -2006,11 +1845,12 @@ struct SkyOverviewView: View {
                 zoom: zoom,
                 siderealRadians: siderealRadians,
                 landDots: landDots,
-                presence: presence
+                presence: presence,
+                camera: camera
             )
         }
         context.stroke(
-            Path(ellipseIn: earthRect.insetBy(dx: -1.45, dy: -1.45)),
+            earth,
             with: .color(Palette.observationTint.opacity(simplified ? 0.1 : 0.16)),
             style: StrokeStyle(lineWidth: 0.46)
         )
@@ -2022,7 +1862,8 @@ struct SkyOverviewView: View {
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
         zoom: CGFloat,
-        presence: Double
+        presence: Double,
+        camera: ObservationCameraState? = nil
     ) {
         guard presence > 0.01 else { return }
         let earthRadius = geometry.radius * zoom * Self.earthDisplayRadius
@@ -2032,7 +1873,7 @@ struct SkyOverviewView: View {
             width: earthRadius * 2,
             height: earthRadius * 2
         )
-        let earth = Path(ellipseIn: earthRect)
+        let earth = camera?.surfaceOutline() ?? Path(ellipseIn: earthRect)
         context.stroke(
             earth,
             with: .color(Palette.voidBlack.opacity(0.84 * presence)),
@@ -2044,6 +1885,7 @@ struct SkyOverviewView: View {
             style: StrokeStyle(lineWidth: 0.68)
         )
 
+        guard camera == nil else { return }
         var illuminatedLimb = Path()
         illuminatedLimb.addArc(
             center: geometry.center,
@@ -2066,7 +1908,8 @@ struct SkyOverviewView: View {
         earth: Path,
         earthRect: CGRect,
         earthRadius: CGFloat,
-        simplified: Bool
+        simplified: Bool,
+        projective: Bool = false
     ) {
         context.drawLayer { surface in
             surface.clip(to: earth)
@@ -2104,6 +1947,7 @@ struct SkyOverviewView: View {
         }
 
         // 内侧大气边缘仅在受光半球可见，避免再画一圈完整装饰环。
+        guard !projective else { return }
         var innerAtmosphere = Path()
         innerAtmosphere.addArc(
             center: CGPoint(x: earthRect.midX, y: earthRect.midY),
@@ -2128,7 +1972,8 @@ struct SkyOverviewView: View {
         zoom: CGFloat,
         siderealRadians: Double,
         landDots: [EarthLandDot],
-        presence: Double
+        presence: Double,
+        camera: ObservationCameraState? = nil
     ) {
         guard presence > 0.01 else { return }
         let earthRotation = simd_quatd(
@@ -2150,7 +1995,7 @@ struct SkyOverviewView: View {
                 Double(dot.direction.y),
                 Double(dot.direction.z)
             )
-            let projected = Self.projectDirection(
+            let projected = camera?.projectSurface(earthRotation.act(direction)) ?? Self.projectDirection(
                 direction,
                 displayRadius: Self.earthDisplayRadius,
                 center: geometry.center,
@@ -2226,7 +2071,8 @@ struct SkyOverviewView: View {
         geometry: GlobeGeometry,
         zoom: CGFloat,
         presence: Double,
-        simplified: Bool
+        simplified: Bool,
+        camera: ObservationCameraState? = nil
     ) {
         let tint = Palette.inkLow.opacity(
             (simplified ? 0.06 : 0.09) * presence
@@ -2245,8 +2091,10 @@ struct SkyOverviewView: View {
                 from: 0.0,
                 through: Double.pi * 2,
                 by: sampleStep
-            ).map { longitude in
-                Self.projectDirection(
+            ).map { longitude -> Projected3D in
+                let direction = SIMD3<Double>(cos(lat) * cos(longitude), cos(lat) * sin(longitude), sin(lat))
+                if let camera { return camera.projectSurface(direction) }
+                return Self.projectDirection(
                     SIMD3(cos(lat) * cos(longitude), cos(lat) * sin(longitude), sin(lat)),
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
@@ -2275,8 +2123,10 @@ struct SkyOverviewView: View {
                 from: -Double.pi / 2,
                 through: Double.pi / 2,
                 by: sampleStep
-            ).map { latitude in
-                Self.projectDirection(
+            ).map { latitude -> Projected3D in
+                let direction = SIMD3<Double>(cos(latitude) * cos(longitude), cos(latitude) * sin(longitude), sin(latitude))
+                if let camera { return camera.projectSurface(direction) }
+                return Self.projectDirection(
                     SIMD3(cos(latitude) * cos(longitude), cos(latitude) * sin(longitude), sin(latitude)),
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,
@@ -2306,7 +2156,8 @@ struct SkyOverviewView: View {
         detailedCoastlines: [[SIMD2<Float>]],
         fallbackCoastlines: [[Float]],
         presence: Double,
-        simplified: Bool
+        simplified: Bool,
+        camera: ObservationCameraState? = nil
     ) {
         if Self.usesDetailedCoastlines(
             renderingSimplified: simplified,
@@ -2324,7 +2175,7 @@ struct SkyOverviewView: View {
                         longitude: Double(coordinate.y),
                         siderealRadians: siderealRadians
                     )
-                    return Self.projectDirection(
+                    return camera?.projectSurface(direction) ?? Self.projectDirection(
                         direction,
                         displayRadius: Self.earthDisplayRadius,
                         center: geometry.center,
@@ -2356,7 +2207,7 @@ struct SkyOverviewView: View {
                     longitude: Double(coastline[index + 1]),
                     siderealRadians: siderealRadians
                 )
-                return Self.projectDirection(
+                return camera?.projectSurface(direction) ?? Self.projectDirection(
                     direction,
                     displayRadius: Self.earthDisplayRadius,
                     center: geometry.center,

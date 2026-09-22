@@ -62,6 +62,8 @@ final class EphemerisEngine: ObservableObject {
 
     /// 测试与仪器诊断使用；不暴露对象内容，避免界面绕过目录所有权。
     var activePropagationObjectCount: Int { propagationObjectIDs.count }
+    private(set) var frameObserver: ObserverLocation.Coordinates?
+    var hasUsableFrame: Bool { !samples.isEmpty && frameObserver == observer }
 
     init(store: CatalogStore, observer: ObserverLocation.Coordinates) {
         self.store = store
@@ -289,10 +291,11 @@ final class EphemerisEngine: ObservableObject {
                 // 镜片切换只改变下一轮需要更新的对象，不销毁此前完整目录的缓存。
                 // 因此从一个小集合切到另一个集合时，真实旧位置可以立即出现，
                 // 并在本轮传播完成后平滑更新，而不是先给用户一片空天空。
-                var next = self.samples
+                let sameObserver = self.frameObserver == capturedObserver
+                var next = sameObserver ? self.samples : [:]
                 next.reserveCapacity(max(next.count, frame.count))
                 for (objectId, ephemeris) in frame {
-                    let previous = self.samples[objectId]
+                    let previous = sameObserver ? self.samples[objectId] : nil
                     next[objectId] = Sample(
                         current: ephemeris,
                         previous: previous?.current,
@@ -301,6 +304,7 @@ final class EphemerisEngine: ObservableObject {
                     )
                 }
                 self.samples = next
+                self.frameObserver = capturedObserver
                 self.frameRevision &+= 1
                 if needsWarmup, self.warmupTask == nil {
                     self.warmupTask = Task { @MainActor in

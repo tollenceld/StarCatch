@@ -114,6 +114,7 @@ enum SkyObservationIssue: Equatable {
     case motionUnavailable, locationDenied, locating, locationAssumed
     case locationAccuracy, directionUncalibrated
     case staleOrbit(days: Int)
+    case orbitPreparing
 
     static func resolve(
         availability: PointingAvailability,
@@ -122,8 +123,10 @@ enum SkyObservationIssue: Equatable {
         assumed: Bool,
         accuracy: Double,
         confidence: HeadingConfidence,
-        orbitAge: Int
+        orbitAge: Int,
+        orbitFrameReady: Bool = true
     ) -> Self? {
+        if !orbitFrameReady { return .orbitPreparing }
         if availability == .unavailable { return .motionUnavailable }
         if authorization == .denied || authorization == .restricted { return .locationDenied }
         if assumed {
@@ -147,6 +150,7 @@ enum SkyObservationIssue: Equatable {
         case .locationAccuracy: L10n.text("sky.degraded.location_accuracy")
         case .directionUncalibrated: L10n.text("sky.degraded.uncalibrated")
         case .staleOrbit(let days): L10n.format("sky.degraded.orbit_age", days)
+        case .orbitPreparing: L10n.text("sky.issue.orbit_preparing.detail")
         }
     }
 
@@ -159,6 +163,7 @@ enum SkyObservationIssue: Equatable {
         case .locationAccuracy: "location_accuracy"
         case .directionUncalibrated: "direction"
         case .staleOrbit: "orbit"
+        case .orbitPreparing: "orbit_preparing"
         }
     }
 }

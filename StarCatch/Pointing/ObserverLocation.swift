@@ -36,6 +36,21 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
 
     private let manager = CLLocationManager()
     private var refreshTimer: Timer?
+    private var presentationHold = false
+    private var pendingCoordinates: Coordinates?
+
+    func holdForPresentation() { presentationHold = true }
+
+    func releasePresentationHold() {
+        presentationHold = false
+        if let pendingCoordinates { coordinates = pendingCoordinates }
+        pendingCoordinates = nil
+    }
+
+    func requestIfAuthorized() {
+        guard authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse else { return }
+        request()
+    }
 
     /// 观测期间保持观察者坐标新鲜，但不持续打开 GPS。单次定位由系统
     /// 在每个周期内自行选择低成本的缓存或新样本；进入后台立即停止。
@@ -83,6 +98,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
             isLocating = false
             // 撤销权限后立即停止沿用上一份真实坐标。界面与轨道引擎会同步回到
             // 明确标注的上海假定坐标，和应用内隐私说明保持一致。
+            pendingCoordinates = nil
             coordinates = Self.fallback
         }
     }
@@ -90,7 +106,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         isLocating = false
         guard let loc = Self.bestUsableLocation(from: locations, now: Date()) else { return }
-        coordinates = Coordinates(
+        let measured = Coordinates(
             latitude: loc.coordinate.latitude,
             longitude: loc.coordinate.longitude,
             altitudeMeters: loc.verticalAccuracy >= 0 ? loc.altitude : 0,
@@ -98,6 +114,8 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
             measuredAt: loc.timestamp,
             assumed: false
         )
+        if presentationHold { pendingCoordinates = measured }
+        else { coordinates = measured }
     }
 
     /// `requestLocation()` 可能先交付缓存结果。只接受最近五分钟且误差半径不超过
