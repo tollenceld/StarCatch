@@ -100,6 +100,7 @@ extension EnvironmentValues {
 /// One continuous surface, with identical fallback rules on every supported OS.
 struct DockSurface: ViewModifier {
     var panelBlend: Double = 0
+    var navigationPresence: Double = 0
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
     @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
@@ -111,7 +112,7 @@ struct DockSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         surface(content)
-            .overlay { shape.stroke(Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34), lineWidth: 0.6) }
+            .overlay { shape.stroke(Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34 - 0.12 * navigationPresence), lineWidth: 0.6) }
             .clipShape(shape)
     }
 
@@ -119,14 +120,14 @@ struct DockSurface: ViewModifier {
         if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
             content
                 .background(Palette.sheetBackground.opacity(panelBlend))
-                .glassEffect(.regular.tint(Palette.voidBlack.opacity(0.1)).interactive(), in: shape)
+                .glassEffect(.regular.tint(Palette.voidBlack.opacity(0.1 - 0.06 * navigationPresence)).interactive(), in: shape)
         } else if reduceTransparency {
             content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
                 .background(Palette.voidBlack.opacity(0.97), in: shape)
         } else {
             content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
                 .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.76), in: shape)
+                .background(Palette.voidBlack.opacity(0.76 - 0.14 * navigationPresence), in: shape)
         }
     }
 }
@@ -158,7 +159,7 @@ struct UtilityPanelContainer<Content: View>: View, Animatable {
                 .accessibilityHidden(true)
             Color.clear
                 .frame(width: source.width, height: height)
-                .modifier(DockSurface(panelBlend: progress))
+                .modifier(DockSurface(panelBlend: progress, navigationPresence: 1 - progress))
                 .overlay(alignment: .top) {
                     content()
                         .environment(\.utilityPanelProgress, reducedMotion ? 1 : progress)

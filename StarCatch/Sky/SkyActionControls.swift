@@ -149,54 +149,56 @@ struct SkyCapsulePressStyle: ButtonStyle {
     }
 }
 
-/// 主天空与三维星图共用的镜头归位动作。仅在视场偏离默认比例时出现。
+/// 主天空按需出现的紧凑复位入口。32pt 视觉表面仍保留 44pt 热区。
 struct FieldOfViewResetControl: View {
     let action: () -> Void
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
     @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
 
+    private var reduceTransparency: Bool { systemReduceTransparency || previewReduceTransparency }
+
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
-                actionButton
-                    .glassEffect(
-                        .regular
-                            .tint(Palette.inkLow.opacity(0.1))
-                            .interactive(),
-                        in: Capsule()
-                    )
-            } else {
-                actionButton
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .background(Palette.voidBlack.opacity(0.8), in: Capsule())
-                    .overlay {
-                        Capsule()
-                            .stroke(Palette.inkFaint.opacity(0.46), lineWidth: 0.6)
-                    }
-            }
+        Button(action: action) {
+            surface
+                .padding(.vertical, 6)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(L10n.text("view.reset"))
         .accessibilityHint(L10n.text("view.reset.hint"))
     }
 
-    private var actionButton: some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: "viewfinder")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Palette.signal.opacity(0.78))
-                Text(L10n.text("view.reset"))
-                    .font(.system(size: 11, weight: .medium, design: .default))
-                    .tracking(1.1)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.88))
-            }
-            .frame(
-                width: AppChromeMetrics.mainActionWidth,
-                height: AppChromeMetrics.controlHeight
-            )
-            .contentShape(Capsule())
+    @ViewBuilder private var surface: some View {
+        if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
+            label
+                .glassEffect(
+                    .regular.tint(Palette.inkLow.opacity(0.1)).interactive(),
+                    in: Capsule()
+                )
+        } else {
+            label
+                .background(Palette.voidBlack.opacity(reduceTransparency ? 1 : 0.8), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .stroke(Palette.inkFaint.opacity(0.46), lineWidth: 0.6)
+                }
         }
-        .buttonStyle(SkyCapsulePressStyle())
+    }
+
+    private var label: some View {
+        HStack(spacing: 9) {
+            Image(systemName: "viewfinder")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(Palette.signal.opacity(0.78))
+            Text(L10n.text("view.reset"))
+                .font(.system(size: 11, weight: .medium, design: .default))
+                .tracking(1.1)
+                .foregroundStyle(Palette.inkHigh.opacity(0.88))
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 32)
     }
 }

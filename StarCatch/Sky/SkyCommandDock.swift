@@ -110,7 +110,7 @@ struct SkyCommandDock: View {
     private func commandSurface(_ configuration: SkyCommandConfiguration) -> some View {
         commandRow(configuration)
             .frame(height: AppChromeMetrics.commandRailHeight)
-            .modifier(DockSurface())
+            .modifier(DockSurface(navigationPresence: 1))
     }
 
     private func commandRow(_ configuration: SkyCommandConfiguration) -> some View {
@@ -170,29 +170,20 @@ private struct SkyCommandSlotButton: View {
 
     var body: some View {
         Button(action: action) {
-            ViewThatFits(in: .vertical) {
-                VStack(spacing: 4) {
-                    icon
-                    Text(item.shortLabel)
-                        .font(Typography.statusTag)
-                        .tracking(0.35)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-
+            VStack(spacing: 3) {
                 icon
+                Text(item.shortLabel)
+                    .font(Typography.statusTag)
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    .tracking(0.35)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
             .foregroundStyle(
                 (active ? Palette.signal : Palette.inkMid)
-                    .opacity(active ? 0.96 : 0.84)
+                    .opacity(active ? 0.90 : 0.70)
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background {
-                if active {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Palette.signal.opacity(0.075))
-                }
-            }
             .overlay(alignment: .bottom) {
                 if active {
                     Capsule()
@@ -212,5 +203,12 @@ private struct SkyCommandSlotButton: View {
         Image(systemName: item.symbol)
             .font(.system(size: 14, weight: .medium))
             .frame(minWidth: 24, minHeight: 18)
+            .background {
+                if active {
+                    Capsule()
+                        .fill(Palette.signal.opacity(0.055))
+                        .frame(width: 30, height: 22)
+                }
+            }
     }
 }

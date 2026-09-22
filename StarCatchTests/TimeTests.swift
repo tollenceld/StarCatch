@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import StarCatch
 import SatelliteKit
 import simd
@@ -8,9 +9,113 @@ import simd
 final class TimeTests: XCTestCase {
     private static let store = CatalogStore()
 
+    func testDockIdleWakeAndAccessibilityPrecedence() {
+        var activity = SkyDockActivity()
+        activity.restart(at: 0)
+        XCTAssertEqual(activity.opacity(at: 7.9), 1)
+        XCTAssertEqual(activity.opacity(at: 8), 0.72)
+        activity.touch(at: 9, bottom: true)
+        for step in 0...4 {
+            activity.sample(Pointing(azimuth: Double(step) * .pi / 180,
+                                     elevation: 0, roll: 0), at: 9 + Double(step) * 0.1)
+        }
+        XCTAssertTrue(activity.moving)
+        XCTAssertEqual(activity.opacity(at: 11.9), 1)
+        XCTAssertEqual(activity.opacity(at: 12), 0.35)
+        XCTAssertEqual(activity.opacity(at: 12, accessible: true), 1)
+        activity.touch(at: 12, bottom: false)
+        XCTAssertEqual(activity.opacity(at: 12), 0.35)
+        activity.restart(at: 30)
+        XCTAssertFalse(activity.moving)
+        XCTAssertEqual(activity.opacity(at: 30), 1)
+        XCTAssertEqual(activity.opacity(at: 38), 0.72)
+    }
+
+    func testDockMovementWrapThrottleAndHysteresis() {
+        func pointing(_ degrees: Double) -> Pointing {
+            Pointing(azimuth: degrees * .pi / 180, elevation: 0, roll: 0)
+        }
+        XCTAssertEqual(SkyDockActivity.angleDegrees(pointing(359), pointing(0)), 1, accuracy: 0.0001)
+        var activity = SkyDockActivity()
+        activity.sample(pointing(359), at: 0)
+        // A high frequency transient is ignored; the accepted sample barely moved.
+        activity.sample(pointing(80), at: 0.01)
+        activity.sample(pointing(359.1), at: 0.1)
+        XCTAssertFalse(activity.moving)
+        activity.sample(pointing(0.1), at: 0.2)
+        activity.sample(pointing(1.1), at: 0.3)
+        XCTAssertFalse(activity.moving)
+        activity.sample(pointing(2.1), at: 0.4)
+        XCTAssertTrue(activity.moving)
+        for step in 5...10 { activity.sample(pointing(2.1), at: Double(step) * 0.1) }
+        XCTAssertTrue(activity.moving)
+        for step in 11...13 { activity.sample(pointing(2.1), at: Double(step) * 0.1) }
+        XCTAssertFalse(activity.moving)
+        activity.sample(pointing(100), at: 5)
+        XCTAssertFalse(activity.moving, "A suspended interval is not observed motion")
+    }
+
+    func testFieldResetThresholdsAvoidNoiseAndHideDuringPinch() {
+        var policy = SkyFieldResetPolicy()
+        policy.update(magnification: 1.02, manualDeviation: 2)
+        XCTAssertFalse(policy.isAvailable(interacting: false))
+        policy.update(magnification: 1.09, manualDeviation: 0)
+        XCTAssertTrue(policy.isAvailable(interacting: false))
+        XCTAssertFalse(policy.isAvailable(interacting: true))
+        policy.update(magnification: 1.05, manualDeviation: 0)
+        XCTAssertTrue(policy.isAvailable(interacting: false))
+        policy.update(magnification: 1.02, manualDeviation: 0)
+        XCTAssertFalse(policy.isAvailable(interacting: false))
+        policy.update(magnification: 1, manualDeviation: 4)
+        XCTAssertTrue(policy.isAvailable(interacting: false))
+        policy.update(magnification: 1, manualDeviation: 2)
+        XCTAssertTrue(policy.isAvailable(interacting: false))
+        policy.update(magnification: 1, manualDeviation: 0.5)
+        XCTAssertFalse(policy.isAvailable(interacting: false))
+    }
+
+    func testManualResetRestoresReferenceAndCancelsInertia() async throws {
+        let provider = ManualPointingProvider()
+        let reference = provider.pointing
+        provider.drag(translation: CGSize(width: 20_000, height: 0))
+        XCTAssertGreaterThanOrEqual(provider.pointing.azimuth, -.pi)
+        XCTAssertLessThan(provider.pointing.azimuth, .pi)
+        provider.drag(translation: CGSize(width: 60, height: 20))
+        provider.endDrag(velocity: CGSize(width: 500, height: 200))
+        provider.reset(to: reference)
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(provider.pointing, reference)
+    }
+
+    func testObservationIssuesExplainActualCauseInPriorityOrder() {
+        func resolve(availability: PointingAvailability = .tracking,
+                     authorization: CLAuthorizationStatus = .authorizedWhenInUse,
+                     locating: Bool = false, assumed: Bool = false,
+                     accuracy: Double = 20, confidence: HeadingConfidence = .trueNorth,
+                     age: Int = 1) -> SkyObservationIssue? {
+            SkyObservationIssue.resolve(availability: availability, authorization: authorization,
+                                        locating: locating, assumed: assumed, accuracy: accuracy,
+                                        confidence: confidence, orbitAge: age)
+        }
+        XCTAssertEqual(resolve(availability: .unavailable, authorization: .denied), .motionUnavailable)
+        XCTAssertEqual(resolve(authorization: .denied, confidence: .uncalibrated), .locationDenied)
+        XCTAssertEqual(resolve(locating: true, assumed: true), .locating)
+        XCTAssertEqual(resolve(assumed: true), .locationAssumed)
+        XCTAssertEqual(resolve(availability: .manual, authorization: .notDetermined, assumed: true), .locationAssumed)
+        XCTAssertEqual(resolve(accuracy: 3_000, confidence: .uncalibrated), .locationAccuracy)
+        XCTAssertEqual(resolve(confidence: .uncalibrated, age: 20), .directionUncalibrated)
+        XCTAssertEqual(resolve(age: 20), .staleOrbit(days: 20))
+        XCTAssertNil(resolve())
+        let locked = SkyStatusIndicator.Mode.locked(identifier: "ISS", confirmedAt: .distantPast)
+        XCTAssertEqual(locked.label(at: Date()), L10n.text("sky.status.locked"))
+        XCTAssertTrue(locked.fullLabel.contains("ISS"))
+        XCTAssertEqual(SkyStatusIndicator.Mode.degraded(reason: .locationDenied).label(at: Date()),
+                       SkyObservationIssue.locationDenied.shortLabel)
+    }
+
     func testCaptureSignalUsesGreenOnlyAfterRecognitionOrLock() {
         XCTAssertEqual(SkyStatusIndicator.Mode.observing.signal, .red)
-        XCTAssertEqual(SkyStatusIndicator.Mode.degraded(reason: "unavailable").signal, .red)
+        XCTAssertEqual(SkyStatusIndicator.Mode.degraded(reason: .motionUnavailable).signal, .red)
         XCTAssertEqual(SkyStatusIndicator.Mode.sensing.signal, .yellow)
         XCTAssertEqual(SkyStatusIndicator.Mode.focusing.signal, .yellow)
         XCTAssertEqual(SkyStatusIndicator.Mode.locked(identifier: "ISS", confirmedAt: nil).signal, .green)
@@ -41,9 +146,9 @@ final class TimeTests: XCTestCase {
     func testDockMorphKeepsBottomAnchorAndStartsAtRailHeight() {
         let target = DockMorphMetrics.panelHeight(bottom: 780, top: 20)
         XCTAssertEqual(target, 760 * 0.84, accuracy: 0.001)
-        XCTAssertEqual(DockMorphMetrics.height(progress: 0, target: target), 64)
+        XCTAssertEqual(DockMorphMetrics.height(progress: 0, target: target), 56)
         XCTAssertEqual(DockMorphMetrics.height(progress: 1, target: target), target)
-        XCTAssertEqual(DockMorphMetrics.height(progress: -1, target: target), 64)
+        XCTAssertEqual(DockMorphMetrics.height(progress: -1, target: target), 56)
         XCTAssertEqual(DockMorphMetrics.height(progress: 2, target: target), target)
         for step in 1...100 {
             let before = DockMorphMetrics.height(progress: Double(step - 1) / 100, target: target)

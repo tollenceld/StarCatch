@@ -86,6 +86,11 @@ final class SkySession: ObservableObject {
             }
             .store(in: &cancellables)
 
+        observer.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+
         observer.$authorizationStatus
             .removeDuplicates()
             .dropFirst()

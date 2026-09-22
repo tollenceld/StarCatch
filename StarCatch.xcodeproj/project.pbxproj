@@ -61,6 +61,7 @@
 		CB29F8C877351D814A3DCC98 /* PrivacyStatementView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CCD1EF3879C24EBE88D20A7 /* PrivacyStatementView.swift */; };
 		CCDE460945E44F44FFEC0B1B /* SkyChromeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9821C0F786817CDB792B2A9 /* SkyChromeState.swift */; };
 		CD45D853E0586732FB9B0572 /* OverviewAmbientTrailPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2464D846268EFF91FCE4EF55 /* OverviewAmbientTrailPolicy.swift */; };
+		CEC50094869224D2EDF66715 /* SkyObservationChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39FB4050323D05103803A083 /* SkyObservationChrome.swift */; };
 		D0BE988272CF619374487A26 /* OrbitTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17CC2803ABD4E2DFDFB588FC /* OrbitTests.swift */; };
 		D10840282DF79F9C1E52A0B2 /* GlobalDockMorph.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3FD59376544CBC8CACFDB96 /* GlobalDockMorph.swift */; };
 		D22F8B9162FE33C23D19E75D /* StarMagnitudeScale.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66D2EC1B8C603C17BD29C9BF /* StarMagnitudeScale.swift */; };
@@ -107,6 +108,7 @@
 		342E553F2F7937963476DE0E /* earth_coastlines_50m.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; path = earth_coastlines_50m.bin; sourceTree = "<group>"; };
 		343FF92394A7814FD1DE6EFA /* PointingProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PointingProvider.swift; sourceTree = "<group>"; };
 		36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFilterControl.swift; sourceTree = "<group>"; };
+		39FB4050323D05103803A083 /* SkyObservationChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyObservationChrome.swift; sourceTree = "<group>"; };
 		3CAEF5F15EA29265AD47221C /* EphemerisEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EphemerisEngine.swift; sourceTree = "<group>"; };
 		441F1955000D3A76CDF9E931 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Projection.swift; sourceTree = "<group>"; };
@@ -336,6 +338,7 @@
 				E9821C0F786817CDB792B2A9 /* SkyChromeState.swift */,
 				2E2304EF8F9EE7F222CCD873 /* SkyClock.swift */,
 				9A55E248D745507E34A339FF /* SkyCommandDock.swift */,
+				39FB4050323D05103803A083 /* SkyObservationChrome.swift */,
 				D8D39BE6D95DEEAE2EE45F4A /* SkyOverviewView.swift */,
 				8098D7D68A03AF5B5A3E9A6D /* SkyRenderer.swift */,
 				CC1242DAD73E4C1124A97F05 /* SkySession.swift */,
@@ -551,6 +554,7 @@
 				CCDE460945E44F44FFEC0B1B /* SkyChromeState.swift in Sources */,
 				2FCC2E3974F45F4973293A3A /* SkyClock.swift in Sources */,
 				2CDBBABDE3C012FF82691BD3 /* SkyCommandDock.swift in Sources */,
+				CEC50094869224D2EDF66715 /* SkyObservationChrome.swift in Sources */,
 				84A99B3E6B2A799F19F48142 /* SkyOverviewView.swift in Sources */,
 				79807E3EBF4A6032770A5EF3 /* SkyRenderer.swift in Sources */,
 				5E50679C759F41669BB6A568 /* SkySession.swift in Sources */,

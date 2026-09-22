@@ -4059,6 +4059,159 @@
         }
       }
     },
+    "sky.issue.direction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "UNCALIBR."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方向未校准"
+          }
+        }
+      }
+    },
+    "sky.issue.locating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LOCATING"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在定位"
+          }
+        }
+      }
+    },
+    "sky.issue.locating.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for a usable location. The sky currently uses the default observing location."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待可用定位，天空暂时使用默认观测位置。"
+          }
+        }
+      }
+    },
+    "sky.issue.location_accuracy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LOW GPS ACC"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定位精度较低"
+          }
+        }
+      }
+    },
+    "sky.issue.location_assumed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "EST. POS."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用估算位置"
+          }
+        }
+      }
+    },
+    "sky.issue.location_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NO LOCATION"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定位未授权"
+          }
+        }
+      }
+    },
+    "sky.issue.location_denied.detail" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Location access is unavailable. Using the default observing location."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "定位权限未开启，正在使用默认观测位置。"
+          }
+        }
+      }
+    },
+    "sky.issue.motion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MOTION OFF"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运动数据受限"
+          }
+        }
+      }
+    },
+    "sky.issue.orbit" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OLD ORBITS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道数据较旧"
+          }
+        }
+      }
+    },
     "sky.status.accessibility" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -4116,13 +4269,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "FOCUSING"
+            "value" : "LOCKING"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在对焦"
+            "value" : "正在锁定"
           }
         }
       }
@@ -5388,13 +5541,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Restore the default scale for the current view"
+            "value" : "Restore the default scale and, when browsing manually, the direction before dragging"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "恢复当前视图的默认观察比例"
+            "value" : "恢复默认缩放；手动浏览时同时返回拖动前的方向"
           }
         }
       }

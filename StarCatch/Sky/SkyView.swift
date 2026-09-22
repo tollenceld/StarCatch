@@ -30,6 +30,16 @@ struct SkyView: View {
     private var systemReducedMotion: Bool { platformReducedMotion || previewReducedMotion }
     @AppStorage("reducedMotion") private var reducedMotion = false
     @AppStorage("grainEnabled") private var grainEnabled = true
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    @Environment(\.colorSchemeContrast) private var contrast
+    @StateObject private var dockActivity = SkyDockActivityController()
+    @State private var fieldResetPolicy = SkyFieldResetPolicy()
+    @State private var manualFieldReference: Pointing?
+    @State private var retiringCandidate: (id: String, date: Date)?
+    @State private var commandDockFrame: CGRect = .zero
+
+    private var keepsDockVisible: Bool { voiceOverEnabled || contrast == .increased }
 
     private let dust = StarDust()
     /// 时间偏移会高频发布；这些引用必须跨 View 值重建持久存在。
@@ -108,9 +118,7 @@ struct SkyView: View {
             )
     }
     private var localFieldResetAvailable: Bool {
-        return !clock.isScrubbing
-            && !fieldMagnificationActive
-            && abs(fieldMagnification - 1) > 0.015
+        fieldResetPolicy.isAvailable(interacting: clock.isScrubbing || fieldMagnificationActive)
     }
     private var chromeState: SkyChromeState {
         SkyChromeState(
@@ -184,6 +192,14 @@ struct SkyView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomControlBand
         }
+        // Observe touches without adding a hit-testing surface over the sky.
+        // The 16pt wake band must still belong to the existing sky drag gesture.
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("appChrome"))
+                .onChanged { observeChromeTouch(at: $0.location) }
+                .onEnded { observeChromeTouch(at: $0.location) }
+        )
+        .onPreferenceChange(CommandDockFrameKey.self) { commandDockFrame = $0 }
         .overlay {
             satelliteStoryLayer
         }
@@ -201,8 +217,15 @@ struct SkyView: View {
         interactionSurface
         .onChange(of: renderingSuspended, initial: true) { _, suspended in
             frozenFrameDate = suspended ? Date() : nil
+            dockActivity.restart()
         }
+        .onChange(of: scenePhase) { _, _ in dockActivity.restart() }
+        .onChange(of: keepsDockVisible) { _, _ in dockActivity.restart() }
+        .onChange(of: fieldMagnification) { _, _ in updateFieldResetAvailability() }
+        .onChange(of: session.pointing) { _, _ in updateFieldResetAvailability() }
+        .onDisappear { dockActivity.restart() }
         .onAppear {
+            dockActivity.restart()
             EarthCoastlineStore.shared.prepare()
             if initialOverviewPresented {
                 presentationMode = .global
@@ -284,7 +307,13 @@ struct SkyView: View {
         .task(id: presentedStoryObjectID) {
             await preparePresentedForecast(for: presentedStoryObjectID)
         }
-        .onChange(of: capture.phase) { _, newPhase in
+        .onChange(of: capture.phase) { oldPhase, newPhase in
+            if case .acquiring(let id) = oldPhase, case .exploring = newPhase {
+                retiringCandidate = (id, Date())
+            } else {
+                retiringCandidate = nil
+            }
+            dockActivity.restart()
             switch newPhase {
             case .acquiring:
                 dismissTransientOverlay()
@@ -341,6 +370,7 @@ struct SkyView: View {
             }
         }
         .onChange(of: presentationMode) { oldMode, newMode in
+            dockActivity.restart()
             dismissTransientOverlay()
             session.setOverviewPropagationActive(
                 newMode.presentsOverview || globalEntryArmed
@@ -376,6 +406,7 @@ struct SkyView: View {
             overviewAmbientTrails.clear()
         }
         .onChange(of: isUtilityPagePresented) { _, presented in
+            dockActivity.restart()
             if presented {
                 dismissTransientOverlay()
             } else {
@@ -392,6 +423,14 @@ struct SkyView: View {
         viewport: CGSize
     ) {
         let frameTime = frameDate.timeIntervalSince(startDate)
+        if scenePhase == .active, !renderingSuspended, !isUtilityPagePresented,
+           presentedStoryObjectID == nil, chromeState.dockMode == .exploration {
+            dockActivity.update(
+                pointing: session.pointing,
+                at: frameDate.timeIntervalSinceReferenceDate,
+                accessible: keepsDockVisible
+            )
+        }
         if !clock.isLive {
             session.ephemeris.prepareSnapshot(at: observationTime)
         }
@@ -547,7 +586,7 @@ struct SkyView: View {
         VStack(spacing: 10) {
             if chromeState.resetAction == .localField {
                 FieldOfViewResetControl(action: resetLocalFieldOfView)
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .transition(suppressMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
                     .opacity(isUtilityPagePresented ? 0 : 1)
             }
 
@@ -560,6 +599,11 @@ struct SkyView: View {
                 onEnterGlobal: enterGlobalOverview,
                 onOpenSettings: openInstrument,
                 showsSurface: !isUtilityPagePresented
+            )
+            .opacity(keepsDockVisible ? 1 : dockActivity.opacity)
+            .animation(
+                .easeOut(duration: suppressMotion ? 0.14 : (dockActivity.opacity == 1 ? 0.18 : 0.45)),
+                value: dockActivity.opacity
             )
             .background {
                 GeometryReader { geometry in
@@ -587,19 +631,29 @@ struct SkyView: View {
         }
     }
 
+    private func observeChromeTouch(at point: CGPoint) {
+        guard chromeState.dockMode == .exploration else { return }
+        let wakeArea = commandDockFrame.union(commandDockFrame.offsetBy(dx: 0, dy: -16))
+        dockActivity.touch(bottom: !commandDockFrame.isEmpty && wakeArea.contains(point),
+                           accessible: keepsDockVisible)
+    }
+
     private func openFilters() {
+        dockActivity.restart()
         dismissTransientOverlay()
         ObservationHaptics.shared.selectionChanged()
         onOpenFilters()
     }
 
     private func openInstrument() {
+        dockActivity.restart()
         dismissTransientOverlay()
         ObservationHaptics.shared.selectionChanged()
         onOpenInstrument()
     }
 
     private func openObservations() {
+        dockActivity.restart()
         dismissTransientOverlay()
         ObservationHaptics.shared.selectionChanged()
         onOpenArchive()
@@ -617,6 +671,11 @@ struct SkyView: View {
 
     private func resetLocalFieldOfView() {
         ObservationHaptics.shared.lightImpact(intensity: 0.68)
+        if let reference = manualFieldReference {
+            session.manualProvider?.reset(to: reference)
+            manualFieldReference = nil
+        }
+        fieldResetPolicy = SkyFieldResetPolicy()
 
         fieldMagnificationActive = false
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
@@ -626,8 +685,20 @@ struct SkyView: View {
         persistentOverviewProgress = 0
         overviewEntryPointing = nil
         overviewCelestialFrame = nil
-        withAnimation(Motion.fieldReset) {
+        withAnimation(suppressMotion ? .easeOut(duration: 0.14) : Motion.fieldReset) {
             fieldMagnification = ObservationScale.defaultLocalMagnification
+        }
+    }
+
+    private func updateFieldResetAvailability() {
+        let deviation = manualFieldReference.map {
+            SkyDockActivity.angleDegrees($0, session.pointing)
+        } ?? 0
+        var next = fieldResetPolicy
+        next.update(magnification: Double(fieldMagnification), manualDeviation: deviation)
+        if next.zoomDisplaced != fieldResetPolicy.zoomDisplaced
+            || next.directionDisplaced != fieldResetPolicy.directionDisplaced {
+            fieldResetPolicy = next
         }
     }
 
@@ -862,7 +933,7 @@ struct SkyView: View {
     /// 捕获中的事件状态优先于非阻断式环境提示，确保顶部与准星、卡片说同一种语言。
     private var statusMode: SkyStatusIndicator.Mode {
         if session.pointingAvailability == .unavailable {
-            return .degraded(reason: L10n.text("sky.degraded.pointing"))
+            return .degraded(reason: .motionUnavailable)
         }
         if archivePresentationReady,
            let id = capture.engagedObjectId,
@@ -872,7 +943,10 @@ struct SkyView: View {
         if capture.isAcquiring {
             return capture.acquisitionProgress < 0.28 ? .sensing : .focusing
         }
-        if let reason = pointingStatusLabel {
+        if session.pointingAvailability == .idle || session.pointingAvailability == .starting {
+            return .sensing
+        }
+        if let reason = observationIssue {
             return .degraded(reason: reason)
         }
         return .observing
@@ -1079,29 +1153,16 @@ struct SkyView: View {
 
     /// 只有会影响“这些点是否真的在你所指天空中”的降级才常驻提示；正常真北、
     /// 真实坐标和新鲜目录下不增加任何界面噪声。
-    private var pointingStatusLabel: String? {
-        // 降级说明现在是用户最先读到的一行字，因此用可直接理解的中文，
-        // 并只保留最重要的一条：同时罗列多项会让顶部重新变成一串噪声。
-        switch session.pointingAvailability {
-        case .unavailable:
-            return L10n.text("sky.degraded.pointing")
-        case .manual:
-            return nil
-        case .idle, .starting, .tracking:
-            if session.confidence == .uncalibrated {
-                return L10n.text("sky.degraded.uncalibrated")
-            }
-        }
-        if session.observer.coordinates.assumed {
-            return L10n.text("sky.degraded.location_assumed")
-        }
-        if session.observer.coordinates.horizontalAccuracyMeters > 2_000 {
-            return L10n.text("sky.degraded.location_accuracy")
-        }
-        if session.tleAgeDays > 14 {
-            return L10n.format("sky.degraded.orbit_age", session.tleAgeDays)
-        }
-        return nil
+    private var observationIssue: SkyObservationIssue? {
+        SkyObservationIssue.resolve(
+            availability: session.pointingAvailability,
+            authorization: session.observer.authorizationStatus,
+            locating: session.observer.isLocating,
+            assumed: session.observer.coordinates.assumed,
+            accuracy: session.observer.coordinates.horizontalAccuracyMeters,
+            confidence: session.confidence,
+            orbitAge: session.tleAgeDays
+        )
     }
 
     private struct CaptureSample {
@@ -1378,7 +1439,8 @@ struct SkyView: View {
                 context,
                 dust: dust,
                 size: size,
-                transform: dustTransform
+                transform: dustTransform,
+                quietObservation: true
             )
 
             // 全景已完全覆盖屏幕时，底层只保留可用于退场交叉溶解的介质背景；
@@ -1395,6 +1457,11 @@ struct SkyView: View {
             )
             let live = clock.isLive
             let engagedId = capture.engagedObjectId
+            let retreatDuration = suppressMotion ? 0.14 : 0.24
+            let retreatPresence = retiringCandidate.map {
+                min(1, max(0, 1 - frameDate.timeIntervalSince($0.date) / retreatDuration))
+            } ?? 0
+            let retreatID = retreatPresence > 0 ? retiringCandidate?.id : nil
             let engagedObject = engagedId.flatMap { session.catalog.objectsByID[$0] }
             let focusedFamily = engagedObject?.family
             // 投影所有对象（LIVE 用插值，非 LIVE 按观测时刻直算）
@@ -1512,9 +1579,7 @@ struct SkyView: View {
             categoryTiers.reserveCapacity(CatalogCategory.allCases.count)
             familyTiers.reserveCapacity(CatalogFamily.allCases.count)
             for (object, proj, magnitude) in projected
-            where object.id != engagedId
-                && !object.isCurated
-                && !object.isFeatured {
+            where object.id != engagedId && object.id != retreatID {
                 let sample = SkyRenderer.SatellitePoint(
                     point: proj.point,
                     seed: object.noradId,
@@ -1554,8 +1619,8 @@ struct SkyView: View {
                     context,
                     tiers: tiers,
                     tint: family.tint,
-                    opacity: (emphasized ? 0.92 : 0.62) * widePointOpacity,
-                    emphasis: emphasized ? 1.08 : 0.86,
+                    opacity: (emphasized ? 0.70 : 0.62) * widePointOpacity,
+                    emphasis: emphasized ? 0.94 : 0.86,
                     visualScale: widePointScale
                 )
             }
@@ -1565,37 +1630,39 @@ struct SkyView: View {
                 progress: localFocusProgress
             )
 
-            // 精选与当前捕捉对象保留呼吸、光晕和刻度细节。
+            // Only the current candidate/lock gets a focus halo. A departing candidate
+            // crossfades back to its ordinary physical magnitude without altering capture.
             for (object, proj, magnitude) in projected {
                 let isEngaged = object.id == engagedId
-                guard isEngaged
-                    || object.isFeatured
-                    || (object.isCurated && object.family == nil)
-                else { continue }
-                let tint = object.identityTint
-                // 未参与捕获的精选目标仍按自身星等呈现，不因"可读"就统一提亮 ——
-                // 否则档案覆盖率会变成一层与天文无关的亮度图案。
-                let magnitudeFloor = 0.16 + 0.16 * Double(magnitude.rawValue)
-                let brightness: Double
-                if isEngaged {
-                    brightness = (0.3 + 0.7 * strength) * proj.visibility
-                } else {
-                    brightness = magnitudeFloor * proj.visibility
+                let isRetiring = object.id == retreatID
+                guard isEngaged || isRetiring else { continue }
+                let tint = isEngaged && archivePresentationReady ? Palette.signal : Palette.inkHigh
+                if isRetiring {
+                    SkyRenderer.drawStarField(
+                        context,
+                        tiers: [magnitude: [.init(point: proj.point, seed: object.noradId,
+                                                signature: SkyRenderer.satelliteSignature(for: object))]],
+                        tint: object.identityTint,
+                        opacity: (1 - retreatPresence) * widePointOpacity * (object.family == nil ? 1 : 0.62),
+                        visualScale: widePointScale
+                    )
                 }
+                var focusContext = context
+                if isRetiring { focusContext.opacity = retreatPresence }
+                let brightness = max(0.82, 0.3 + 0.7 * strength) * proj.visibility
                 SkyRenderer.drawTarget(
-                    context,
+                    focusContext,
                     at: proj.point,
                     brightness: brightness * (1 - 0.22 * wideFieldProgress),
                     tint: tint,
                     time: motionTime,
-                    breathPhase: Double(object.id.hashValue % 628) / 100.0,
+                    breathPhase: Double(object.noradId % 628) / 100.0,
                     focusProgress: isEngaged
                         ? (archivePresentationReady ? 1 : capture.acquisitionProgress)
                         : 0,
                     locked: isEngaged && archivePresentationReady,
-                    breathes: isEngaged,
-                    haloStrength: (isEngaged ? 1 : 0.34)
-                        * (1 - 0.38 * wideFieldProgress),
+                    breathes: isEngaged && !suppressMotion,
+                    haloStrength: 1 - 0.38 * wideFieldProgress,
                     visualScale: widePointScale
                 )
 
@@ -1625,7 +1692,7 @@ struct SkyView: View {
             // 锁定目标离开视野后只保留这一枚暖色信标；浏览态不再显示候选箭头。
             if let id = engagedId,
                archivePresentationReady,
-               let object = session.catalog.objectsByID[id],
+               session.catalog.objectsByID[id] != nil,
                let relationship {
                 let marker = relationship.marker
                 let dismissalVisibility = 1 - unitSmoothstep(dismissalProgress)
@@ -1635,7 +1702,7 @@ struct SkyView: View {
                     edgeProgress: marker.edgeProgress,
                     inward: marker.inward,
                     clippedTo: cueBounds,
-                    tint: object.identityTint,
+                    tint: Palette.signal,
                     time: motionTime,
                     confirmationProgress: lockProgress,
                     dismissalProgress: dismissalProgress,
@@ -1902,7 +1969,9 @@ struct SkyView: View {
                 guard !overviewCommitted else { return }
                 guard !fieldMagnificationActive else { return }
                 guard let manual = session.manualProvider else { return }
+                dockActivity.touch(bottom: false, accessible: keepsDockVisible)
                 if lastTranslation == .zero {
+                    if manualFieldReference == nil { manualFieldReference = manual.pointing }
                     dismissTransientOverlay()
                 }
                 let scale = max(
@@ -1923,6 +1992,11 @@ struct SkyView: View {
                 }
                 lastTranslation = .zero
                 guard !fieldMagnificationActive else { return }
+                // A very short drag may deliver only its terminal sample. Capture
+                // the reference before momentum starts in that path as well.
+                if manualFieldReference == nil {
+                    manualFieldReference = session.manualProvider?.pointing
+                }
                 let scale = max(
                     ObservationScale.minimumLocalMagnification,
                     fieldMagnification
@@ -1940,6 +2014,7 @@ struct SkyView: View {
         MagnificationGesture(minimumScaleDelta: 0.01)
             .onChanged { value in
                 guard presentationMode == .local, !clock.isScrubbing else { return }
+                dockActivity.touch(bottom: false, accessible: keepsDockVisible)
                 if !fieldMagnificationActive {
                     if !globalEntryArmed {
                         globalEntryHapticSent = false

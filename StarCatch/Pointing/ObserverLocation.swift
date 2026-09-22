@@ -32,6 +32,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
 
     @Published private(set) var coordinates: Coordinates = ObserverLocation.fallback
     @Published private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published private(set) var isLocating = false
 
     private let manager = CLLocationManager()
     private var refreshTimer: Timer?
@@ -53,8 +54,10 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         authorizationStatus = manager.authorizationStatus
         switch manager.authorizationStatus {
         case .notDetermined:
+            isLocating = true
             manager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
+            isLocating = true
             manager.requestLocation()
         default:
             break // 保持 fallback
@@ -64,6 +67,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
 
     /// 与天空会话同生命周期：页面覆盖、App 失活或进入后台时不再请求定位。
     func stop() {
+        isLocating = false
         refreshTimer?.invalidate()
         refreshTimer = nil
     }
@@ -72,9 +76,11 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
         authorizationStatus = manager.authorizationStatus
         if manager.authorizationStatus == .authorizedWhenInUse
             || manager.authorizationStatus == .authorizedAlways {
+            isLocating = true
             manager.requestLocation()
         } else if manager.authorizationStatus == .denied
                     || manager.authorizationStatus == .restricted {
+            isLocating = false
             // 撤销权限后立即停止沿用上一份真实坐标。界面与轨道引擎会同步回到
             // 明确标注的上海假定坐标，和应用内隐私说明保持一致。
             coordinates = Self.fallback
@@ -82,6 +88,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        isLocating = false
         guard let loc = Self.bestUsableLocation(from: locations, now: Date()) else { return }
         coordinates = Coordinates(
             latitude: loc.coordinate.latitude,
@@ -119,7 +126,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // 保持 fallback，不打扰用户
+        isLocating = false
     }
 
     private func startRefreshTimerIfNeeded() {
@@ -131,6 +138,7 @@ final class ObserverLocation: NSObject, ObservableObject, CLLocationManagerDeleg
             guard let self else { return }
             let status = self.manager.authorizationStatus
             guard status == .authorizedWhenInUse || status == .authorizedAlways else { return }
+            self.isLocating = true
             self.manager.requestLocation()
         }
     }

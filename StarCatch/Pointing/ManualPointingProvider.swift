@@ -18,6 +18,14 @@ final class ManualPointingProvider: PointingProvider {
     func start() {}
     func stop() { decayTimer?.invalidate() }
 
+    /// A reset also cancels momentum so the next tick cannot move away again.
+    func reset(to reference: Pointing) {
+        decayTimer?.invalidate()
+        decayTimer = nil
+        velocity = .zero
+        pointing = reference
+    }
+
     #if DEBUG
     /// Deterministic simulator aim used by visual regression launch arguments.
     func focusForPreview(azimuth: Double, elevation: Double) {
@@ -74,8 +82,9 @@ final class ManualPointingProvider: PointingProvider {
         p.elevation += Double(dy) * radiansPerPoint
         p.elevation = max(-0.2, min(.pi / 2, p.elevation))
         // 方位角回绕
-        if p.azimuth > .pi { p.azimuth -= 2 * .pi }
-        if p.azimuth < -.pi { p.azimuth += 2 * .pi }
+        p.azimuth = (p.azimuth + .pi).truncatingRemainder(dividingBy: 2 * .pi)
+        if p.azimuth < 0 { p.azimuth += 2 * .pi }
+        p.azimuth -= .pi
         pointing = p
     }
 }

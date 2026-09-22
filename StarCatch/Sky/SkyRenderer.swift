@@ -9,7 +9,8 @@ enum SkyRenderer {
         _ context: GraphicsContext,
         dust: StarDust,
         size: CGSize,
-        transform: StarDust.SkyTransform = .identity
+        transform: StarDust.SkyTransform = .identity,
+        quietObservation: Bool = false
     ) {
         let center = CGPoint(x: size.width / 2, y: size.height / 2)
         let quietRadiusSquared: CGFloat = 55 * 55
@@ -56,13 +57,13 @@ enum SkyRenderer {
                 stellarSpikes.addLine(to: CGPoint(x: p.x, y: p.y + spike))
             }
         }
-        context.fill(faintStars, with: .color(Palette.dust.opacity(0.3)))
-        context.fill(neutralStars, with: .color(Palette.inkFaint.opacity(0.46)))
-        context.fill(coolStars, with: .color(Palette.inkHigh.opacity(0.55)))
-        context.fill(warmStars, with: .color(Palette.signal.opacity(0.38)))
+        context.fill(faintStars, with: .color(Palette.dust.opacity(quietObservation ? 0.20 : 0.3)))
+        context.fill(neutralStars, with: .color(Palette.inkFaint.opacity(quietObservation ? 0.24 : 0.46)))
+        context.fill(coolStars, with: .color(Palette.inkHigh.opacity(quietObservation ? 0.16 : 0.55)))
+        context.fill(warmStars, with: .color(quietObservation ? Palette.inkLow.opacity(0.18) : Palette.signal.opacity(0.38)))
         context.stroke(
             stellarSpikes,
-            with: .color(Palette.inkLow.opacity(0.23)),
+            with: .color(Palette.inkLow.opacity(quietObservation ? 0.10 : 0.23)),
             style: StrokeStyle(lineWidth: 0.35, lineCap: .round)
         )
     }

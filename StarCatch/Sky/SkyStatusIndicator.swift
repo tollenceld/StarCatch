@@ -263,29 +263,24 @@ struct SkyStatusIndicator: View {
         case focusing
         case locked(identifier: String, confirmedAt: Date?)
         case field(timeLabel: String)
-        case degraded(reason: String)
+        case degraded(reason: SkyObservationIssue)
 
         func label(at date: Date) -> String {
             switch self {
             case .observing: L10n.text("sky.status.observing")
             case .sensing: L10n.text("sky.status.sensing")
             case .focusing: L10n.text("sky.status.focusing")
-            case .locked(let identifier, let confirmedAt):
-                if let confirmedAt,
-                   date.timeIntervalSince(confirmedAt) < Motion.lockStatusHoldDuration {
-                    L10n.text("sky.status.locked")
-                } else {
-                    identifier
-                }
+            case .locked: L10n.text("sky.status.locked")
             case .field: L10n.text("sky.status.global")
-            case .degraded: L10n.text("sky.status.degraded")
+            case .degraded(let reason): reason.shortLabel
             }
         }
 
         var fullLabel: String {
             switch self {
             case .field(let timeLabel): timeLabel
-            case .degraded(let reason): reason
+            case .degraded(let reason): reason.fullLabel
+            case .locked(let identifier, _): "\(L10n.text("sky.status.locked")) · \(identifier)"
             default: label(at: Date())
             }
         }
@@ -463,10 +458,13 @@ struct SkyStatusIndicator: View {
 
                 Text(label)
                     .font(Typography.statusTag)
+                    // Fixed island wings keep the compact label whole; the
+                    // expanded status and VoiceOver retain its full explanation.
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .tracking(0.7)
                     .foregroundStyle(Palette.inkMid.opacity(0.88))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .minimumScaleFactor(0.5)
             }
             .padding(.horizontal, 9)
             .frame(maxWidth: .infinity, minHeight: wingHeight, maxHeight: wingHeight)

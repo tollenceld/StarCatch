@@ -44,7 +44,7 @@ struct GlobalDockMorph: View, Animatable {
             .accessibilityHidden(true)
         }
         .frame(height: height, alignment: .bottom)
-        .modifier(DockSurface())
-        .onPreferenceChange(TimeDialHeightKey.self) { dialHeight = max(64, $0) }
+        .modifier(DockSurface(navigationPresence: 1 - progress))
+        .onPreferenceChange(TimeDialHeightKey.self) { dialHeight = max(AppChromeMetrics.commandRailHeight, $0) }
     }
 }
