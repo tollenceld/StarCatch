@@ -203,6 +203,8 @@ struct SkyOverviewView: View {
     @ObservedObject private var coastlineStore = EarthCoastlineStore.shared
 
     let observation: Date
+    let frameDate: Date
+    let frameUptime: TimeInterval
     let frameTime: TimeInterval
     let motionTime: TimeInterval
     let trails: TrailStore
@@ -216,7 +218,7 @@ struct SkyOverviewView: View {
     let interactive: Bool
     let onInteractionStateChanged: (Bool) -> Void
     var localVerticalFOV: Double = Projection.baseVerticalFOV
-    var returnFrame: ObservationSceneFrame? = nil
+    var returnFrame: ObservationSceneFrame.ReturnSource? = nil
     var returnProgress = 1.0
     var journeyContext: ObservationJourneyContext? = nil
     var returningToSky = false
@@ -241,6 +243,8 @@ struct SkyOverviewView: View {
     @State private var scaleLogarithmicVelocity: Double = 0
     @State private var renderDetailsSettled = true
     @State private var renderRecoveryEvent = 0
+    @State private var renderDetailRecoveryAt: TimeInterval?
+    @State private var journeySettledAt: TimeInterval?
     @State private var observerLabelEmphasized = false
     @State private var observerLabelEvent = 0
     @State private var transientGestureHintVisible = true
@@ -344,15 +348,21 @@ struct SkyOverviewView: View {
                 )
 
                 let baseGeometry = Self.globeGeometry(in: size)
-                let rendered = renderedGeometry(in: size, at: ProcessInfo.processInfo.systemUptime)
+                let rendered = renderedGeometry(in: size, at: frameUptime)
                 let geometry = GlobeGeometry(center: rendered.center, radius: rendered.radius,
                     orientation: journeyGlobePose?.orientation ?? rendered.orientation)
                 let sceneZoom = journeyGlobePose?.zoom ?? zoom
                 let local = 1 - transitionProgress
-                let current = session.sceneFrame(at: returnFrame == nil ? observation : Date(),
+                let current = session.sceneFrame(at: returnFrame == nil ? observation : frameDate,
                     live: returnFrame != nil || clock.isLive, includeLocal: local > 0.65,
                     focusedObjectID: focusedObjectId)
                 let frame = returnFrame.map { current.returning(from: $0, progress: returnProgress) } ?? current
+                let landDetail = ObservationSceneDetail.landPresence(
+                    journeyProgress: transitionProgress, journeySettledAt: journeySettledAt,
+                    interactionSettled: renderDetailsSettled,
+                    interactionRecoveryAt: renderDetailRecoveryAt,
+                    now: frameUptime, returning: returningToSky,
+                    reducedMotion: !transitionMotionEnabled)
                 let pointing = transitionMotionEnabled
                     ? journeyContext?.resolvedPointing(latest: frame.pointing,
                         localProgress: local, returning: returningToSky) ?? frame.pointing
@@ -367,9 +377,12 @@ struct SkyOverviewView: View {
                     verticalFOV: fov)
                 ObservationSceneRenderer.draw(context, camera: camera, frame: frame,
                     landStore: coastlineStore, focusedObjectID: focusedObjectId,
-                    showsObserverCoordinates: observerLabelEmphasized)
+                    showsObserverCoordinates: observerLabelEmphasized, landDetail: landDetail)
                 if transitionProgress > 0.98 {
                     let samples: [RenderSample] = frame.targets.compactMap { target in
+                        guard target.object.isCurated
+                            || target.object.noradId.isMultiple(of: 89)
+                            || target.object.id == focusedObjectId else { return nil }
                         guard let projected = Self.project(orbitalPosition: target.ephemeris.orbitalPosition,
                             center: geometry.center, radius: geometry.radius,
                             orientation: geometry.orientation, zoom: zoom) else { return nil }
@@ -438,6 +451,10 @@ struct SkyOverviewView: View {
             .onChange(of: renderingSimplified) { _, active in
                 onInteractionStateChanged(active)
             }
+            .onChange(of: transitionProgress) { oldProgress, newProgress in
+                if newProgress < 1 { journeySettledAt = nil }
+                else if oldProgress < 1 { journeySettledAt = frameUptime }
+            }
             .task(id: gestureHintsSeen) {
                 guard !gestureHintsSeen else {
                     transientGestureHintVisible = false
@@ -476,10 +493,17 @@ struct SkyOverviewView: View {
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active, interactive { scheduleShowcaseRotationResume() }
-                else { cancelSpatialInertia(); pauseShowcaseRotation() }
+                else {
+                    cancelSpatialInertia()
+                    pauseShowcaseRotation()
+                    renderRecoveryEvent &+= 1
+                    renderDetailRecoveryAt = nil
+                    renderDetailsSettled = true
+                }
             }
             .onDisappear {
                 showcaseResumeEvent &+= 1
+                renderRecoveryEvent &+= 1
                 cancelSpatialInertia()
                 onInteractionStateChanged(false)
             }
@@ -869,6 +893,7 @@ struct SkyOverviewView: View {
     private func beginRenderInteraction() {
         renderRecoveryEvent &+= 1
         renderDetailsSettled = false
+        renderDetailRecoveryAt = nil
     }
 
     private func recoverRenderDetails(after delay: TimeInterval) {
@@ -882,9 +907,13 @@ struct SkyOverviewView: View {
                   !rotationGestureActive,
                   !spatialInertiaActive
             else { return }
-            withAnimation(.easeOut(duration: 0.18)) {
-                renderDetailsSettled = true
-            }
+            renderDetailRecoveryAt = ProcessInfo.processInfo.systemUptime
+            try? await Task.sleep(for: .milliseconds(180))
+            guard event == renderRecoveryEvent,
+                  !orbitGestureActive, !scaleGestureActive,
+                  !rotationGestureActive, !spatialInertiaActive else { return }
+            renderDetailsSettled = true
+            renderDetailRecoveryAt = nil
         }
     }
 
@@ -1754,7 +1783,8 @@ struct SkyOverviewView: View {
         presence: Double,
         simplified: Bool,
         gridPresence: Double? = nil,
-        camera: ObservationCameraState? = nil
+        camera: ObservationCameraState? = nil,
+        landDetail: Double = 1
     ) {
         let baseRadius = geometry.radius * zoom * Self.earthDisplayRadius
         let baseRect = CGRect(
@@ -1871,7 +1901,8 @@ struct SkyOverviewView: View {
                 siderealRadians: siderealRadians,
                 landDots: landDots,
                 presence: presence,
-                camera: camera
+                camera: camera,
+                detail: landDetail
             )
         }
         context.stroke(
@@ -1989,8 +2020,8 @@ struct SkyOverviewView: View {
     }
 
     /// 大陆在构建期被采样成近似等面积的点阵。Canvas 每帧只旋转预计算的
-    /// 单位球方向并合并为六条 Path；不做多边形判断，也不逐段描摹复杂海岸线。
-    /// 海岸邻近点更小、更亮，内陆点稍大、更安静，兼顾轮廓精度与陆地体量。
+    /// 单位球方向并按层级合并 Path；运动中优先保留海岸，静止时恢复完整点阵。
+    /// 抽样只依赖稳定数组位置与大小类，不会随姿态或时间闪烁。
     private static func drawEarthLandDots(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,
@@ -1998,7 +2029,8 @@ struct SkyOverviewView: View {
         siderealRadians: Double,
         landDots: [EarthLandDot],
         presence: Double,
-        camera: ObservationCameraState? = nil
+        camera: ObservationCameraState? = nil,
+        detail: Double = 1
     ) {
         guard presence > 0.01 else { return }
         let earthRotation = simd_quatd(
@@ -2007,27 +2039,31 @@ struct SkyOverviewView: View {
         )
         let surfaceOrientation = simd_normalize(geometry.orientation * earthRotation)
 
-        var coastal = Path()
-        var coastalRim = Path()
-        var nearCoastal = Path()
-        var nearCoastalRim = Path()
-        var interior = Path()
-        var interiorRim = Path()
+        let detail = min(1, max(0, detail))
+        let fullDetail = detail >= 0.999
+        var corePaths = Array(repeating: Path(), count: 6)
+        var supplementalPaths = Array(repeating: Path(), count: 6)
 
-        for dot in landDots {
+        for (index, dot) in landDots.enumerated() {
+            let essential = fullDetail || landDotIsEssential(index: index, sizeClass: dot.sizeClass)
+            guard essential || detail > 0.001 else { continue }
             let direction = SIMD3(
                 Double(dot.direction.x),
                 Double(dot.direction.y),
                 Double(dot.direction.z)
             )
-            let projected = camera?.projectSurface(earthRotation.act(direction)) ?? Self.projectDirection(
-                direction,
-                displayRadius: Self.earthDisplayRadius,
-                center: geometry.center,
-                radius: geometry.radius,
-                orientation: surfaceOrientation,
-                zoom: zoom
-            )
+            let projected: Projected3D
+            if let camera, camera.localProgress > 0 {
+                projected = camera.projectSurface(earthRotation.act(direction))
+            } else {
+                // At the global endpoint the shared camera is exactly orthographic.
+                // Skip the projective camera's normalization, angle and depth work
+                // for every land dot while keeping identical endpoint geometry.
+                projected = Self.projectDirection(direction,
+                    displayRadius: Self.earthDisplayRadius,
+                    center: geometry.center, radius: geometry.radius,
+                    orientation: surfaceOrientation, zoom: zoom)
+            }
             guard projected.depth >= 0.012 else { continue }
             let nearHorizon = projected.depth < Self.earthDisplayRadius * 0.24
             let diameter = Self.landDotDiameter(
@@ -2041,40 +2077,36 @@ struct SkyOverviewView: View {
                 width: diameter,
                 height: diameter
             )
-            switch (dot.sizeClass, nearHorizon) {
-            case (0, false): coastal.addEllipse(in: rect)
-            case (0, true): coastalRim.addEllipse(in: rect)
-            case (1, false): nearCoastal.addEllipse(in: rect)
-            case (1, true): nearCoastalRim.addEllipse(in: rect)
-            case (_, false): interior.addEllipse(in: rect)
-            case (_, true): interiorRim.addEllipse(in: rect)
-            }
+            let bucket = min(2, Int(dot.sizeClass)) * 2 + (nearHorizon ? 1 : 0)
+            if essential { corePaths[bucket].addEllipse(in: rect) }
+            else { supplementalPaths[bucket].addEllipse(in: rect) }
         }
 
-        context.fill(
-            interior,
-            with: .color(Palette.observationTint.opacity(0.25 * presence))
-        )
-        context.fill(
-            interiorRim,
-            with: .color(Palette.observationTint.opacity(0.1 * presence))
-        )
-        context.fill(
-            nearCoastal,
-            with: .color(Palette.observationTint.opacity(0.34 * presence))
-        )
-        context.fill(
-            nearCoastalRim,
-            with: .color(Palette.observationTint.opacity(0.15 * presence))
-        )
-        context.fill(
-            coastal,
-            with: .color(Palette.inkHigh.opacity(0.62 * presence))
-        )
-        context.fill(
-            coastalRim,
-            with: .color(Palette.inkHigh.opacity(0.22 * presence))
-        )
+        for bucket in [4, 5, 2, 3, 0, 1] {
+            let color = bucket < 2 ? Palette.inkHigh : Palette.observationTint
+            let alpha: Double = switch bucket {
+            case 0: 0.62
+            case 1: 0.22
+            case 2: 0.34
+            case 3: 0.15
+            case 4: 0.25
+            default: 0.1
+            }
+            context.fill(corePaths[bucket], with: .color(color.opacity(alpha * presence)))
+            if !fullDetail && detail > 0.001 {
+                context.fill(supplementalPaths[bucket],
+                    with: .color(color.opacity(alpha * presence * detail)))
+            }
+        }
+    }
+
+    nonisolated static func landDotIsEssential(index: Int, sizeClass: UInt8) -> Bool {
+        let stride = switch sizeClass {
+        case 0: 2 // The coastline retains the most detail while travelling.
+        case 1: 3
+        default: 4
+        }
+        return index.isMultiple(of: stride)
     }
 
     nonisolated static func landDotDiameter(

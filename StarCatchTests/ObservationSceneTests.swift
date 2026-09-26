@@ -10,6 +10,52 @@ final class ObservationSceneTests: XCTestCase {
     private let size = CGSize(width: 393, height: 852)
     private static let catalog = CatalogStore()
 
+    func testRenderCadenceAndPropagationWaitForSettledCamera() {
+        XCTAssertEqual(ObservationRenderCadence.minimumInterval(
+            reducedMotion: false, motionActive: true), 1.0 / 60.0)
+        XCTAssertEqual(ObservationRenderCadence.minimumInterval(
+            reducedMotion: false, motionActive: false), 1.0 / 30.0)
+        XCTAssertEqual(ObservationRenderCadence.minimumInterval(
+            reducedMotion: true, motionActive: true), 1.0 / 30.0)
+        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
+            reducedMotion: false, approaching: true), 16)
+        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
+            reducedMotion: false, approaching: false), 33)
+        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
+            reducedMotion: true, approaching: true), 33)
+        XCTAssertEqual(SkyPresentationMode.local.settledOverviewPropagation, false)
+        XCTAssertEqual(SkyPresentationMode.global.settledOverviewPropagation, true)
+        for mode in [SkyPresentationMode.previewingGlobal, .enteringGlobal,
+                     .cancellingGlobal, .exitingGlobal] {
+            XCTAssertNil(mode.settledOverviewPropagation)
+        }
+    }
+
+    func testLandDetailHasStableMotionSubsetAndSmoothRecovery() {
+        XCTAssertTrue(SkyOverviewView.landDotIsEssential(index: 6, sizeClass: 0))
+        XCTAssertFalse(SkyOverviewView.landDotIsEssential(index: 7, sizeClass: 0))
+        XCTAssertTrue(SkyOverviewView.landDotIsEssential(index: 6, sizeClass: 1))
+        XCTAssertFalse(SkyOverviewView.landDotIsEssential(index: 7, sizeClass: 1))
+        XCTAssertTrue(SkyOverviewView.landDotIsEssential(index: 8, sizeClass: 2))
+        XCTAssertFalse(SkyOverviewView.landDotIsEssential(index: 9, sizeClass: 2))
+        func detail(_ progress: Double, _ now: Double, settled: Bool = true,
+                    recoveryAt: Double? = nil, returning: Bool = false,
+                    reduced: Bool = false) -> Double {
+            ObservationSceneDetail.landPresence(journeyProgress: progress, journeySettledAt: 10,
+                interactionSettled: settled, interactionRecoveryAt: recoveryAt,
+                now: now, returning: returning, reducedMotion: reduced)
+        }
+        XCTAssertEqual(detail(0.8, 10), 0)
+        XCTAssertEqual(detail(1, 10), 0)
+        XCTAssertEqual(detail(1, 10.09), 0.5, accuracy: 0.001)
+        XCTAssertEqual(detail(1, 10.18), 1)
+        XCTAssertEqual(detail(1, 10.18, settled: false), 0)
+        XCTAssertEqual(detail(1, 10.27, settled: false, recoveryAt: 10.18), 0.5, accuracy: 0.001)
+        XCTAssertEqual(detail(0.92, 10, returning: true), 0.5, accuracy: 0.001)
+        XCTAssertEqual(detail(0.84, 10, returning: true), 0)
+        XCTAssertEqual(detail(0.8, 10, reduced: true), 1)
+    }
+
     func testInteractiveTravelReversesAndSettlesWithoutRestartingProgress() {
         var travel = ScaleJourneyProgress()
         travel.seek(0.72)
@@ -100,7 +146,7 @@ final class ObservationSceneTests: XCTestCase {
         }
     }
 
-    func testGlobalEndpointMatchesExistingProjectionAtArbitraryOrientationAndZoom() {
+    func testGlobalEndpointMatchesExistingProjectionAtArbitraryOrientationAndZoom() throws {
         let geometry = SkyOverviewView.GlobeGeometry(center: CGPoint(x: 180, y: 360), radius: 210,
             orientation: SkyOverviewView.orientation(yaw: 1.2, pitch: -0.7, roll: 0.3))
         let camera = ObservationCameraState(size: size, geometry: geometry, zoom: 1.26, localProgress: 0,
@@ -113,8 +159,25 @@ final class ObservationSceneTests: XCTestCase {
                 let new = camera.project(position)!
                 XCTAssertEqual(new.point.x, old.point.x, accuracy: 0.000001)
                 XCTAssertEqual(new.point.y, old.point.y, accuracy: 0.000001)
+                let ephemeris = Ephemeris(objectId: "endpoint", azimuth: 0, elevation: 0.5,
+                    rangeKm: 1200, altitudeKm: radius - 6378.137, velocityKmS: 7,
+                    orbitalPosition: position)
+                let fast = try XCTUnwrap(camera.project(ephemeris))
+                XCTAssertEqual(fast.point.x, old.point.x, accuracy: 0.000001)
+                XCTAssertEqual(fast.point.y, old.point.y, accuracy: 0.000001)
+                XCTAssertEqual(fast.depth * SkyOverviewView.earthDisplayRadius,
+                               old.depth, accuracy: 0.000001)
             }
         }
+        let direction = simd_normalize(SIMD3(0.5, -0.3, 0.7))
+        let earthRotation = simd_quatd(angle: camera.sidereal, axis: SIMD3(0, 0, 1))
+        let surface = camera.projectSurface(earthRotation.act(direction))
+        let orthographic = SkyOverviewView.projectDirection(direction,
+            displayRadius: SkyOverviewView.earthDisplayRadius,
+            center: geometry.center, radius: geometry.radius,
+            orientation: geometry.orientation * earthRotation, zoom: 1.26)
+        XCTAssertEqual(surface.point.x, orthographic.point.x, accuracy: 0.000001)
+        XCTAssertEqual(surface.point.y, orthographic.point.y, accuracy: 0.000001)
     }
 
     func testLocalEndpointMatchesSkyForPolesWrapRollAndZenith() {
@@ -320,7 +383,12 @@ final class ObservationSceneTests: XCTestCase {
         }
         XCTAssertTrue(session.ephemeris.hasUsableFrame)
         let global = session.sceneFrame(at: date)
+        let buildCount = session.sceneFrameBuildCount
+        XCTAssertEqual(session.sceneFrame(at: date).targets.count, global.targets.count)
+        XCTAssertEqual(session.sceneFrameBuildCount, buildCount,
+                       "Identical time and ephemeris revision reuse the immutable scene frame")
         let local = session.sceneFrame(at: date, includeLocal: true)
+        XCTAssertEqual(session.sceneFrameBuildCount, buildCount + 1)
         XCTAssertEqual(global.observerVersion, local.observerVersion)
         XCTAssertLessThanOrEqual(global.targets.count, 4600)
         XCTAssertFalse(global.targets.isEmpty)
@@ -339,6 +407,9 @@ final class ObservationSceneTests: XCTestCase {
             try await Task.sleep(for: .milliseconds(10))
         }
         XCTAssertEqual(session.ephemeris.frameObserver, changed)
+        XCTAssertEqual(session.sceneFrame(at: date, includeLocal: true).observerVersion, changed)
+        XCTAssertGreaterThan(session.sceneFrameBuildCount, buildCount + 1,
+                             "Observer and ephemeris revisions invalidate the frame")
         XCTAssertEqual(session.log.entries.count, recordsBefore)
     }
 
@@ -359,12 +430,13 @@ final class ObservationSceneTests: XCTestCase {
         }
         let old = frame(reversed: true, angle: 0)
         let live = frame(reversed: false, angle: .pi)
-        let origin = live.returning(from: old, progress: 0)
+        let indexedSource = ObservationSceneFrame.ReturnSource(old)
+        let origin = live.returning(from: indexedSource, progress: 0)
         XCTAssertEqual(origin.targets.first?.ephemeris.orbitalPosition, old.targets.last?.ephemeris.orbitalPosition)
-        for target in live.returning(from: old, progress: 0.5).targets {
+        for target in live.returning(from: indexedSource, progress: 0.5).targets {
             XCTAssertEqual(simd_length(target.ephemeris.orbitalPosition), 6900, accuracy: 0.001)
         }
-        XCTAssertEqual(live.returning(from: old, progress: 1).targets.first?.ephemeris.orbitalPosition,
+        XCTAssertEqual(live.returning(from: indexedSource, progress: 1).targets.first?.ephemeris.orbitalPosition,
                        live.targets.first?.ephemeris.orbitalPosition)
     }
 

@@ -114,7 +114,9 @@ struct ObservationEstablishmentField: View {
             ObservationSceneRenderer.drawBackground(context, size: size, pointing: camera.pointing,
                 presence: ObservationSceneMath.ease((establishment.elapsed - 0.4) / 0.9))
             ObservationSceneRenderer.draw(context, camera: camera, frame: frame,
-                reveal: establishment.reveal, landStore: coastlines)
+                reveal: establishment.reveal, landStore: coastlines,
+                landDetail: establishment.reducedMotion ? 1
+                    : 1 - ObservationSceneMath.ease(establishment.localProgress / 0.08))
         }
         .onAppear { coastlines.prepare() }
         .accessibilityHidden(true)

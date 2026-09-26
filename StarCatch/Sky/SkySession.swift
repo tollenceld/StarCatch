@@ -29,30 +29,79 @@ final class SkySession: ObservableObject {
     @Published private(set) var overviewTrailObjects: [CatalogObject] = []
     private var overviewPropagationActive = false
     private var overviewIDs: Set<String> = []
-    private var revealOrders: [String: Double] = [:]
+    private var displayIDs: Set<String> = []
+    private struct SceneTargetIdentity {
+        let object: CatalogObject
+        let isOverview: Bool
+        let revealOrder: Double
+    }
+    private var overviewSceneIdentities: [SceneTargetIdentity] = []
+    private var localSceneIdentities: [SceneTargetIdentity] = []
+    private var sceneIdentityRevision: UInt = 0
+    private struct SceneFrameKey: Equatable {
+        let date: Date
+        let live: Bool
+        let includeLocal: Bool
+        let focusedObjectID: String?
+        let ephemerisRevision: UInt
+        let identityRevision: UInt
+        let observer: ObserverLocation.Coordinates
+        let pointing: Pointing
+    }
+    private var cachedSceneFrame: (key: SceneFrameKey, frame: ObservationSceneFrame)?
+    #if DEBUG
+    private(set) var sceneFrameBuildCount = 0
+    #endif
 
     func sceneFrame(at date: Date, live: Bool = true, includeLocal: Bool = false,
                     focusedObjectID: String? = nil) -> ObservationSceneFrame {
-        var objects = includeLocal ? displayObjects : overviewObjects
-        if let focusedObjectID, !objects.contains(where: { $0.id == focusedObjectID }),
-           let focused = catalog.objectsByID[focusedObjectID] { objects.append(focused) }
-        let targets = objects.compactMap { object -> ObservationSceneFrame.Target? in
-            guard let ephemeris = ephemeris.cachedEphemeris(object.id, at: date, live: live) else { return nil }
-            return ObservationSceneFrame.Target(object: object, ephemeris: ephemeris,
-                isOverview: overviewIDs.contains(object.id) || object.id == focusedObjectID,
-                revealOrder: revealOrders[object.id] ?? 0)
+        let frameObserver = ephemeris.frameObserver ?? observer.coordinates
+        let key = SceneFrameKey(date: date, live: live, includeLocal: includeLocal,
+            focusedObjectID: focusedObjectID, ephemerisRevision: ephemeris.frameRevision,
+            identityRevision: sceneIdentityRevision, observer: frameObserver, pointing: pointing)
+        if let cachedSceneFrame, cachedSceneFrame.key == key { return cachedSceneFrame.frame }
+        let identities = includeLocal ? localSceneIdentities : overviewSceneIdentities
+        var targets: [ObservationSceneFrame.Target] = []
+        targets.reserveCapacity(identities.count + (focusedObjectID == nil ? 0 : 1))
+        for identity in identities {
+            guard let sample = ephemeris.cachedEphemeris(identity.object.id, at: date, live: live) else { continue }
+            targets.append(.init(object: identity.object, ephemeris: sample,
+                isOverview: identity.isOverview, revealOrder: identity.revealOrder))
         }
-        return ObservationSceneFrame(observation: date, observer: ephemeris.frameObserver ?? observer.coordinates,
-                                     pointing: pointing, targets: targets)
+        if let focusedObjectID,
+           !(includeLocal ? displayIDs : overviewIDs).contains(focusedObjectID),
+           let focused = catalog.objectsByID[focusedObjectID],
+           let sample = ephemeris.cachedEphemeris(focusedObjectID, at: date, live: live) {
+            targets.append(.init(object: focused, ephemeris: sample,
+                isOverview: true, revealOrder: 0))
+        }
+        let frame = ObservationSceneFrame(observation: date, observer: frameObserver,
+                                          pointing: pointing, targets: targets)
+        cachedSceneFrame = (key, frame)
+        #if DEBUG
+        sceneFrameBuildCount += 1
+        #endif
+        return frame
     }
 
     private func prepareSceneIdentity() {
+        sceneIdentityRevision &+= 1
+        cachedSceneFrame = nil
         overviewIDs = Set(overviewObjects.map(\.id))
-        revealOrders = Dictionary(uniqueKeysWithValues: displayObjects.map { object in
+        displayIDs = Set(displayObjects.map(\.id))
+        let revealOrders = Dictionary(uniqueKeysWithValues: displayObjects.map { object in
             // Inclination groups are a stable reveal order, never a substitute orbit.
             let group = min(5, max(0, floor(object.orbitFingerprint.inclinationDegrees / 30)))
             return (object.id, (group + ObservationSceneMath.revealOrder(object.id)) / 6)
         })
+        overviewSceneIdentities = overviewObjects.map { object in
+            SceneTargetIdentity(object: object, isOverview: true,
+                revealOrder: revealOrders[object.id] ?? 0)
+        }
+        localSceneIdentities = displayObjects.map { object in
+            SceneTargetIdentity(object: object, isOverview: overviewIDs.contains(object.id),
+                revealOrder: revealOrders[object.id] ?? 0)
+        }
     }
 
     /// TLE 快照龄期（天）—— 档案层的 EPOCH AGE 字段。
@@ -266,6 +315,8 @@ final class SkySession: ObservableObject {
     func setOverviewPropagationActive(_ active: Bool) {
         guard overviewPropagationActive != active else { return }
         overviewPropagationActive = active
+        sceneIdentityRevision &+= 1
+        cachedSceneFrame = nil
         ephemeris.setPropagationObjects(active ? overviewObjects : displayObjects)
     }
 

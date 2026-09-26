@@ -424,7 +424,11 @@ struct RootView: View {
                 stage = .sky
                 return
             }
-            do { try await Task.sleep(for: .milliseconds(33)) }
+            // The establishment camera travels at 60fps; elapsed time remains
+            // monotonic so a delayed tick never stretches the journey itself.
+            do { try await Task.sleep(for: .milliseconds(
+                ObservationRenderCadence.establishmentTickMilliseconds(
+                    reducedMotion: suppressMotion, approaching: establishment.localProgress > 0))) }
             catch { return }
         }
     }

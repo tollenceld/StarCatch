@@ -107,6 +107,24 @@ enum SkyPresentationMode: Equatable {
         self != .local && self != .global
     }
     var ownsGlobalInteraction: Bool { self == .global }
+    /// Keep the current ephemeris job alive until the camera reaches either endpoint.
+    var settledOverviewPropagation: Bool? {
+        switch self {
+        case .local: false
+        case .global: true
+        case .previewingGlobal, .cancellingGlobal, .enteringGlobal, .exitingGlobal: nil
+        }
+    }
+}
+
+enum ObservationRenderCadence {
+    static func minimumInterval(reducedMotion: Bool, motionActive: Bool) -> TimeInterval {
+        !reducedMotion && motionActive ? 1.0 / 60.0 : 1.0 / 30.0
+    }
+
+    static func establishmentTickMilliseconds(reducedMotion: Bool, approaching: Bool) -> Int {
+        !reducedMotion && approaching ? 16 : 33
+    }
 }
 
 enum ScaleJourneyPolicy {

@@ -17,14 +17,27 @@ struct ObservationSceneFrame {
     /// The coordinate value is the revision token, including measuredAt and accuracy.
     var observerVersion: ObserverLocation.Coordinates { observer }
 
+    /// Build the historical lookup once when the return starts, not on every Canvas frame.
+    struct ReturnSource {
+        let frame: ObservationSceneFrame
+        let targetIndexByID: [String: Int]
+
+        init(_ frame: ObservationSceneFrame) {
+            self.frame = frame
+            targetIndexByID = Dictionary(uniqueKeysWithValues: frame.targets.enumerated().map {
+                ($0.element.object.id, $0.offset)
+            })
+        }
+    }
+
     /// Historical return is a presentation interpolation between two real snapshots.
     /// Match by ID, not array order; keep orbital radii outside Earth on long returns.
-    func returning(from source: Self, progress: Double) -> Self {
+    func returning(from source: ReturnSource, progress: Double) -> Self {
         let p = ObservationSceneMath.ease(progress)
         guard p < 1 else { return self }
-        let previous = Dictionary(uniqueKeysWithValues: source.targets.map { ($0.object.id, $0) })
         let blended = targets.map { target -> Target in
-            guard let old = previous[target.object.id] else { return target }
+            guard let index = source.targetIndexByID[target.object.id] else { return target }
+            let old = source.frame.targets[index]
             var eph = target.ephemeris
             let a = old.ephemeris.orbitalPosition, b = eph.orbitalPosition
             let ar = simd_length(a), br = simd_length(b)
@@ -39,7 +52,7 @@ struct ObservationSceneFrame {
             eph.rangeKm = old.ephemeris.rangeKm + (eph.rangeKm - old.ephemeris.rangeKm) * p
             return Target(object: target.object, ephemeris: eph, isOverview: target.isOverview, revealOrder: target.revealOrder)
         }
-        return Self(observation: source.observation.addingTimeInterval(observation.timeIntervalSince(source.observation) * p),
+        return Self(observation: source.frame.observation.addingTimeInterval(observation.timeIntervalSince(source.frame.observation) * p),
                     observer: observer, pointing: pointing, targets: blended)
     }
 }
@@ -117,6 +130,24 @@ enum ObservationSceneMath {
     }
 }
 
+enum ObservationSceneDetail {
+    static func landPresence(journeyProgress: Double, journeySettledAt: TimeInterval?,
+                             interactionSettled: Bool, interactionRecoveryAt: TimeInterval?,
+                             now: TimeInterval, returning: Bool, reducedMotion: Bool) -> Double {
+        if reducedMotion { return 1 }
+        let journey: Double
+        if journeyProgress < 1 {
+            journey = returning ? ObservationSceneMath.ease((journeyProgress - 0.84) / 0.16) : 0
+        } else {
+            journey = journeySettledAt.map { ObservationSceneMath.ease((now - $0) / 0.18) } ?? 1
+        }
+        let interaction = interactionSettled ? 1 : interactionRecoveryAt.map {
+            ObservationSceneMath.ease((now - $0) / 0.18)
+        } ?? 0
+        return min(journey, interaction)
+    }
+}
+
 /// A continuous world-to-camera transform. Global units use the existing
 /// compressed shells; the local endpoint is the ENU camera used by Projection.
 /// Projection is homogeneous throughout (no interpolation of screen positions).
@@ -126,6 +157,8 @@ struct ObservationCameraState {
         let depth: Double
         let visibility: Double
     }
+    private static let fadeStartTangentSquared = pow(tan(Projection.fadeStart), 2)
+    private static let fadeEndTangentSquared = pow(tan(Projection.fadeEnd), 2)
     let size: CGSize
     let geometry: SkyOverviewView.GlobeGeometry
     let zoom: CGFloat
@@ -147,6 +180,8 @@ struct ObservationCameraState {
     private let projectionScale: Double
     private let projectionCenter: CGPoint
     private let cameraDistance: Double
+    private let observerShift: SIMD3<Double>
+    private let nearPlane: Double
     let surfaceSphereRadius: Double
     var eyeRadius: Double { simd_length(eye) }
 
@@ -171,6 +206,9 @@ struct ObservationCameraState {
                           geodetic: LatLonAlt(observer.latitude, observer.longitude, observer.altitudeMeters / 1000))
         observerPosition = SIMD3(site.x, site.y, site.z)
         travel = ObservationSceneMath.ease((self.localProgress - 0.22) / 0.78)
+        observerShift = observerPosition / 6378.137 * travel
+        nearPlane = 0.000001 + 0.015 *
+            (1 - ObservationSceneMath.ease((self.localProgress - 0.75) / 0.25))
         pixelScale = Double(size.height) / 2 / tan(verticalFOV / 2)
         localMagnification = CGFloat(tan(Projection.baseVerticalFOV / 2) / tan(verticalFOV / 2))
 
@@ -194,7 +232,7 @@ struct ObservationCameraState {
         cameraOrientation = simd_slerp(aligned, localOrientation, ObservationSceneMath.ease((self.localProgress - 0.42) / 0.58))
         cameraOffset = cameraOrientation.act(approachAxis)
         cameraDistance = travel > 0.000001 ? (1 - travel) / travel : 0
-        eye = observerPosition / 6378.137 * travel + approachAxis * ((1 - travel) / max(0.000001, travel))
+        eye = observerShift + approachAxis * ((1 - travel) / max(0.000001, travel))
         // Match the local WGS84 surface at arrival, rather than flying below a
         // fixed equatorial sphere at higher latitudes. Global geometry is unchanged.
         let sea = geo2eci(julianDays: observation.julianDate,
@@ -212,11 +250,10 @@ struct ObservationCameraState {
         let globalRadius = surface ? 1 : ObservationSceneMath.displayRadius(radius) / SkyOverviewView.earthDisplayRadius
         let worldRadius = surface ? surfaceSphereRadius : globalRadius + (radius / 6378.137 - globalRadius) * travel
         let world = position / radius * worldRadius
-        let camera = cameraOrientation.act(world - observerPosition / 6378.137 * travel)
+        let camera = cameraOrientation.act(world - observerShift)
         let offset = cameraOffset
         let denominator = (1 - travel) * offset.z - travel * camera.z
-        let near = 0.000001 + 0.015 * (1 - ObservationSceneMath.ease((localProgress - 0.75) / 0.25))
-        guard denominator > near else { return nil }
+        guard denominator > nearPlane else { return nil }
         let scale = projectionScale
         let center = projectionCenter
         let distance = cameraDistance
@@ -225,8 +262,19 @@ struct ObservationCameraState {
         let point = CGPoint(x: center.x + x * scale / denominator,
                             y: center.y - y * scale / denominator)
         guard point.x.isFinite, point.y.isFinite else { return nil }
-        let angle = atan2(hypot(x, y), denominator / max(travel, 0.000001))
-        let localVisibility = 1 - min(1, max(0, (angle - Projection.fadeStart) / (Projection.fadeEnd - Projection.fadeStart)))
+        let axial = denominator / max(travel, 0.000001)
+        let radialSquared = x * x + y * y
+        let axialSquared = axial * axial
+        let localVisibility: Double
+        if radialSquared <= axialSquared * Self.fadeStartTangentSquared {
+            localVisibility = 1
+        } else if radialSquared >= axialSquared * Self.fadeEndTangentSquared {
+            localVisibility = 0
+        } else {
+            let angle = atan2(sqrt(radialSquared), axial)
+            localVisibility = 1 - (angle - Projection.fadeStart) /
+                (Projection.fadeEnd - Projection.fadeStart)
+        }
         if localProgress == 1, localVisibility <= 0 { return nil }
         let eyeDirection = travel > 0.000001 ? simd_normalize(eye - world) : approachAxis
         let normalDepth = simd_dot(world, eyeDirection)
@@ -292,13 +340,28 @@ struct ObservationCameraState {
     }
 
     func project(_ ephemeris: Ephemeris) -> Sample? {
+        if localProgress == 0,
+           let global = SkyOverviewView.project(
+                orbitalPosition: ephemeris.orbitalPosition,
+                center: geometry.center, radius: geometry.radius,
+                orientation: geometry.orientation, zoom: zoom) {
+            return Sample(point: global.point,
+                          depth: global.depth / SkyOverviewView.earthDisplayRadius,
+                          visibility: 1)
+        }
         // Cached angles and ECI are interpolated independently by the engine.
         // Gradually reconcile that tiny difference in world space before arrival.
-        let enu = SIMD3(cos(ephemeris.elevation) * sin(ephemeris.azimuth),
-                        cos(ephemeris.elevation) * cos(ephemeris.azimuth), sin(ephemeris.elevation))
-        let reconstructed = observerPosition + (east * enu.x + north * enu.y + up * enu.z) * ephemeris.rangeKm
         let correction = ObservationSceneMath.ease((localProgress - 0.65) / 0.35)
-        let position = ephemeris.orbitalPosition * (1 - correction) + reconstructed * correction
+        let position: SIMD3<Double>
+        if correction == 0 {
+            position = ephemeris.orbitalPosition
+        } else {
+            let enu = SIMD3(cos(ephemeris.elevation) * sin(ephemeris.azimuth),
+                            cos(ephemeris.elevation) * cos(ephemeris.azimuth), sin(ephemeris.elevation))
+            let reconstructed = observerPosition +
+                (east * enu.x + north * enu.y + up * enu.z) * ephemeris.rangeKm
+            position = ephemeris.orbitalPosition * (1 - correction) + reconstructed * correction
+        }
         guard let sample = project(position) else { return nil }
         let horizon = ephemeris.elevation > 0 ? 1.0 : 1 - ObservationSceneMath.ease((localProgress - 0.7) / 0.25)
         return Sample(point: sample.point, depth: sample.depth, visibility: sample.visibility * horizon)
@@ -337,53 +400,60 @@ enum ObservationSceneRenderer {
     static func draw(_ context: GraphicsContext, camera: ObservationCameraState,
                      frame: ObservationSceneFrame, reveal: ObservationSceneReveal = .complete,
                      landStore: EarthCoastlineStore, focusedObjectID: String? = nil,
-                     showsObserverCoordinates: Bool = false) {
+                     showsObserverCoordinates: Bool = false, landDetail: Double = 1) {
         let local = camera.localProgress
         let surfacePresence = 1 - ObservationSceneMath.ease((local - 0.68) / 0.27)
         let localStyle = ObservationSceneMath.ease((local - 0.55) / 0.40)
         let wide = ObservationScale.wideFieldProgress(magnification: camera.localMagnification)
         let pointScale = CGFloat(1 - 0.28 * wide)
         let pointOpacity = 1 - 0.14 * wide
-        let globeSamples = frame.targets.compactMap { target -> (ObservationSceneFrame.Target, ObservationCameraState.Sample)? in
+        var rearShells = Array(repeating: [SkyOverviewView.Projected3D](), count: 8)
+        var frontShells = Array(repeating: [SkyOverviewView.Projected3D](), count: 8)
+        var categoryTiers: [CatalogCategory: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]] = [:]
+        var familyTiers: [CatalogFamily: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]] = [:]
+        var focusedFamily: CatalogFamily?
+        for target in frame.targets {
+            if target.object.id == focusedObjectID { focusedFamily = target.object.family }
             guard target.isOverview || local > 0.65,
-                  let point = camera.project(target.ephemeris) else { return nil }
-            return (target, point)
-        }
-        func drawPoints(front: Bool) {
-            var shells = Array(repeating: [SkyOverviewView.Projected3D](), count: 8)
-            var categoryTiers: [CatalogCategory: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]] = [:]
-            var familyTiers: [CatalogFamily: [SkyRenderer.StarMagnitude: [SkyRenderer.SatellitePoint]]] = [:]
-            for (target, projected) in globeSamples {
-                guard (projected.depth >= 0) == front else { continue }
-                let arrival = ObservationSceneMath.ease((reveal.satellites * 1.25 - target.revealOrder) / 0.25)
-                let additional = target.isOverview ? 1 : ObservationSceneMath.ease((local - 0.65) / 0.3)
-                let alpha = arrival * additional * projected.visibility
-                guard alpha > 0.01 else { continue }
-                let bucket = min(7, max(0, Int(alpha * 7)))
-                shells[bucket].append(.init(point: projected.point,
-                    depth: projected.depth * SkyOverviewView.earthDisplayRadius,
-                    displayRadius: ObservationSceneMath.displayRadius(simd_length(target.ephemeris.orbitalPosition))))
-                if front, localStyle > 0, target.ephemeris.elevation > 0,
-                   alpha > 0.5 {
-                    let magnitude = StarMagnitudeScale.magnitude(rangeKm: target.ephemeris.rangeKm,
-                        elevation: target.ephemeris.elevation, isCurated: target.object.isCurated || target.object.isFeatured)
-                    let point = SkyRenderer.SatellitePoint(point: projected.point, seed: target.object.noradId,
-                                                          signature: SkyRenderer.satelliteSignature(for: target.object))
-                    if let family = target.object.family { familyTiers[family, default: [:]][magnitude, default: []].append(point) }
-                    else { categoryTiers[target.object.category, default: [:]][magnitude, default: []].append(point) }
+                  let projected = camera.project(target.ephemeris) else { continue }
+            let arrival = ObservationSceneMath.ease((reveal.satellites * 1.25 - target.revealOrder) / 0.25)
+            let additional = target.isOverview ? 1 : ObservationSceneMath.ease((local - 0.65) / 0.3)
+            let alpha = arrival * additional * projected.visibility
+            guard alpha > 0.01 else { continue }
+            let bucket = min(7, max(0, Int(alpha * 7)))
+            let sample = SkyOverviewView.Projected3D(point: projected.point,
+                depth: projected.depth * SkyOverviewView.earthDisplayRadius,
+                displayRadius: ObservationSceneMath.displayRadius(simd_length(target.ephemeris.orbitalPosition)))
+            let front = projected.depth >= 0
+            if front { frontShells[bucket].append(sample) }
+            else { rearShells[bucket].append(sample) }
+            if front, localStyle > 0, target.ephemeris.elevation > 0, alpha > 0.5 {
+                let magnitude = StarMagnitudeScale.magnitude(rangeKm: target.ephemeris.rangeKm,
+                    elevation: target.ephemeris.elevation,
+                    isCurated: target.object.isCurated || target.object.isFeatured)
+                let point = SkyRenderer.SatellitePoint(point: projected.point, seed: target.object.noradId,
+                    signature: SkyRenderer.satelliteSignature(for: target.object))
+                if let family = target.object.family {
+                    familyTiers[family, default: [:]][magnitude, default: []].append(point)
+                } else {
+                    categoryTiers[target.object.category, default: [:]][magnitude, default: []].append(point)
                 }
             }
+        }
+        func drawPoints(front: Bool) {
+            let shells = front ? frontShells : rearShells
             for index in shells.indices where !shells[index].isEmpty {
                 SkyOverviewView.drawGlobeSatelliteField(context, projected: shells[index],
                     geometry: camera.geometry, zoom: camera.zoom, front: front, simplified: false,
                     emphasis: Double(index) / 7 * (1 - localStyle))
             }
+            guard front else { return }
             for (category, tiers) in categoryTiers {
                 SkyRenderer.drawStarField(context, tiers: tiers, tint: category.tint,
                     opacity: localStyle * pointOpacity, visualScale: pointScale)
             }
             for (family, tiers) in familyTiers {
-                let emphasized = frame.targets.first { $0.object.id == focusedObjectID }?.object.family == family
+                let emphasized = focusedFamily == family
                 SkyRenderer.drawStarField(context, tiers: tiers, tint: family.tint,
                     opacity: localStyle * pointOpacity * (emphasized ? 0.70 : 0.62),
                     emphasis: emphasized ? 0.94 : 0.86, visualScale: pointScale)
@@ -391,7 +461,8 @@ enum ObservationSceneRenderer {
         }
 
         drawPoints(front: false)
-        drawSurface(context, camera: camera, reveal: reveal, presence: surfacePresence, store: landStore)
+        drawSurface(context, camera: camera, reveal: reveal, presence: surfacePresence,
+            store: landStore, landDetail: landDetail)
         for (index, guide) in guides.enumerated() {
             let presence = ObservationSceneMath.ease(reveal.orbits * 1.5 - Double(index) * 0.1) * surfacePresence
             stroke(context, points: guide.compactMap { camera.project($0) },
@@ -411,14 +482,16 @@ enum ObservationSceneRenderer {
     }
 
     private static func drawSurface(_ context: GraphicsContext, camera: ObservationCameraState,
-                                    reveal: ObservationSceneReveal, presence: Double, store: EarthCoastlineStore) {
+                                    reveal: ObservationSceneReveal, presence: Double,
+                                    store: EarthCoastlineStore, landDetail: Double) {
         guard presence > 0.001, reveal.limb > 0 else { return }
         var surface = context
         surface.opacity = reveal.limb * presence
         SkyOverviewView.drawGlobeSurface(surface, geometry: camera.geometry, zoom: camera.zoom,
             siderealRadians: camera.sidereal, landDots: store.landDots, detailedCoastlines: store.coastlines,
-            fallbackCoastlines: SkyOverviewView.coastlineSamples, presence: reveal.land, simplified: false,
-            gridPresence: reveal.grid, camera: camera)
+            fallbackCoastlines: SkyOverviewView.coastlineSamples, presence: reveal.land,
+            simplified: landDetail < 0.99, gridPresence: reveal.grid, camera: camera,
+            landDetail: landDetail)
     }
 
     static func drawObserver(_ context: GraphicsContext, camera: ObservationCameraState,

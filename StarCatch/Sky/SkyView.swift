@@ -3,7 +3,7 @@ import SwiftUI
 import UIKit
 #endif
 
-/// 主渲染视图：TimelineView + Canvas，30fps。
+/// 主渲染视图：TimelineView + Canvas，转场/交互 60fps，稳定观察 30fps。
 /// 完整层序：星尘 → 拖影 → 轨迹弧 → 点位/刻度环/扫描 → vignette → 锁定信标 → 十字丝 → 微型标签 → 颗粒 shader。
 ///
 /// 两个观测维度：主天空负责指向与自动锁定，全局星图中的 TimeDial 负责选择观测时刻。
@@ -63,7 +63,7 @@ struct SkyView: View {
     @State private var presentationMode: SkyPresentationMode = .local
     @State private var scaleJourney = ScaleJourneyProgress()
     @State private var journeyContext: ObservationJourneyContext?
-    @State private var overviewReturnFrame: ObservationSceneFrame?
+    @State private var overviewReturnFrame: ObservationSceneFrame.ReturnSource?
     @State private var overviewReturnOffset = 0.0
     @State private var overviewEntryPointing: Pointing?
     @State private var overviewCelestialFrame: CelestialViewFrame?
@@ -128,16 +128,19 @@ struct SkyView: View {
 
     private var renderingSurface: some View {
         GeometryReader { geo in
-            TimelineView(.animation(minimumInterval: 1.0 / 30.0,
+            TimelineView(.animation(minimumInterval: ObservationRenderCadence.minimumInterval(
+                reducedMotion: suppressMotion,
+                motionActive: presentationMode.isTransitioning || overviewInteractionActive),
                 paused: renderingSuspended || establishment != nil || scenePhase != .active)) { timeline in
-                let frameDate = frozenFrameDate ?? timeline.date
+                let frameDate = establishment != nil ? Date() : frozenFrameDate ?? timeline.date
+                let frameUptime = ProcessInfo.processInfo.systemUptime
                 let time = frameDate.timeIntervalSince(startDate)
                 let obsTime = clock.observationTime(realNow: frameDate)
 
                 ZStack(alignment: .topLeading) {
                     if let establishment, !establishment.isComplete {
                         ObservationEstablishmentField(establishment: establishment,
-                            frame: session.sceneFrame(at: Date(), includeLocal: establishment.localProgress > 0.65))
+                            frame: session.sceneFrame(at: frameDate, includeLocal: establishment.localProgress > 0.65))
                             .opacity(establishment.reducedMotion ? 1 - establishment.localProgress : 1)
                         if establishment.reducedMotion {
                             canvasLayer(time: time, observation: obsTime).opacity(establishment.localProgress)
@@ -156,7 +159,8 @@ struct SkyView: View {
                             .opacity(establishment?.chromePresence ?? 1)
                             .opacity(localChromePresence)
                     }
-                    timeOverviewLayer(time: time, observation: obsTime)
+                    timeOverviewLayer(time: time, observation: obsTime,
+                        frameDate: frameDate, frameUptime: frameUptime)
                 }
                 .colorEffect(
                     ShaderLibrary.grain(
@@ -169,6 +173,7 @@ struct SkyView: View {
                     updateFrame(
                         at: frameDate,
                         observationTime: obsTime,
+                        frameUptime: frameUptime,
                         viewport: geo.size
                     )
                 }
@@ -391,9 +396,11 @@ struct SkyView: View {
         .onChange(of: presentationMode) { oldMode, newMode in
             dockActivity.restart()
             dismissTransientOverlay()
-            session.setOverviewPropagationActive(
-                newMode.presentsOverview
-            )
+            // Reuse the cached local target set during the camera journey. Switching
+            // propagation here would cancel and relaunch a bulk task mid-transition.
+            if let active = newMode.settledOverviewPropagation {
+                session.setOverviewPropagationActive(active)
+            }
             if newMode == .local {
                 capture.resumeSampling()
                 lastCaptureSample = -.infinity
@@ -438,10 +445,11 @@ struct SkyView: View {
     private func updateFrame(
         at frameDate: Date,
         observationTime: Date,
+        frameUptime: TimeInterval,
         viewport: CGSize
     ) {
         let frameTime = frameDate.timeIntervalSince(startDate)
-        advanceOverviewTransition(at: ProcessInfo.processInfo.systemUptime)
+        advanceOverviewTransition(at: frameUptime)
         if scenePhase == .active, !renderingSuspended, !isUtilityPagePresented,
            presentedStoryObjectID == nil, chromeState.dockMode == .exploration {
             dockActivity.update(
@@ -803,21 +811,19 @@ struct SkyView: View {
         fieldMagnification = ObservationScale.defaultLocalMagnification
         presentationMode = .exitingGlobal
         if !clock.isLive {
-            overviewReturnFrame = session.sceneFrame(at: clock.observationTime(), live: false,
-                                                     focusedObjectID: capture.engagedObjectId)
+            overviewReturnFrame = .init(session.sceneFrame(at: clock.observationTime(), live: false,
+                                                     focusedObjectID: capture.engagedObjectId))
             overviewReturnOffset = abs(clock.offset)
             returnToLiveFromOverview()
         }
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
         scaleJourney.settle(to: 0, reducedMotion: suppressMotion)
-        if clock.isLive { session.setOverviewPropagationActive(false) }
     }
 
     private func advanceOverviewTransition(at uptime: Double) {
         let ready = presentationMode.isTransitioning && presentationMode != .previewingGlobal
             && scenePhase == .active && !renderingSuspended
             && (presentationMode != .exitingGlobal || clock.isLive)
-        if ready, presentationMode == .exitingGlobal { session.setOverviewPropagationActive(false) }
         guard scaleJourney.advance(at: uptime, ready: ready) else { return }
         overviewReturnFrame = nil
         session.observer.releasePresentationHold()
@@ -1406,7 +1412,8 @@ struct SkyView: View {
     }
 
     @ViewBuilder
-    private func timeOverviewLayer(time: TimeInterval, observation: Date) -> some View {
+    private func timeOverviewLayer(time: TimeInterval, observation: Date,
+                                   frameDate: Date, frameUptime: TimeInterval) -> some View {
         if persistentOverviewPresented {
             let progress = overviewPresentationProgress
             let globePresence = ObservationScale.globePresence(
@@ -1416,6 +1423,8 @@ struct SkyView: View {
                 session: session,
                 clock: clock,
                 observation: observation,
+                frameDate: frameDate,
+                frameUptime: frameUptime,
                 frameTime: time,
                 motionTime: suppressMotion ? 0 : time,
                 trails: overviewTrails,
@@ -1470,6 +1479,10 @@ struct SkyView: View {
                 with: .color(Palette.voidBlack)
             )
 
+            // The globe Canvas owns the identical dust field during travel. Keep
+            // this layer mounted without drawing a second full-screen background.
+            if persistentOverviewPresented, !suppressMotion { return }
+
             let pointing = session.pointing
             let dustTransform = StarDust.skyTransform(
                 pointing: pointing,
@@ -1483,13 +1496,6 @@ struct SkyView: View {
                 transform: dustTransform,
                 quietObservation: true
             )
-
-            // 共享相机拥有整个空间转场。底层保留实例，但不重复投影卫星；
-            // 仅 Reduce Motion 的短淡化需要同时保留就地天空。
-            if persistentOverviewPresented, !suppressMotion {
-                SkyRenderer.drawVignette(context, size: size)
-                return
-            }
 
             let projection = Projection(
                 pointing: pointing,
