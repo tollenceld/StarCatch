@@ -17,7 +17,7 @@
 - Archive 自动发布检查：目录时效、资源 schema、隐私清单、图标和依赖锁定不合格时直接阻止归档。
 - 目录损坏或缺失时提供用户可见诊断和支持入口。
 - 应用内明确标注“仅供教育与观测，不用于导航、碰撞规避或安全决策”。
-- `AppStore/Metadata/zh-Hans` 已准备产品描述、关键词、审核说明和答卷草案。
+- `AppStore/Metadata/zh-Hans` 和 `en-US` 已准备产品描述、关键词、审核说明和答卷草案；提交前仍需复核最终候选构建。
 
 ## App Store Connect 仍需人工填写
 
@@ -28,7 +28,7 @@
 - 隐私政策 URL：`https://github.com/tollenceld/StarCatch/blob/main/PRIVACY_POLICY.md`。
 - 支持 URL：当前临时使用 `https://github.com/tollenceld/StarCatch/issues`。正式提交前应提供包含可联系邮箱的公开支持页，并由账号持有人确认版权主体和适用地区要求的商家联系方式。
 - 新版年龄分级问卷；当前内容预计适合最低年龄档，最终以问卷结果为准。
-- 1–10 张 App Store 截图；优先提供 6.9 英寸 iPhone 规格。
+- 1–10 张与最终候选构建一致的 App Store 截图；现有 6.9 英寸原始截图拍摄于 2026-08-02，后续界面已重构，不能直接上传。
 - App Review 备注：说明真机使用定位与姿态，模拟器使用拖拽；拒绝定位时使用上海假定坐标。
 - Signing Team、分发证书、Provisioning Profile、App Store Connect App Record 和 TestFlight 外部测试。
 - App Store Connect 中的价格与销售范围、税务和银行协议、出口合规问卷。
@@ -44,8 +44,10 @@
 ## 每个候选版本的最小门禁
 
 ```bash
-python3 Scripts/update_catalog.py
+python3 Scripts/update_catalog.py --refresh-active
+python3 Scripts/satellite_knowledge.py sync
 python3 Scripts/satellite_knowledge.py validate
+python3 Scripts/satellite_knowledge.py compile
 python3 Scripts/release_check.py
 ```
 

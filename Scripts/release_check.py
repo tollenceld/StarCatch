@@ -104,6 +104,12 @@ def check_localizations() -> None:
         strings = document.get("strings")
         require(isinstance(strings, dict) and strings, f"{name} 不能为空")
         for key, entry in strings.items():
+            if entry.get("shouldTranslate") is False:
+                require(
+                    not entry.get("localizations"),
+                    f"{name}: {key} 标记为无需翻译，但仍包含本地化文本",
+                )
+                continue
             localizations = entry.get("localizations", {})
             values: dict[str, str] = {}
             for language in ("en", "zh-Hans"):

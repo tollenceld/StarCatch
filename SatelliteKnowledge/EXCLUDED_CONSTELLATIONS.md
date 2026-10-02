@@ -4,13 +4,13 @@
 
 | 星座 | 排除数量 |
 | --- | ---: |
-| Starlink | 11078 |
+| Starlink | 11152 |
 | OneWeb | 651 |
 | Project Kuiper | 391 |
-| 千帆 | 238 |
+| 千帆 | 257 |
 | 国网 | 191 |
 | Iridium | 81 |
 | Globalstar | 36 |
 | Orbcomm | 14 |
 
-合计：12680 颗。
+合计：12773 颗。

@@ -35,7 +35,7 @@
       }
     },
     "°" : {
-
+      "shouldTranslate" : false
     },
     "+24 H" : {
       "localizations" : {
@@ -103,19 +103,19 @@
       }
     },
     "00H" : {
-
+      "shouldTranslate" : false
     },
     "06H" : {
-
+      "shouldTranslate" : false
     },
     "12H" : {
-
+      "shouldTranslate" : false
     },
     "18H" : {
-
+      "shouldTranslate" : false
     },
     "24H" : {
-
+      "shouldTranslate" : false
     },
     "accessibility.off" : {
       "extractionState" : "stale",

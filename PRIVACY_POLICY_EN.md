@@ -1,6 +1,6 @@
 # StarCatch Privacy Policy
 
-Effective date: August 1, 2026
+Effective date: October 2, 2026
 
 StarCatch is an observation tool that calculates the positions of artificial orbital objects on the device. We value your privacy and design the app around data minimization.
 
@@ -10,7 +10,7 @@ StarCatch is an observation tool that calculates the positions of artificial orb
 - Device attitude: Gyroscope and motion data are used only to determine where the device is pointing. They are neither saved nor transmitted.
 - Local records: Observation history, manual progress, and display preferences are stored only on your device.
 
-If location access is denied, StarCatch uses Beijing as an assumed coordinate and explicitly marks the interface as `OBSERVER: ASSUMED`. You can revoke location access at any time in iOS Settings.
+If location access is denied, StarCatch uses Shanghai as an assumed coordinate and clearly labels the location as assumed. You can revoke location access at any time in iOS Settings.
 
 ## Data collection and third parties
 
@@ -18,7 +18,7 @@ The current version creates no user account, contains no advertising, analytics,
 
 ## Retention and deletion
 
-Observation history and preferences remain on device until you clear the observation history, reset related settings, or delete the app. Deleting the app removes all locally stored data.
+Observation history and preferences remain on device until you clear observation history on the Records page, change related settings, or delete the app. Deleting the app removes all locally stored data.
 
 ## Children's privacy
 

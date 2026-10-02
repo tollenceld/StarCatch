@@ -26,11 +26,11 @@ open StarCatch.xcodeproj
 
 每次锁定自动落观测日志（本地 UserDefaults），并保存当时的时间与轨道读数；右上角设置页显示识别摘要，点按后进入独立记录页，再点某个对象可查看任务信息、观测时间和当时的方位、仰角、高度、距离与速度。
 
-隐私：位置、姿态、设置与观测记录只在设备上使用或保存；应用不含账户、广告、分析或跟踪。仪器面板可查看完整隐私说明并清除本地观测记录。
+隐私：位置、姿态、设置与观测记录只在设备上使用或保存；应用不含账户、广告、分析或跟踪。设置页提供完整隐私说明，记录页可清除本地观测记录。
 
 ## 数据
 
-`StarCatch/Resources/catalog.json` 是随包发布的 schema v2 CelesTrak GP/OMM 离线快照，当前包含 16,507 个轨道目标；不在 active GP 分组中的少量历史目标以同一 schema 内的策展 TLE 载荷保留，运行时不再兼容旧版整份小目录文档。构建测试核对唯一 NORAD/COSPAR 标识、元素历元时效、代表性物理量和档案覆盖是否确实存在于目录；这不等同于替代官方运营方对任务状态的持续公告。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
+`StarCatch/Resources/catalog.json` 是随包发布的 schema v2 CelesTrak GP/OMM 离线快照，当前包含 16,635 个轨道目标；不在 active GP 分组中的少量历史目标以同一 schema 内的策展 TLE 载荷保留，运行时不再兼容旧版整份小目录文档。构建测试核对唯一 NORAD/COSPAR 标识、元素历元时效、代表性物理量和档案覆盖是否确实存在于目录；这不等同于替代官方运营方对任务状态的持续公告。SGP4（SatelliteKit）在本地推算方位、高度、速度与距离，APP 运行时不请求轨道网络数据。
 
 人工编写的逐星档案位于 [`SatelliteKnowledge`](SatelliteKnowledge/README.md)。它是可直接用 Obsidian 打开的 Markdown 资料库；Xcode 构建会自动校验并编译为紧凑 JSON，APP 运行时按 NORAD 编号读取。数千份源笔记不会进入安装包，也不会拖慢启动时的文件扫描。
 
