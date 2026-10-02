@@ -510,8 +510,10 @@ struct SkyOverviewView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L10n.text("overview.accessibility"))
-        .accessibilityHint(interactive ? "单指上下左右旋转，双指缩放或旋转倾角，双击复位" : "拖动时间轴查看轨道变化")
-        .accessibilityAction(named: "复位星图") { resetView() }
+        .accessibilityHint(L10n.text(interactive
+            ? "overview.accessibility.interactive_hint"
+            : "overview.accessibility.time_hint"))
+        .accessibilityAction(named: L10n.text("overview.accessibility.reset")) { resetView() }
     }
 
     // MARK: - 交互

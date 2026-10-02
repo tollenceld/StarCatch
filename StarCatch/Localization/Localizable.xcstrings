@@ -1278,13 +1278,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Most do not shine and cannot be seen with the naked eye. This instrument returns them to your field of awareness."
+            "value" : "They do not make their own light. Some can be seen with the naked eye; this instrument helps you find the many that cannot."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "它们不发光，肉眼不可见。这台仪器把它们放回你的感知范围。"
+            "value" : "它们不自行发光；有些肉眼可见，更多则难以辨认。这台仪器帮你找到它们。"
           }
         }
       }
@@ -1346,13 +1346,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bring the reticle near an object to reveal its archive. The panel remains briefly after you move away; pin it to keep it visible. If Capture Confirmation is enabled in Settings, confirmation and switching controls appear in the main view."
+            "value" : "Keep the reticle on an object for a moment. StarCatch locks on automatically and saves an observation. Its information panel stays open until you close it."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "让十字丝靠近它，档案会随视线浮现。移开后仍保留短暂阅读时间；触碰面板可将它固定。若在设置中开启“确认捕获”，主视野才会出现确认、切换与取消捕获按钮。"
+            "value" : "让十字丝持续对准目标片刻，仪器会自动锁定并保存一次观测。信息面板在你主动关闭前会一直保留。"
           }
         }
       }
@@ -1363,13 +1363,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Archive reveals the full record. Individual spacecraft use their own source record; large constellations share verified program context while preserving each node's identity and orbit."
+            "value" : "Open Archive to read more. Individual spacecraft have their own source records; large constellations share verified program context while each node keeps its identity and orbit."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "完整信息出现后，画面下方会浮现“深入档案”。单体卫星读取自己的资料；大型星座的任意节点进入同一份项目档案，避免用重复文字伪装成不同故事。"
+            "value" : "锁定后可点按“深入档案”阅读更多。单体卫星有各自的资料；大型星座共享项目背景，同时保留每个节点的身份与轨道。"
           }
         }
       }
@@ -1397,13 +1397,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enter the global orbit view from the upper-left control. Its lower edge contains the observation clock; move the scale to inspect the past or future."
+            "value" : "Open Global from the bottom navigation, or pinch in past the sky's minimum zoom. Drag the timeline to inspect past or future orbits."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "点按左上角进入全局星图，屏幕下缘才会出现观测时钟。左右拨动刻度，即可抵达过去或未来。"
+            "value" : "点按底部导航的“全球”，或继续缩小天空视场进入全球星图。拖动时间轴，即可查看过去或未来的轨道。"
           }
         }
       }
@@ -1516,13 +1516,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Use the Settings control in the upper-right corner to reopen this manual, adjust the display, or read the privacy statement."
+            "value" : "Open Settings from the bottom navigation to revisit this manual, adjust the display, or read the privacy statement."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "右上角的设置入口可以重新打开手册、显示控制与隐私说明。"
+            "value" : "点按底部导航的“设置”，即可重读手册、调整显示并查看隐私说明。"
           }
         }
       }
@@ -2122,6 +2122,22 @@
         }
       }
     },
+    "observations.clear.unreadable_note" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This also deletes the preserved unreadable records. Display preferences and manual progress will remain."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这也会删除已保留但暂时无法读取的原始记录。显示偏好与手册状态不会被清除。"
+          }
+        }
+      }
+    },
     "observations.detail.hint" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2145,13 +2161,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aim at an artificial object to read its archive. With Capture Confirmation enabled, confirmed observations are stored on this device."
+            "value" : "Keep the reticle on an orbital object for a moment. StarCatch locks on automatically and saves the observation on this device."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将准星对准人造天体可即时阅读档案；开启“确认捕获”并确认目标后，观测会保存在这台设备上。"
+            "value" : "让十字丝持续对准在轨目标片刻，仪器会自动锁定，并在这台设备上保存观测记录。"
           }
         }
       }
@@ -2169,6 +2185,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚无观测记录"
+          }
+        }
+      }
+    },
+    "observations.recovery.warning" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved observations could not be read. Their original data remains on this device; new observations can still be saved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的观测记录暂时无法读取。原始数据仍保留在本机，新观测可以继续保存。"
           }
         }
       }
@@ -2632,6 +2664,54 @@
         }
       }
     },
+    "overview.accessibility.interactive_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use the Reset globe accessibility action to restore the default view."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用“复位星图”无障碍操作可恢复默认视角。"
+          }
+        }
+      }
+    },
+    "overview.accessibility.reset" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset globe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复位星图"
+          }
+        }
+      }
+    },
+    "overview.accessibility.time_hint" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjust the timeline control to explore changes in the orbits."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整时间轴控件以查看轨道变化。"
+          }
+        }
+      }
+    },
     "overview.counts" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2751,18 +2831,18 @@
         }
       }
     },
-    "PRIVACY · ON DEVICE · 2026-08-01" : {
+    "PRIVACY · ON DEVICE" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "PRIVACY · ON DEVICE · 2026-08-01"
+            "value" : "PRIVACY · ON DEVICE"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "隐私 · 仅限本机 · 2026-08-01"
+            "value" : "隐私 · 仅限本机"
           }
         }
       }

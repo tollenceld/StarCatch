@@ -53,7 +53,7 @@ RootView
   建立索引与 SatelliteKit 对象。主体为 OMM；active GP 分组之外的少量历史目标由
   同一 schema 中显式的策展 TLE 载荷保留，不再兼容旧版整份目录文档。
 - `SatelliteStories.swift`：以 NORAD ID 连接逐星 Markdown，并让大型星座节点连接
-  项目共享 Markdown；schema v3 为每条内容保留来源 ID、`object/family` 范围与可信类型。
+  项目共享 Markdown；schema v4 为每条内容保留来源 ID、`object/family` 范围与可信类型。
 - `EphemerisEngine.swift`：负责传播调度、缓存、LIVE 插值与冻结时刻快照。
 - `TrackSampler.swift` / `PassPredictor.swift`：基于星历的低频派生能力。
 - `SatelliteInsights.swift`：为当前感应目标在 utility 任务中计算星下点、距离趋势、单次

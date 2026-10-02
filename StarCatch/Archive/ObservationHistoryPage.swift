@@ -71,7 +71,9 @@ struct ObservationHistoryPage: View {
             Button(copy("observations.clear"), role: .destructive) { log.clear() }
             Button(copy("action.cancel"), role: .cancel) {}
         } message: {
-            Text(copy("observations.clear.note"))
+            Text(copy(log.hasUnreadableArchive
+                ? "observations.clear.unreadable_note"
+                : "observations.clear.note"))
         }
         .onAppear {
             #if DEBUG
@@ -89,6 +91,16 @@ struct ObservationHistoryPage: View {
                 .listRowInsets(EdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18))
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
+
+            if log.hasUnreadableArchive {
+                Label(copy("observations.recovery.warning"), systemImage: "exclamationmark.triangle")
+                    .font(Typography.statusTag)
+                    .foregroundStyle(Palette.legacyTint.opacity(Palette.Level.present))
+                    .fixedSize(horizontal: false, vertical: true)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 18, bottom: 10, trailing: 18))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+            }
 
             if log.entries.isEmpty {
                 emptyHistory
@@ -141,7 +153,7 @@ struct ObservationHistoryPage: View {
 
             Spacer(minLength: 4)
 
-            if !log.entries.isEmpty {
+            if !log.entries.isEmpty || log.hasUnreadableArchive {
                 Button {
                     confirmClearLog = true
                 } label: {

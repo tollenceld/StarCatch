@@ -262,6 +262,61 @@ final class TimeTests: XCTestCase {
         XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
     }
 
+    func testUnreadableObservationLogIsPreservedWhileNewLocksContinue() throws {
+        let suiteName = "StarCatchTests.UnreadableObservationLog.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let original = Data("incompatible historical payload".utf8)
+        defaults.set(original, forKey: "observationLog.v1")
+
+        let log = ObservationLog(defaults: defaults)
+        XCTAssertTrue(log.hasUnreadableArchive)
+        XCTAssertTrue(log.entries.isEmpty)
+        XCTAssertEqual(defaults.data(forKey: "observationLog.unreadableArchive.v1"), original)
+
+        let object = try XCTUnwrap(Self.store.objects.first)
+        log.record(objectId: object.id, catalog: Self.store)
+        let restored = ObservationLog(defaults: defaults)
+        XCTAssertTrue(restored.hasUnreadableArchive)
+        XCTAssertEqual(restored.entries.map(\.objectId), [object.id])
+        XCTAssertEqual(defaults.data(forKey: "observationLog.unreadableArchive.v1"), original)
+
+        restored.clear()
+        XCTAssertFalse(restored.hasUnreadableArchive)
+        XCTAssertNil(defaults.data(forKey: "observationLog.unreadableArchive.v1"))
+        XCTAssertTrue(ObservationLog(defaults: defaults).entries.isEmpty)
+    }
+
+    func testGlobeAccessibilityCopyIsLocalizedForBothLanguages() {
+        for key in ["overview.accessibility.interactive_hint",
+                    "overview.accessibility.time_hint", "overview.accessibility.reset"] {
+            XCTAssertNotEqual(L10n.text(key, language: .english), key)
+            XCTAssertNotEqual(L10n.text(key, language: .simplifiedChinese), key)
+        }
+        XCTAssertEqual(L10n.text("overview.accessibility.reset", language: .english), "Reset globe")
+    }
+
+    func testOnboardingCopyMatchesAutomaticCaptureAndBottomNavigation() {
+        for language in SupportedLanguage.allCases {
+            let captureHelp = L10n.text("manual.2.paragraph.3", language: language)
+            let emptyHistory = L10n.text("observations.empty.body", language: language)
+            let globalHelp = L10n.text("manual.3.paragraph.1", language: language)
+            let settingsHelp = L10n.text("manual.5.paragraph.1", language: language)
+            XCTAssertFalse(captureHelp.isEmpty)
+            XCTAssertFalse(emptyHistory.isEmpty)
+            XCTAssertFalse(globalHelp.isEmpty)
+            XCTAssertFalse(settingsHelp.isEmpty)
+            XCTAssertFalse(captureHelp.localizedCaseInsensitiveContains("confirmation"))
+            XCTAssertFalse(emptyHistory.localizedCaseInsensitiveContains("confirmation"))
+            XCTAssertFalse(captureHelp.contains("确认捕获"))
+            XCTAssertFalse(emptyHistory.contains("确认捕获"))
+            XCTAssertFalse(globalHelp.localizedCaseInsensitiveContains("upper-left"))
+            XCTAssertFalse(settingsHelp.localizedCaseInsensitiveContains("upper-right"))
+            XCTAssertFalse(globalHelp.contains("左上角"))
+            XCTAssertFalse(settingsHelp.contains("右上角"))
+        }
+    }
+
     func testAutomaticLockRecordsOnceUntilDismissedAndAccumulatesAfterRelock() throws {
         let suiteName = "StarCatchTests.AutomaticObservation.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))

@@ -50,7 +50,7 @@ struct PrivacyStatementView: View {
                     }
                     .overlay(alignment: .top) { ContentHairline() }
 
-                    Text("PRIVACY · ON DEVICE · 2026-08-01")
+                    Text("PRIVACY · ON DEVICE")
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
                         .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))

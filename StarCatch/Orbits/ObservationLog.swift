@@ -33,8 +33,11 @@ final class ObservationLog: ObservableObject {
     }
 
     @Published private(set) var entries: [Entry] = []
+    /// Keep a damaged legacy payload until the user explicitly clears history.
+    @Published private(set) var hasUnreadableArchive = false
 
     private static let storageKey = "observationLog.v1"
+    private static let unreadableArchiveKey = "observationLog.unreadableArchive.v1"
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -103,6 +106,8 @@ final class ObservationLog: ObservableObject {
     func clear() {
         entries = []
         defaults.removeObject(forKey: Self.storageKey)
+        defaults.removeObject(forKey: Self.unreadableArchiveKey)
+        hasUnreadableArchive = false
     }
 
     func remove(objectId: String) {
@@ -111,10 +116,18 @@ final class ObservationLog: ObservableObject {
     }
 
     private func load() {
-        guard let data = defaults.data(forKey: Self.storageKey),
-              let decoded = try? JSONDecoder().decode([Entry].self, from: data)
-        else { return }
-        entries = decoded
+        hasUnreadableArchive = defaults.data(forKey: Self.unreadableArchiveKey) != nil
+        guard let data = defaults.data(forKey: Self.storageKey) else { return }
+        if let decoded = try? JSONDecoder().decode([Entry].self, from: data) {
+            entries = decoded
+        } else {
+            // Preserve the original bytes before new locks can replace the unreadable data.
+            if !hasUnreadableArchive {
+                defaults.set(data, forKey: Self.unreadableArchiveKey)
+            }
+            defaults.removeObject(forKey: Self.storageKey)
+            hasUnreadableArchive = true
+        }
     }
 
     private func save() {
