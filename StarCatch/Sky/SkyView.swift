@@ -15,7 +15,6 @@ struct SkyView: View {
     /// 工具面板暂停采样与绘制，但保留同一个绘制表面和最后观测时刻。
     var isUtilityPagePresented = false
     var renderingSuspended = false
-    var establishment: ObservationEstablishment? = nil
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
     /// 设置与观测档案由上层负责呈现；观测记录同时作为底部控制栏的稳定入口，
     /// 目标卡仍可按内容直接进入深度档案。
@@ -107,9 +106,6 @@ struct SkyView: View {
         let wideReduction = 1 - 0.46 * wideFieldProgress
         return wideReduction * (1 - overviewPresentationProgress)
     }
-    private var localSkyPresence: Double {
-        1
-    }
     private var localFieldResetAvailable: Bool {
         fieldResetPolicy.isAvailable(interacting: clock.isScrubbing || fieldMagnificationActive)
     }
@@ -131,32 +127,21 @@ struct SkyView: View {
             TimelineView(.animation(minimumInterval: ObservationRenderCadence.minimumInterval(
                 reducedMotion: suppressMotion,
                 motionActive: presentationMode.isTransitioning || overviewInteractionActive),
-                paused: renderingSuspended || establishment != nil || scenePhase != .active)) { timeline in
-                let frameDate = establishment != nil ? Date() : frozenFrameDate ?? timeline.date
+                paused: renderingSuspended || scenePhase != .active)) { timeline in
+                let frameDate = frozenFrameDate ?? timeline.date
                 let frameUptime = ProcessInfo.processInfo.systemUptime
                 let time = frameDate.timeIntervalSince(startDate)
                 let obsTime = clock.observationTime(realNow: frameDate)
 
                 ZStack(alignment: .topLeading) {
-                    if let establishment, !establishment.isComplete {
-                        ObservationEstablishmentField(establishment: establishment,
-                            frame: session.sceneFrame(at: frameDate, includeLocal: establishment.localProgress > 0.65))
-                            .opacity(establishment.reducedMotion ? 1 - establishment.localProgress : 1)
-                        if establishment.reducedMotion {
-                            canvasLayer(time: time, observation: obsTime).opacity(establishment.localProgress)
-                        }
-                    } else {
-                        canvasLayer(time: time, observation: obsTime)
+                    canvasLayer(time: time, observation: obsTime)
                         .contentShape(Rectangle())
-                        .opacity(localSkyPresence)
-                    }
                     crosshairLayer
-                        .opacity(localChromePresence * (establishment?.chromePresence ?? 1))
+                        .opacity(localChromePresence)
                     targetMicroLabelLayer(observation: obsTime)
-                        .opacity(localChromePresence * (establishment?.chromePresence ?? 1))
+                        .opacity(localChromePresence)
                     if clock.isLive {
                         guideLayer
-                            .opacity(establishment?.chromePresence ?? 1)
                             .opacity(localChromePresence)
                     }
                     timeOverviewLayer(time: time, observation: obsTime,
@@ -164,8 +149,8 @@ struct SkyView: View {
                 }
                 .colorEffect(
                     ShaderLibrary.grain(
-                        .float(Float(suppressMotion ? 0 : establishment?.elapsed ?? time)),
-                        .float(grainEnabled ? Float(0.024 * (establishment.map { ObservationSceneMath.ease($0.elapsed / 0.7) } ?? 1)) : 0)
+                        .float(Float(suppressMotion ? 0 : time)),
+                        .float(grainEnabled ? 0.024 : 0)
                     )
                 )
                 .onChange(of: timeline.date) { _, frameDate in
@@ -193,14 +178,12 @@ struct SkyView: View {
         .overlay { transientDismissLayer }
         .overlay(alignment: .top) {
             pointingReadout
-                .opacity(establishment?.chromePresence ?? 1)
                 // 顶部功能翼必须和灵动岛共享同一条水平轴；默认 overlay 会从
                 // 安全区下缘开始布局，结果看起来仍是一条岛下工具栏。
                 .ignoresSafeArea(edges: .top)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomControlBand
-                .opacity(establishment?.chromePresence ?? 1)
         }
         // Observe touches without adding a hit-testing surface over the sky.
         // The 16pt wake band must still belong to the existing sky drag gesture.
@@ -235,9 +218,6 @@ struct SkyView: View {
                 finishScalePreview()
             }
             scaleJourney.pause()
-        }
-        .onChange(of: establishment == nil) { _, live in
-            if live { lastCaptureSample = -.infinity; capture.resumeSampling() }
         }
         .onChange(of: keepsDockVisible) { _, _ in dockActivity.restart() }
         .onChange(of: fieldMagnification) { _, _ in updateFieldResetAvailability() }
@@ -331,7 +311,6 @@ struct SkyView: View {
             await preparePresentedForecast(for: presentedStoryObjectID)
         }
         .onChange(of: capture.phase) { oldPhase, newPhase in
-            guard establishment == nil else { return }
             if case .acquiring(let id) = oldPhase, case .exploring = newPhase {
                 retiringCandidate = (id, Date())
             } else {
@@ -471,8 +450,7 @@ struct SkyView: View {
             )
         }
 
-        guard establishment == nil,
-              scenePhase == .active,
+        guard scenePhase == .active,
               !isUtilityPagePresented,
               !clock.isScrubbing,
               presentationMode == .local,

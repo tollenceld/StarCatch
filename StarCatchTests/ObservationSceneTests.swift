@@ -17,12 +17,6 @@ final class ObservationSceneTests: XCTestCase {
             reducedMotion: false, motionActive: false), 1.0 / 30.0)
         XCTAssertEqual(ObservationRenderCadence.minimumInterval(
             reducedMotion: true, motionActive: true), 1.0 / 30.0)
-        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
-            reducedMotion: false, approaching: true), 16)
-        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
-            reducedMotion: false, approaching: false), 33)
-        XCTAssertEqual(ObservationRenderCadence.establishmentTickMilliseconds(
-            reducedMotion: true, approaching: true), 33)
         XCTAssertEqual(SkyPresentationMode.local.settledOverviewPropagation, false)
         XCTAssertEqual(SkyPresentationMode.global.settledOverviewPropagation, true)
         for mode in [SkyPresentationMode.previewingGlobal, .enteringGlobal,
@@ -218,77 +212,82 @@ final class ObservationSceneTests: XCTestCase {
         }
     }
 
-    func testFastStartupCompletesOnceInAboutTwoPointSixSeconds() {
+    func testFastStartupFollowsReadinessAfterShortMinimumDwell() {
         var state = ObservationEstablishment()
-        var observer = ObserverLocation.fallback
-        observer.assumed = false
-        var confirmations = 0
-        for tick in 0...90 {
-            if state.advance(at: Double(tick) / 30, active: true, sessionReady: true,
-                frameReady: true, locating: false, coordinates: observer) { confirmations += 1 }
-        }
-        XCTAssertEqual(state.phase, .live)
-        XCTAssertEqual(state.elapsed, 2.6, accuracy: 0.08)
-        XCTAssertEqual(confirmations, 1)
-    }
-
-    func testDelayedFrameDoesNotReplayEarthAndPausedTimeDoesNotAdvance() {
-        var state = ObservationEstablishment()
-        for tick in 0...120 {
-            _ = state.advance(at: Double(tick) / 30, active: true, sessionReady: true,
-                frameReady: false, locating: false, coordinates: ObserverLocation.fallback)
-        }
-        XCTAssertEqual(state.phase, .network)
-        XCTAssertEqual(state.reveal.land, 1)
-        XCTAssertEqual(state.reveal.satellites, 0)
-        state.pause()
-        _ = state.advance(at: 100, active: true, sessionReady: true, frameReady: true,
-            locating: false, coordinates: ObserverLocation.fallback)
-        XCTAssertEqual(state.elapsed, 4, accuracy: 0.001)
-        for tick in 1...65 {
-            _ = state.advance(at: 100 + Double(tick) / 30, active: true, sessionReady: true,
-                frameReady: true, locating: false, coordinates: ObserverLocation.fallback)
-        }
-        XCTAssertEqual(state.phase, .live)
-        XCTAssertEqual(state.observer?.assumed, true)
-    }
-
-    func testLocationWaitIsBoundedAndAssumedPositionNeverConfirms() {
-        var state = ObservationEstablishment()
-        for tick in 0...120 {
-            XCTAssertFalse(state.advance(at: Double(tick) / 30, active: true, sessionReady: true,
-                frameReady: true, locating: true, coordinates: ObserverLocation.fallback))
-        }
-        XCTAssertEqual(state.phase, .live)
-        XCTAssertLessThan(state.elapsed, 3.6)
-    }
-
-    func testReducedMotionAndUnavailableDataDoNotTrapTheUser() {
-        var reduced = ObservationEstablishment()
         for tick in 0...10 {
-            _ = reduced.advance(at: Double(tick) / 30, active: true, sessionReady: true, frameReady: true,
-                locating: false, coordinates: ObserverLocation.fallback, reduced: true)
+            state.advance(at: Double(tick) / 20, active: true, sessionReady: true,
+                frameReady: true, locating: false, assumedLocation: false)
+        }
+        XCTAssertFalse(state.isComplete)
+        state.advance(at: 0.55, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: false)
+        XCTAssertEqual(state.phase, .live)
+        XCTAssertEqual(state.elapsed, 0.55, accuracy: 0.001)
+    }
+
+    func testDelayedFrameAndPauseDoNotForceFixedLengthStartup() {
+        var state = ObservationEstablishment()
+        for tick in 0...40 {
+            state.advance(at: Double(tick) / 20, active: true, sessionReady: true,
+                frameReady: false, locating: false, assumedLocation: true)
+        }
+        XCTAssertEqual(state.phase, .waitingForFrame)
+        state.pause()
+        state.advance(at: 100, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: true)
+        XCTAssertEqual(state.elapsed, 2, accuracy: 0.001)
+        XCTAssertFalse(state.isComplete)
+        state.advance(at: 100.1, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: true)
+        XCTAssertEqual(state.phase, .live)
+        XCTAssertLessThan(state.elapsed, 2.2)
+    }
+
+    func testLocationWaitIsBoundedAndAccurateFixCanEndItEarly() {
+        var state = ObservationEstablishment()
+        for tick in 0...8 {
+            state.advance(at: Double(tick) / 20, active: true, sessionReady: true,
+                frameReady: true, locating: true, assumedLocation: true)
+        }
+        XCTAssertEqual(state.phase, .waitingForLocation)
+        state.advance(at: 0.55, active: true, sessionReady: true,
+            frameReady: true, locating: true, assumedLocation: false)
+        XCTAssertEqual(state.phase, .live)
+
+        var fallback = ObservationEstablishment()
+        for tick in 0...20 {
+            fallback.advance(at: Double(tick) / 20, active: true, sessionReady: true,
+                frameReady: true, locating: true, assumedLocation: true)
+        }
+        XCTAssertEqual(fallback.phase, .live)
+        XCTAssertLessThan(fallback.elapsed, 1.1)
+    }
+
+    func testReducedMotionAndUnavailableFrameDoNotTrapTheUser() {
+        var reduced = ObservationEstablishment()
+        for tick in 0...4 {
+            reduced.advance(at: Double(tick) / 20, active: true, sessionReady: true,
+                frameReady: true, locating: false, assumedLocation: true, reducedMotion: true)
         }
         XCTAssertTrue(reduced.isComplete)
-        XCTAssertEqual(reduced.rotation, 0)
         var timeout = ObservationEstablishment()
-        _ = timeout.advance(at: 0, active: true, sessionReady: true, frameReady: false,
-            locating: false, coordinates: ObserverLocation.fallback)
-        _ = timeout.advance(at: 8, active: true, sessionReady: true, frameReady: false,
-            locating: false, coordinates: ObserverLocation.fallback)
+        timeout.advance(at: 0, active: true, sessionReady: true, frameReady: false,
+            locating: false, assumedLocation: true)
+        timeout.advance(at: 8, active: true, sessionReady: true, frameReady: false,
+            locating: false, assumedLocation: true)
         XCTAssertEqual(timeout.phase, .live)
         XCTAssertEqual(SkyObservationIssue.resolve(availability: .manual, authorization: .notDetermined,
             locating: false, assumed: true, accuracy: .infinity, confidence: .manual,
             orbitAge: 0, orbitFrameReady: false), .orbitPreparing)
     }
 
-    func testFailureIsTerminalAndNeverConfirms() {
+    func testStartupFailureIsTerminal() {
         var state = ObservationEstablishment()
-        XCTAssertFalse(state.advance(at: 0, active: true, sessionReady: true, frameReady: false,
-            locating: false, coordinates: ObserverLocation.fallback, failed: true))
+        state.advance(at: 0, active: true, sessionReady: true, frameReady: false,
+            locating: false, assumedLocation: true, failed: true)
         XCTAssertEqual(state.phase, .failed)
-        XCTAssertFalse(state.advance(at: 10, active: true, sessionReady: true, frameReady: true,
-            locating: false, coordinates: ObserverLocation.fallback))
+        state.advance(at: 10, active: true, sessionReady: true, frameReady: true,
+            locating: false, assumedLocation: false)
         XCTAssertEqual(state.phase, .failed)
     }
 
@@ -299,23 +298,18 @@ final class ObservationSceneTests: XCTestCase {
                        1.0 / 30, accuracy: 0.000001)
     }
 
-    func testLateAccurateLocationLocksOnceAndFreezesThePresentationVersion() {
+    func testReadinessMustSettleAgainAfterFrameBecomesUnavailable() {
         var state = ObservationEstablishment()
-        var measured = ObserverLocation.fallback
-        measured.latitude = -33.86; measured.longitude = 151.21
-        measured.assumed = false; measured.measuredAt = date; measured.horizontalAccuracyMeters = 3000
-        var confirmations = 0
-        for tick in 0...80 {
-            let coordinates = tick < 48 ? ObserverLocation.fallback : measured
-            if state.advance(at: Double(tick) / 30, active: true, sessionReady: true,
-                frameReady: true, locating: tick < 48, coordinates: coordinates) { confirmations += 1 }
-        }
-        XCTAssertEqual(state.observer, measured)
-        measured.latitude = 0
-        _ = state.advance(at: 3, active: true, sessionReady: true, frameReady: true,
-            locating: false, coordinates: measured)
-        XCTAssertEqual(state.observer?.latitude, -33.86)
-        XCTAssertEqual(confirmations, 1)
+        state.advance(at: 0, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: false)
+        state.advance(at: 0.5, active: true, sessionReady: true,
+            frameReady: false, locating: false, assumedLocation: false)
+        state.advance(at: 0.55, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: false)
+        XCTAssertFalse(state.isComplete)
+        state.advance(at: 0.64, active: true, sessionReady: true,
+            frameReady: true, locating: false, assumedLocation: false)
+        XCTAssertEqual(state.phase, .live)
     }
 
     func testObserverHoldDefersUpdatesAndReleasesLatestMeasurement() {

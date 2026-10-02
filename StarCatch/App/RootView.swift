@@ -12,11 +12,11 @@ enum SkyTopBarMetrics {
 
 /// 顶层视图。核心流程：
 ///
-///   1. ObservationEstablishment —— 从信号到本地天空的共享空间建立
+///   1. ObservationEstablishment —— 目录与首个轨道帧就绪前的轻量文字等待
 ///   2. SkyView —— 主观测视图
 ///   3. ManualBookView —— 从设置按需打开的五页观测手册
 ///
-/// Sky 在准备期间挂载并保持身份，镜头抵达后原位接管；后台返回不重播。
+/// 天空只在数据准备完毕后挂载；后台返回不重播加载页。
 struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
@@ -82,8 +82,8 @@ struct RootView: View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
 
-            // 工具面板出现时保留同一个天空实例与冻结绘制表面。
-            if stage == .sky || stage == .booting, let session {
+            // 启动阶段不挂载 30/60fps 的天空 Canvas；进入天空后仍保持实例。
+            if stage == .sky, let session {
                 if session.catalog.objects.isEmpty {
                     CatalogUnavailableView(reason: session.catalog.loadFailureDescription)
                 } else {
@@ -93,7 +93,6 @@ struct RootView: View {
                         clock: clock,
                         isUtilityPagePresented: presentedPage != nil,
                         renderingSuspended: skyRenderingSuspended,
-                        establishment: stage == .booting ? establishment : nil,
                         onOpenFilters: {
                             presentPage(.filters)
                         },
@@ -132,9 +131,9 @@ struct RootView: View {
             }
 
             // 启动序列
-            if stage == .booting, session == nil {
-                OrbitalBootView(establishment: establishment)
-                    .transition(.identity)
+            if stage == .booting {
+                OrbitalBootView()
+                    .transition(.opacity)
             }
 
             if stage == .privacy {
@@ -391,9 +390,6 @@ struct RootView: View {
     private func establishObservation() async {
         while !Task.isCancelled, stage == .booting {
             let previousPhase = establishment.phase
-            // This task is keyed by scenePhase, so its environment is current.
-            if scenePhase == .active { session?.start() }
-            let hadObserver = establishment.observer != nil
             var ready = session?.ephemeris.hasUsableFrame == true
                 && session?.ephemeris.frameObserver == session?.observer.coordinates
             var uptime = ProcessInfo.processInfo.systemUptime
@@ -404,31 +400,27 @@ struct RootView: View {
             if let index = arguments.firstIndex(of: "--previewStartupRate"), index + 1 < arguments.count,
                let rate = Double(arguments[index + 1]) { uptime *= min(1, max(0.1, rate)) }
             #endif
-            let confirmation = establishment.advance(
+            establishment.advance(
                 at: uptime, active: scenePhase == .active,
                 sessionReady: session != nil,
                 frameReady: ready,
                 locating: session?.observer.isLocating == true,
-                coordinates: session?.observer.coordinates ?? ObserverLocation.fallback,
+                assumedLocation: session?.observer.coordinates.assumed ?? true,
                 failed: session?.catalog.objects.isEmpty == true,
-                reduced: suppressMotion, pointing: session?.pointing ?? .initial)
+                reducedMotion: suppressMotion)
             #if DEBUG
             if previousPhase != establishment.phase {
                 print("[ObservationStartup] \(establishment.phase) at \(establishment.elapsed), frame: \(session?.ephemeris.hasUsableFrame == true)")
             }
             #endif
-            if !hadObserver, establishment.observer != nil { session?.observer.holdForPresentation() }
-            if confirmation { ObservationHaptics.shared.softImpact(intensity: 0.25) }
             if establishment.isComplete {
-                session?.observer.releasePresentationHold()
-                stage = .sky
+                withAnimation(.easeOut(duration: suppressMotion ? 0.14 : 0.24)) {
+                    stage = .sky
+                }
                 return
             }
-            // The establishment camera travels at 60fps; elapsed time remains
-            // monotonic so a delayed tick never stretches the journey itself.
-            do { try await Task.sleep(for: .milliseconds(
-                ObservationRenderCadence.establishmentTickMilliseconds(
-                    reducedMotion: suppressMotion, approaching: establishment.localProgress > 0))) }
+            // Readiness changes are low-frequency; no display-rate startup loop.
+            do { try await Task.sleep(for: .milliseconds(50)) }
             catch { return }
         }
     }

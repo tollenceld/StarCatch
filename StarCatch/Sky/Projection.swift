@@ -121,10 +121,6 @@ enum ObservationRenderCadence {
     static func minimumInterval(reducedMotion: Bool, motionActive: Bool) -> TimeInterval {
         !reducedMotion && motionActive ? 1.0 / 60.0 : 1.0 / 30.0
     }
-
-    static func establishmentTickMilliseconds(reducedMotion: Bool, approaching: Bool) -> Int {
-        !reducedMotion && approaching ? 16 : 33
-    }
 }
 
 enum ScaleJourneyPolicy {

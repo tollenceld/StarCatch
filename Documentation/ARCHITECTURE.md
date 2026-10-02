@@ -128,24 +128,15 @@ SatelliteKit 在 `project.yml` 中精确锁定版本。依赖升级必须同时�
 8. 共享场景背景复用主天空的确定性 StarDust 与设备方向响应，不随地球 Arcball 或缩放旋转，
    不在交接点换背景身份；全球 Canvas 覆盖期间底层天空保留实例但不再重复绘制 StarDust。
    BrightStarStore / J2000 投影工具继续保留，但不另行绘制第二套背景。
-9. 启动由 RootView 唯一持有的 ObservationEstablishment 编排：信号 0.15s、地球 0.55s、
-   网络 0.60s、Observer 0.25s、推进 1.05s。单调时钟只在前台推进；数据迟到只延长网络阶段，
-   不重播、不补转圈。8s 无可用星历则进入可操作天空，目录错误直接显示数据不可用。
-   ObservationSceneFrame 由 SkySession 从 EphemerisEngine 缓存装配，包含同一时刻、观察者版本
-   （完整 Coordinates 值）、设备方向、稳定 ID、ECI 与 az/el/range。首次真实帧前不绘制卫星；
-   启动与全球均使用最多约 4,600 个 overviewObjects，末段并入已有 displayObjects，不重新抽样。
-   点亮次序按轨道倾角组与 ID 预计算；最多六条静态参考弧不是预测轨迹，不冒充星链赤道带。
-   ObservationCameraState 将压缩半径连续还原到物理 ECI，并沿观察者法线推进、转向 ENU。
-   全球端精确复用原投影，本地端复用 Projection 的基向量、roll、视场与裁切；地球轮廓在齐次
-   坐标中裁切，表面、大陆、轨道和目标共享相机。不使用整屏黑场或两页完整星空交叉溶解。
-   ObservationSceneRenderer 共享地球材质、点阵、参考弧、Observer 和四档点云；
-   静止 30fps、启动推进及尺度/地球手势以 60fps 为目标；Canvas 只读取缓存并批量合并 Path，
-   不做目录 IO、SGP4 或 SatelliteKit 对象构造。同一观测时刻与轨道版本复用场景帧，历史返回的
-   ID 索引只建立一次；每帧卫星投影和前后景分桶合并为单次遍历。全球端投影走等价的正交快速路径。
-   首次定位授权仅在进入天空后请求；已授权提前单次请求，网络后最多等 0.8s，超时明确显示
-   假定上海坐标且无确认触觉。真实 Observer 只确认一次；推进期间冻结位置版本，迟到坐标交接后
-   释放。方向由会话预热，不可用时保留手动/未校准提示。启动禁止捕获采样、自动锁定和记录。
-   SkyView 在目录准备后即挂载，接管后保持同一实例；轨迹、洞察、档案预热不阻塞首帧。
+9. 启动由 RootView 唯一持有的 ObservationEstablishment 编排。加载页只绘制文字、细线和
+   一次短淡入，不挂载天空或全球 Canvas，不对约 4,600 个目标与陆地点阵执行逐帧投影。
+   目录和星历在后台准备；首个可用轨道帧稳定后，普通模式最短停留 0.55s，Reduce Motion 为
+   0.14s。已授权定位正在更新且暂为估算坐标时最多额外等待 0.45s；8s 无可用星历则进入
+   可操作天空并保留明确的数据状态，目录错误进入数据不可用界面。单调计时在后台暂停，
+   SkyView 仅在就绪后挂载；启动期间不采样捕获、不自动锁定或写记录。
+   全球空间旅程仍使用 SkySession 从 EphemerisEngine 缓存装配的 ObservationSceneFrame；
+   地球、Observer、卫星与背景在同一帧共享时间输入。Canvas 路径不做目录 IO、SGP4 或
+   SatelliteKit 对象构造；历史返回的 ID 索引只建立一次，全球端使用等价正交快速投影。
    正式全球进入反向复用相机；退出从当前旋转/缩放对准 Observer 后推进。历史返回由已有时钟
    驱动，在历史与实时两份真实快照间按 ID 做球面呈现插值，回到 LIVE 后再推进；
    SkyPresentationMode + 前台帧时钟完成转场，不使用游离延迟回调。

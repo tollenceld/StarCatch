@@ -56,7 +56,7 @@ struct OverviewShowcaseRotation: Equatable {
 /// 地球、观察者、地表可见区域和轨道目标共享同一套旋转与缩放。
 struct SkyOverviewView: View {
     @Environment(\.scenePhase) private var scenePhase
-    /// 启动电影与全局地球共享同一套视觉半径，避免两处镜头比例逐渐漂移。
+    /// 跨尺度旅程与全局地球共享同一套视觉半径，避免两处镜头比例逐渐漂移。
     nonisolated static let earthDisplayRadius: Double = 0.57
     nonisolated static let maximumOrbitDisplayRadius: Double = 0.88
     /// Natural Earth 1:110m 海岸线经过约 2° 视觉简化后的坐标。
@@ -1186,7 +1186,7 @@ struct SkyOverviewView: View {
         )
     }
 
-    /// 共享的单位方向投影；启动电影与全局页必须使用同一深度和屏幕坐标约定。
+    /// 共享的单位方向投影；跨尺度旅程与全局页使用同一深度和屏幕坐标约定。
     nonisolated static func projectDirection(
         _ direction: SIMD3<Double>,
         displayRadius: Double,
@@ -1212,7 +1212,7 @@ struct SkyOverviewView: View {
     }
 
 
-    /// 启动电影与全局页共用的球体环境光。调用方只提供几何和当前细节档位，
+    /// 跨尺度旅程与全局页共用的球体环境光。调用方只提供几何和当前细节档位，
     /// 不读取会话、目录或任何可变业务状态。
     static func drawGlobeAmbient(
         _ context: GraphicsContext,
@@ -1380,8 +1380,8 @@ struct SkyOverviewView: View {
         )
     }
 
-    /// 纯投影点云的共同分层规则。全局页传入真实 ECI 投影，启动电影传入
-    /// 确定性解析轨道投影；两处由同一份代码决定遮挡、亮度和前后景层次。
+    /// 纯投影点云的共同分层规则。全球端与跨尺度旅程共用
+    /// 遮挡、亮度和前后景层次。
     static func drawGlobeSatelliteField<S: Sequence>(
         _ context: GraphicsContext,
         projected: S,
@@ -1772,8 +1772,8 @@ struct SkyOverviewView: View {
         )
     }
 
-    /// 与具体会话解耦的地球表面绘制入口。启动电影和全局页共享材质、点阵大陆、
-    /// 经纬网与轮廓；资源尚未准备好时，两者都使用同一份编译期海岸线回退。
+    /// 与具体会话解耦的地球表面绘制入口。跨尺度旅程与全局页共享材质、点阵大陆、
+    /// 经纬网与轮廓；资源尚未准备好时使用编译期海岸线回退。
     static func drawGlobeSurface(
         _ context: GraphicsContext,
         geometry: GlobeGeometry,

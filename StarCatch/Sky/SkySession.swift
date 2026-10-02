@@ -239,8 +239,8 @@ final class SkySession: ObservableObject {
         ephemeris.stop()
     }
 
-    /// 在启动页仍可见时预热首次捕获会用到的“速度精算 + 多时刻轨迹”路径。
-    /// 在 utility 后台执行，不阻塞首份轨道快照或启动镜头推进。
+    /// 在轻量加载页仍可见时预热首次捕获会用到的“速度精算 + 多时刻轨迹”路径。
+    /// 在 utility 后台执行，不阻塞首份轨道快照。
     func prewarmCapturePipeline(at date: Date = Date()) async {
         guard let objectID = displayObjects.first?.id else { return }
         async let precise = ephemeris.preparePreciseEphemeris(

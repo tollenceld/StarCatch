@@ -1,17 +1,44 @@
 import SwiftUI
 
-/// The same shared geometry renders before and after the session is mounted.
+/// A deliberately cheap launch surface: no Canvas, shader, orbit projection,
+/// repeating animation, or resource-dependent visual geometry.
 struct OrbitalBootView: View {
-    let establishment: ObservationEstablishment
-    @AppStorage("grainEnabled") private var grainEnabled = true
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @AppStorage("reducedMotion") private var reducedMotion = false
+    @State private var revealed = false
+
+    private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+
     var body: some View {
-        ObservationEstablishmentField(establishment: establishment,
-            frame: ObservationSceneFrame(observation: Date(), observer: ObserverLocation.fallback,
-                                         pointing: .initial, targets: []))
-            .colorEffect(ShaderLibrary.grain(
-                .float(Float(establishment.reducedMotion ? 0 : establishment.elapsed)),
-                .float(grainEnabled ? Float(0.024 * ObservationSceneMath.ease(establishment.elapsed / 0.7)) : 0)))
-            .ignoresSafeArea()
-            .accessibilityLabel(L10n.text("boot.accessibility.preparing"))
+        ZStack {
+            Palette.voidBlack.ignoresSafeArea()
+
+            VStack(spacing: 19) {
+                Text("StarCatch")
+                    .font(.system(.largeTitle, design: .default, weight: .light))
+                    .tracking(2.2)
+                    .foregroundStyle(Palette.inkHigh)
+
+                Rectangle()
+                    .fill(Palette.signal.opacity(0.56))
+                    .frame(width: 34, height: 1)
+                    .scaleEffect(x: revealed ? 1 : 0.2)
+
+                Text(L10n.text("boot.accessibility.preparing"))
+                    .font(Typography.statusTag)
+                    .tracking(Typography.statusTagTracking)
+                    .foregroundStyle(Palette.inkMid)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, 30)
+            .opacity(revealed ? 1 : 0)
+            .offset(y: suppressMotion || revealed ? 0 : 7)
+        }
+        .accessibilityElement(children: .combine)
+        .onAppear {
+            withAnimation(.easeOut(duration: suppressMotion ? 0.14 : 0.4)) {
+                revealed = true
+            }
+        }
     }
 }
