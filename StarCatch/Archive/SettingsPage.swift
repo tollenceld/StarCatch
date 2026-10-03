@@ -76,20 +76,8 @@ struct SettingsPage: View {
     private func pageContent<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
-        ZStack {
-            StaticDustBackdrop()
-                .ignoresSafeArea()
-                .opacity(0.14)
-                .colorEffect(
-                    ShaderLibrary.grain(
-                        .float(0),
-                        .float(grainEnabled ? 0.024 : 0)
-                    )
-                )
-                .allowsHitTesting(false)
-
-            content()
-        }
+        content()
+            .background(Palette.sheetBackground)
     }
 
     private var panelContent: some View {
@@ -98,23 +86,20 @@ struct SettingsPage: View {
                 .padding(.top, 18)
                 .padding(.bottom, 6)
             displayControls
-                .padding(.bottom, 26)
+                .padding(.bottom, 24)
 
             sectionLabel(copy("settings.section.help"))
                 .padding(.bottom, 6)
             actionRow(
-                eyebrow: copy("settings.status.eyebrow"),
                 title: copy("settings.status.title")
             ) {
                 path.append(.systemStatus)
             }
             actionRow(
-                eyebrow: copy("settings.manual.eyebrow"),
                 title: copy("settings.manual.title"),
                 action: onOpenManual
             )
             actionRow(
-                eyebrow: copy("settings.privacy.eyebrow"),
                 title: copy("settings.privacy.title"),
                 action: onOpenPrivacy
             )
@@ -125,10 +110,10 @@ struct SettingsPage: View {
             Text("STARCATCH · \(versionText)")
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                .foregroundStyle(Palette.Text.tertiary)
                 .padding(.top, 22)
         }
-        .padding(.horizontal, 30)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
         .padding(.bottom, 30)
     }
 
@@ -184,7 +169,7 @@ struct SettingsPage: View {
                     .font(Typography.archivePoetic)
                     .tracking(Typography.archivePoeticTracking)
                     .lineSpacing(Typography.archivePoeticLineSpacing)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
 
@@ -199,12 +184,10 @@ struct SettingsPage: View {
                     .padding(.top, 28)
                     .padding(.bottom, 6)
                 externalActionRow(
-                    eyebrow: copy("status.support.eyebrow"),
                     title: copy("status.support.title"),
                     url: AppLinks.support
                 )
                 externalActionRow(
-                    eyebrow: copy("status.source.eyebrow"),
                     title: copy("status.source.title"),
                     url: AppLinks.project
                 )
@@ -212,11 +195,11 @@ struct SettingsPage: View {
                 Text("StarCatch 与 SatelliteKit 依据 MIT License 发布。轨道目录归属 CelesTrak；完整声明随项目公开发布。")
                     .font(Typography.statusTag)
                     .tracking(0.45)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 14)
             }
-            .padding(.horizontal, 30)
+            .padding(.horizontal, AppChromeMetrics.edgeInset)
             .padding(.bottom, 30)
         }
     }
@@ -294,12 +277,12 @@ struct SettingsPage: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                .foregroundStyle(Palette.Text.tertiary)
                 .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(Typography.archiveDataValue)
                 .tracking(Typography.dataValueTracking)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.secondary)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
             Spacer(minLength: 0)
@@ -308,8 +291,8 @@ struct SettingsPage: View {
         .overlay(alignment: .bottom) { hairline }
     }
 
-    private func externalActionRow(eyebrow: String, title: String, url: URL) -> some View {
-        actionRow(eyebrow: eyebrow, title: title, icon: "arrow.up.right") {
+    private func externalActionRow(title: String, url: URL) -> some View {
+        actionRow(title: title, icon: "arrow.up.right") {
             openURL(url)
         }
     }
@@ -329,12 +312,11 @@ struct SettingsPage: View {
                     Text(title)
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .foregroundStyle(Palette.Text.secondary)
                     Text(caption)
                         .font(Typography.readingCompact)
                         .tracking(Typography.readingCompactTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
-                        .lineLimit(2)
+                        .foregroundStyle(Palette.Text.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -348,7 +330,7 @@ struct SettingsPage: View {
             .frame(minHeight: 64)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(title)
         .accessibilityValue(copy(isOn.wrappedValue ? "accessibility.on" : "accessibility.off"))
         .accessibilityHint(copy("accessibility.toggle"))
@@ -357,14 +339,17 @@ struct SettingsPage: View {
     private func switchIndicator(isOn: Bool) -> some View {
         ZStack {
             Capsule()
-                .stroke(Palette.inkFaint.opacity(0.76), lineWidth: 0.6)
-                .frame(width: 30, height: 16)
+                .fill(isOn ? Palette.signal.opacity(0.22) : Palette.sheetSurface)
+                .overlay {
+                    Capsule().stroke(isOn ? Palette.signal.opacity(0.6) : Palette.inkFaint, lineWidth: 0.6)
+                }
+                .frame(width: 34, height: 20)
             Circle()
                 .fill(
                     (isOn ? Palette.signal : Palette.inkLow)
                         .opacity(isOn ? 0.88 : Palette.Level.faint)
                 )
-                .frame(width: 7, height: 7)
+                .frame(width: 10, height: 10)
                 .offset(x: isOn ? 7 : -7)
         }
         .frame(width: 34, height: 34)
@@ -372,7 +357,6 @@ struct SettingsPage: View {
     }
 
     private func actionRow(
-        eyebrow: String,
         title: String,
         icon: String = "chevron.right",
         action: @escaping () -> Void
@@ -383,23 +367,19 @@ struct SettingsPage: View {
                     Text(title)
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                    Text(eyebrow)
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                        .foregroundStyle(Palette.Text.secondary)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: icon)
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .frame(width: 34, height: 34)
             }
             .frame(minHeight: 52)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) { hairline }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(title)
     }
 
@@ -407,7 +387,6 @@ struct SettingsPage: View {
     private var openSettingsButton: some View {
         #if canImport(UIKit) && !targetEnvironment(simulator)
         actionRow(
-            eyebrow: copy("settings.location.eyebrow"),
             title: copy("settings.location.title"),
             icon: "arrow.up.right"
         ) {
@@ -426,7 +405,7 @@ struct SettingsPage: View {
         Text(text)
             .font(Typography.fieldLabel)
             .tracking(Typography.fieldLabelTracking + 0.5)
-            .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+            .foregroundStyle(Palette.Text.tertiary)
     }
 
     private var versionText: String {

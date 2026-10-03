@@ -27,6 +27,7 @@ struct SatelliteStoryView: View {
     let forecast: PassForecast?
     let onDismiss: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var revealed = false
@@ -47,17 +48,14 @@ struct SatelliteStoryView: View {
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
-            StaticDustBackdrop()
-                .ignoresSafeArea()
-                .opacity(0.22)
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 0) {
                     identityHero
-                        .padding(.bottom, 22)
+                        .padding(.bottom, 24)
 
                     archiveSectionPicker
-                        .padding(.bottom, 22)
+                        .padding(.bottom, 24)
 
                     selectedSectionContent
                         .id(selectedSection)
@@ -67,8 +65,8 @@ struct SatelliteStoryView: View {
                                 : .opacity.combined(with: .offset(y: 5))
                         )
                 }
-                .padding(.horizontal, 30)
-                .padding(.top, 14)
+                .padding(.horizontal, AppChromeMetrics.readingInset)
+                .padding(.top, 16)
                 .padding(.bottom, 42)
             }
         }
@@ -97,7 +95,6 @@ struct SatelliteStoryView: View {
                     .font(.system(size: 10, weight: .medium))
                 Text(missionRoleTitle)
                 Spacer(minLength: 8)
-                Text(object.orbitClass)
             }
             .font(Typography.statusTag)
             .tracking(language == .english ? 0.85 : 0.18)
@@ -105,46 +102,34 @@ struct SatelliteStoryView: View {
             .padding(.bottom, 10)
 
             Text(object.deepArchiveTitle)
-                .font(.system(.title2, design: .monospaced, weight: .semibold))
-                .tracking(0.8)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                .instrumentFont(24, relativeTo: .title2, weight: .semibold)
+                .tracking(0.15)
+                .foregroundStyle(Palette.Text.primary)
                 .lineLimit(2)
-                .minimumScaleFactor(0.78)
+                .fixedSize(horizontal: false, vertical: true)
 
             Text(missionRoleSummary)
-                .font(.system(.headline, design: .default, weight: .medium))
-                .foregroundStyle(Palette.inkHigh.opacity(0.88))
+                .font(Typography.readingBody)
+                .foregroundStyle(Palette.Text.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 13)
 
-            HStack(spacing: 7) {
-                archiveBadge(story.eyebrow)
-                archiveBadge("NORAD \(object.noradId)")
-                if object.family != nil {
-                    archiveBadge(copy("archive.badge.series"))
-                }
-            }
-            .padding(.top, 14)
+            Text(metadataLine)
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 16)
         }
     }
 
-    private func archiveBadge(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-            .tracking(language == .english ? 0.45 : 0.08)
-            .foregroundStyle(Palette.inkMid.opacity(0.74))
-            .lineLimit(1)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(Palette.inkHigh.opacity(0.035), in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.5)
-            }
+    private var metadataLine: String {
+        var fields = [story.eyebrow, "NORAD \(object.noradId)", object.orbitClass]
+        if object.family != nil { fields.append(copy("archive.badge.series")) }
+        return fields.joined(separator: "  ·  ")
     }
 
     private var archiveSectionPicker: some View {
-        HStack(spacing: 22) {
+        HStack(spacing: 16) {
             ForEach(ArchiveSection.allCases) { section in
                 Button {
                     withAnimation(suppressMotion ? .easeOut(duration: 0.1) : .easeInOut(duration: 0.22)) {
@@ -156,10 +141,10 @@ struct SatelliteStoryView: View {
                     .font(.system(.caption, design: .default, weight: .medium))
                     .foregroundStyle(
                         selectedSection == section
-                            ? Palette.inkHigh.opacity(0.92)
-                            : Palette.inkLow.opacity(0.68)
+                            ? Palette.Text.primary
+                            : Palette.Text.tertiary
                     )
-                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .overlay(alignment: .bottom) {
                         if selectedSection == section {
                             Rectangle()
@@ -170,7 +155,7 @@ struct SatelliteStoryView: View {
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SkyCapsulePressStyle())
                 .accessibilityAddTraits(selectedSection == section ? .isSelected : [])
             }
         }
@@ -212,7 +197,7 @@ struct SatelliteStoryView: View {
             } else {
                 Text(copy("archive.observation.unavailable"))
                     .font(Typography.readingCompact)
-                    .foregroundStyle(Palette.inkMid.opacity(0.7))
+                    .foregroundStyle(Palette.Text.secondary)
                     .padding(.top, 13)
             }
 
@@ -220,13 +205,16 @@ struct SatelliteStoryView: View {
     }
 
     private var forecastSectionHeader: some View {
-        HStack(spacing: 10) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(spacing: 12))
+        return layout {
             Text(copy("archive.section.future_24h"))
                 .font(Typography.fieldLabel)
                 .tracking(Typography.fieldLabelTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
-                .lineLimit(1)
-            Spacer(minLength: 10)
+                .foregroundStyle(Palette.Text.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 12) }
             HStack(spacing: 6) {
                 Rectangle()
                     .fill(object.identityTint.opacity(0.65))
@@ -234,8 +222,8 @@ struct SatelliteStoryView: View {
                 Text(copy("archive.forecast.above_horizon"))
                     .font(Typography.statusTag)
                     .tracking(language == .english ? 0.35 : 0.08)
-                    .foregroundStyle(Palette.inkLow.opacity(0.64))
-                    .lineLimit(1)
+                    .foregroundStyle(Palette.Text.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -247,14 +235,14 @@ struct SatelliteStoryView: View {
                 .font(Typography.readingBody)
                 .tracking(Typography.readingBodyTracking)
                 .lineSpacing(Typography.readingBodyLineSpacing)
-                .foregroundStyle(Palette.inkMid.opacity(0.88))
+                .foregroundStyle(Palette.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 12)
                 .padding(.bottom, story.officialReference == nil ? 22 : 14)
 
             if let reference = story.officialReference {
                 officialReferenceLink(reference)
-                    .padding(.bottom, 22)
+                    .padding(.bottom, 24)
             }
 
             if !preferredFacts.isEmpty {
@@ -276,7 +264,7 @@ struct SatelliteStoryView: View {
                     }
                 }
                 .padding(.top, 7)
-                .padding(.bottom, 20)
+                .padding(.bottom, 24)
             }
 
             if !story.milestones.isEmpty {
@@ -298,7 +286,7 @@ struct SatelliteStoryView: View {
             orbitParametersModule
                 .padding(.bottom, 24)
             currentTargetModule
-                .padding(.bottom, 20)
+                .padding(.bottom, 24)
             compactDisclosure(
                 title: copy("archive.sources.title"),
                 detail: L10n.format("archive.sources.count", table: "SatelliteText", language: language, story.sources.count),
@@ -322,11 +310,11 @@ struct SatelliteStoryView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(copy("archive.official_reference"))
                         .font(Typography.guide)
-                        .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                        .foregroundStyle(Palette.Text.primary)
                     Text(reference.title)
                         .font(Typography.statusTag)
                         .tracking(0.45)
-                        .foregroundStyle(Palette.inkMid.opacity(0.74))
+                        .foregroundStyle(Palette.Text.secondary)
                         .lineLimit(1)
                 }
                 Spacer(minLength: 8)
@@ -334,7 +322,7 @@ struct SatelliteStoryView: View {
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(object.identityTint.opacity(0.82))
             }
-            .padding(.horizontal, 13)
+            .padding(.horizontal, 16)
             .frame(minHeight: 48)
             .contentShape(Rectangle())
             .background(
@@ -346,7 +334,7 @@ struct SatelliteStoryView: View {
                     .stroke(object.identityTint.opacity(0.3), lineWidth: 0.55)
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(
             L10n.format("accessibility.open_official", table: "SatelliteText", language: language, reference.title)
         )
@@ -440,7 +428,10 @@ struct SatelliteStoryView: View {
     }
 
     private func observationSnapshot(_ ephemeris: Ephemeris) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            : AnyLayout(HStackLayout(spacing: 0))
+        return VStack(alignment: .leading, spacing: 11) {
             if let insight {
                 SatelliteInsightGraphic(
                     insight: insight,
@@ -448,34 +439,34 @@ struct SatelliteStoryView: View {
                 )
             }
 
-            HStack(spacing: 0) {
+            layout {
                 observationCell(
                     label: "EL",
                     value: String(format: "%+.1f°", ephemeris.elevation * 180 / .pi)
                 )
-                observationDivider
+                if !dynamicTypeSize.isAccessibilitySize { observationDivider }
                 observationCell(
                     label: copy("archive.field.range"),
                     value: String(format: "%.0f KM", ephemeris.rangeKm)
                 )
-                observationDivider
+                if !dynamicTypeSize.isAccessibilitySize { observationDivider }
                 observationCell(
                     label: copy("archive.field.speed"),
                     value: String(format: "%.2f KM/S", ephemeris.velocityKmS)
                 )
             }
 
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            layout {
                 Text(observationSentence(ephemeris))
                     .font(Typography.archiveNarrative)
                     .tracking(0.15)
-                    .foregroundStyle(Palette.inkMid.opacity(0.72))
+                    .foregroundStyle(Palette.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                 Text(String(format: "AZ %03.0f°", normalizedDegrees(ephemeris.azimuth)))
                     .font(Typography.statusTag)
                     .tracking(0.45)
-                    .foregroundStyle(Palette.inkLow.opacity(0.64))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .lineLimit(1)
             }
 
@@ -486,16 +477,12 @@ struct SatelliteStoryView: View {
                     .foregroundStyle(object.identityTint.opacity(0.78))
             }
         }
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(
-            object.identityTint.opacity(0.045),
+            Palette.sheetBackground,
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(object.identityTint.opacity(0.25), lineWidth: 0.55)
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(observationSentence(ephemeris))
     }
@@ -573,11 +560,11 @@ struct SatelliteStoryView: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(0.85)
-                .foregroundStyle(Palette.inkLow.opacity(0.7))
+                .foregroundStyle(Palette.Text.tertiary)
             Text(value)
                 .font(Typography.archiveDataValue)
                 .tracking(0.25)
-                .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                .foregroundStyle(Palette.Text.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
@@ -622,10 +609,10 @@ struct SatelliteStoryView: View {
             )
         ) {
             Text(chapter.body)
-                .font(Typography.readingCompact)
+                .font(Typography.readingBody)
                 .tracking(Typography.readingCompactTracking)
-                .lineSpacing(4)
-                .foregroundStyle(Palette.inkMid.opacity(0.78))
+                .lineSpacing(Typography.readingBodyLineSpacing)
+                .foregroundStyle(Palette.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
@@ -639,7 +626,7 @@ struct SatelliteStoryView: View {
                     .tracking(0.55)
                     .foregroundStyle(Palette.inkHigh.opacity(expanded ? 0.9 : 0.78))
             }
-            .frame(minHeight: 38)
+            .frame(minHeight: 44)
         }
         .tint(object.identityTint.opacity(0.72))
         .overlay(alignment: .bottom) {
@@ -662,14 +649,14 @@ struct SatelliteStoryView: View {
                 Text(title)
                     .font(Typography.guide)
                     .tracking(0.55)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.8))
+                    .foregroundStyle(Palette.Text.primary)
                 Spacer(minLength: 8)
                 Text(detail)
                     .font(Typography.statusTag)
                     .tracking(0.4)
-                    .foregroundStyle(Palette.inkLow.opacity(0.58))
+                    .foregroundStyle(Palette.Text.tertiary)
             }
-            .frame(minHeight: 42)
+            .frame(minHeight: 44)
         }
         .tint(object.identityTint.opacity(0.7))
         .overlay(alignment: .bottom) {
@@ -703,7 +690,7 @@ struct SatelliteStoryView: View {
                         Text(item.event)
                             .font(Typography.archiveNarrative)
                             .tracking(0.55)
-                            .foregroundStyle(Palette.inkMid.opacity(0.78))
+                            .foregroundStyle(Palette.Text.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.bottom, index < story.milestones.count - 1 ? 12 : 0)
@@ -713,20 +700,24 @@ struct SatelliteStoryView: View {
     }
 
     private func storyField(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 16) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+            : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 16))
+        return layout {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
-                .frame(width: 76, alignment: .leading)
+                .foregroundStyle(Palette.Text.tertiary)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? nil : 76, alignment: .leading)
             Text(value)
                 .font(Typography.archiveDataValue)
                 .tracking(Typography.dataValueTracking)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
         }
-        .frame(minHeight: 32)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.vertical, 8)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Palette.inkFaint.opacity(0.26))
@@ -739,7 +730,7 @@ struct SatelliteStoryView: View {
             Text(text)
                 .font(Typography.fieldLabel)
                 .tracking(Typography.fieldLabelTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.tertiary)
             Rectangle()
                 .fill(Palette.inkFaint.opacity(0.38))
                 .frame(height: 0.5)
@@ -751,14 +742,14 @@ struct SatelliteStoryView: View {
             Text(copy("archive.sources.offline_edition"))
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(0.52))
+                .foregroundStyle(Palette.Text.tertiary)
             ForEach(story.sources) { source in
                 sourceRow(source)
             }
             Text(copy("archive.sources.calculation_note"))
                 .font(Typography.archiveNarrative)
                 .tracking(0.45)
-                .foregroundStyle(Palette.inkLow.opacity(0.58))
+                .foregroundStyle(Palette.Text.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -779,18 +770,18 @@ struct SatelliteStoryView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(source.title)
                     .font(Typography.archiveNarrative)
-                    .foregroundStyle(Palette.inkMid.opacity(0.8))
+                    .foregroundStyle(Palette.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(source.scope.title)
                     .font(Typography.statusTag)
                     .tracking(0.35)
-                    .foregroundStyle(Palette.inkLow.opacity(0.58))
+                    .foregroundStyle(Palette.Text.tertiary)
             }
             Spacer(minLength: 4)
             if source.url != nil {
                 Image(systemName: "arrow.up.right")
                     .font(.system(size: 8.5, weight: .semibold))
-                    .foregroundStyle(Palette.inkLow.opacity(0.62))
+                    .foregroundStyle(Palette.Text.tertiary)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
@@ -798,7 +789,7 @@ struct SatelliteStoryView: View {
 
         if let url = source.url {
             Link(destination: url) { content }
-                .buttonStyle(.plain)
+                .buttonStyle(SkyCapsulePressStyle())
         } else {
             content
         }
@@ -813,6 +804,7 @@ private struct PassForecastLedgerView: View {
     @Binding var selectedIndex: Int?
     let tint: Color
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var forecastLoadedAt = Date()
 
     private var copyLanguage: SupportedLanguage { .current }
@@ -886,7 +878,7 @@ private struct PassForecastLedgerView: View {
                                     .frame(width: max(7, endX - x), height: selectedIndex == index ? 6 : 3)
                                     .contentShape(Rectangle().inset(by: -12))
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(SkyCapsulePressStyle())
                             .offset(x: x)
                             .accessibilityLabel(passAccessibility(window))
                         }
@@ -916,23 +908,27 @@ private struct PassForecastLedgerView: View {
             }
             .font(Typography.statusTag)
             .tracking(0.45)
-            .foregroundStyle(Palette.inkLow.opacity(0.66))
+            .foregroundStyle(Palette.Text.tertiary)
         }
     }
 
     private func selectedPassPanel(_ pass: PassWindow, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 0) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 16))
+            : AnyLayout(HStackLayout(spacing: 0))
+        return VStack(alignment: .leading, spacing: 12) {
+            layout {
                 ledgerMetric(
                     text(pass.phase == .visible ? "archive.forecast.current_event" : "archive.forecast.next_event"),
-                    eventValue(pass, now: now)
+                    eventValue(pass, now: now),
+                    prominent: true
                 )
-                ledgerDivider
+                if !dynamicTypeSize.isAccessibilitySize { ledgerDivider }
                 ledgerMetric(
                     text("archive.forecast.maximum_elevation"),
                     pass.maximumElevationDegrees.map { String(format: "%.0f°", $0) } ?? "—"
                 )
-                ledgerDivider
+                if !dynamicTypeSize.isAccessibilitySize { ledgerDivider }
                 ledgerMetric(
                     text("archive.forecast.duration"),
                     pass.duration.map(durationText) ?? "—"
@@ -945,11 +941,11 @@ private struct PassForecastLedgerView: View {
             .frame(height: 62)
             .accessibilityHidden(true)
 
-            HStack(alignment: .firstTextBaseline) {
+            layout {
                 eventLabel(text("archive.forecast.rise"), date: pass.rise)
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                 eventLabel(text("archive.forecast.peak"), date: pass.peak)
-                Spacer()
+                if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                 eventLabel(text("archive.forecast.set"), date: pass.set)
             }
 
@@ -958,19 +954,15 @@ private struct PassForecastLedgerView: View {
                 Text(String(format: "AZ %03.0f°  →  %03.0f°", riseAzimuth, setAzimuth))
                     .font(Typography.statusTag)
                     .tracking(0.5)
-                    .foregroundStyle(Palette.inkLow.opacity(0.7))
+                    .foregroundStyle(Palette.Text.tertiary)
             }
         }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
         .background(
-            tint.opacity(0.045),
+            Palette.sheetBackground,
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(tint.opacity(0.25), lineWidth: 0.55)
-        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(passAccessibility(pass))
     }
@@ -985,11 +977,11 @@ private struct PassForecastLedgerView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(text("archive.forecast.stationary"))
                     .font(Typography.guide)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                    .foregroundStyle(Palette.Text.primary)
                 if let elevation = forecast.stationaryElevationDegrees {
                     Text(String(format: "EL %+.1f°", elevation))
                         .font(Typography.statusTag)
-                        .foregroundStyle(Palette.inkMid.opacity(0.72))
+                        .foregroundStyle(Palette.Text.secondary)
                 }
             }
             Spacer()
@@ -1011,10 +1003,10 @@ private struct PassForecastLedgerView: View {
                 .frame(width: 24)
             Text(text(key))
                 .font(Typography.readingCompact)
-                .foregroundStyle(Palette.inkMid.opacity(0.76))
+                .foregroundStyle(Palette.Text.secondary)
             Spacer()
         }
-        .padding(.horizontal, 13)
+        .padding(.horizontal, 16)
         .frame(minHeight: 52)
         .background(Palette.inkHigh.opacity(0.02), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
@@ -1061,17 +1053,16 @@ private struct PassForecastLedgerView: View {
         context.fill(Path(ellipseIn: CGRect(x: point.x - 2.5, y: point.y - 2.5, width: 5, height: 5)), with: .color(tint.opacity(0.92)))
     }
 
-    private func ledgerMetric(_ label: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func ledgerMetric(_ label: String, _ value: String, prominent: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text(label)
-                .font(Typography.statusTag)
-                .foregroundStyle(Palette.inkLow.opacity(0.68))
-                .lineLimit(1)
+                .font(Typography.fieldLabel)
+                .foregroundStyle(Palette.Text.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
             Text(value)
-                .font(Typography.archiveDataValue)
-                .foregroundStyle(Palette.inkHigh.opacity(0.9))
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+                .instrumentFont(prominent ? 24 : 16, relativeTo: .callout, weight: prominent ? .medium : .regular, design: .monospaced)
+                .foregroundStyle(prominent ? Palette.Text.primary : Palette.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1087,10 +1078,10 @@ private struct PassForecastLedgerView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
             Text(date.map(timeText) ?? "—")
-                .foregroundStyle(Palette.inkMid.opacity(0.82))
+                .foregroundStyle(Palette.Text.secondary)
         }
         .font(Typography.statusTag)
-        .foregroundStyle(Palette.inkLow.opacity(0.65))
+        .foregroundStyle(Palette.Text.tertiary)
     }
 
     private func eventValue(_ pass: PassWindow, now: Date) -> String {
@@ -1172,7 +1163,7 @@ struct SatelliteStoryEntryControl: View {
                 Image(systemName: "arrow.right")
                     .font(.system(size: 8.5, weight: .semibold))
             }
-            .foregroundStyle(Palette.inkHigh.opacity(0.9))
+            .foregroundStyle(Palette.Text.primary)
             .frame(width: 154, height: 42)
             .overlay {
                 Capsule()

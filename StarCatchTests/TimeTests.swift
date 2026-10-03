@@ -596,7 +596,7 @@ final class TimeTests: XCTestCase {
     func testScaleJourneyLeavesGlobalZoomIndependent() {
         XCTAssertEqual(ObservationScale.defaultLocalMagnification, 1)
         XCTAssertEqual(ObservationScale.minimumOverviewZoom, 0.72)
-        XCTAssertEqual(ObservationScale.defaultOverviewZoom, 0.82)
+        XCTAssertEqual(ObservationScale.defaultOverviewZoom, 0.94)
         XCTAssertEqual(ObservationScale.maximumOverviewZoom, 2.2)
         XCTAssertTrue(
             (ObservationScale.minimumOverviewZoom ... ObservationScale.maximumOverviewZoom)

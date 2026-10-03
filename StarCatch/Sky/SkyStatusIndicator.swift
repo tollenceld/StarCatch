@@ -52,103 +52,34 @@ struct SkyWingSurfaceModifier: ViewModifier {
     }
 }
 
-/// 全球轨道页的专属模式栏。它位于系统安全区下方，以整条仪器栏明确二级场景，
+/// 全球轨道页的专属模式栏。它位于系统安全区下方，以返回入口和标题明确二级场景，
 /// 不再复用主天空围绕灵动岛的状态翼与 AZ / EL 姿态读数。
 struct GlobalOrbitHeader: View {
-    let timeLabel: String
     let onBack: () -> Void
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
-
-    private var surfaceMode: AppChromeSurfaceMode {
-        if #available(iOS 26.0, *) {
-            return .resolve(
-                liquidGlassAvailable: true,
-                reduceTransparency: reduceTransparency,
-                forceLegacyMaterial: forceLegacyMaterial
-            )
-        }
-        return .resolve(
-            liquidGlassAvailable: false,
-            reduceTransparency: reduceTransparency,
-            forceLegacyMaterial: forceLegacyMaterial
-        )
-    }
-
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *), surfaceMode == .liquidGlass {
-                headerContent
-                    .glassEffect(
-                        .regular
-                            .tint(Palette.voidBlack.opacity(0.1))
-                            .interactive(),
-                        in: headerShape
-                    )
-            } else if surfaceMode == .opaque {
-                headerContent
-                    .background(Palette.voidBlack.opacity(0.97), in: headerShape)
-            } else {
-                headerContent
-                    .background(.ultraThinMaterial, in: headerShape)
-                    .background(Palette.voidBlack.opacity(0.76), in: headerShape)
-            }
-        }
-        .overlay {
-            headerShape.stroke(
-                Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34),
-                lineWidth: AppChromeMetrics.strokeWidth
-            )
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityAction(.escape, onBack)
-        .appRootDismissGesture(action: onBack)
-    }
-
-    private var headerContent: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             AppNavigationControl(
                 title: L10n.text("navigation.sky"),
                 role: .dismissToSky,
                 action: onBack
             )
-                .fixedSize(horizontal: true, vertical: false)
+            .fixedSize(horizontal: true, vertical: false)
 
             Spacer(minLength: 12)
-
-            HStack(spacing: 10) {
-                Text(L10n.text("overview.header.title"))
-                    .font(Typography.guide)
-                    .tracking(Typography.guideTracking)
-                    .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(Palette.signal.opacity(0.78))
-                        .frame(width: 4, height: 4)
-                    Text(timeLabel)
-                        .font(Typography.statusTag)
-                        .tracking(0.7)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .frame(maxWidth: .infinity, alignment: .trailing)
-            .layoutPriority(1)
+            Text(L10n.text("overview.header.title"))
+                .font(Typography.guide)
+                .foregroundStyle(Palette.Text.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
-        // 与工具面板相同：表面距屏幕 18pt，控件再内收 18pt。
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .frame(height: ContentTopBarMetrics.height)
-        .contentShape(headerShape)
-    }
-
-    private var headerShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .contentShape(Rectangle())
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .accessibilityElement(children: .contain)
+        .accessibilityAction(.escape, onBack)
+        .appRootDismissGesture(action: onBack)
     }
 }
 

@@ -11,12 +11,9 @@ struct PrivacyStatementView: View {
     var body: some View {
         ZStack {
             Palette.voidBlack.ignoresSafeArea()
-            StaticDustBackdrop()
-                .ignoresSafeArea()
-                .opacity(0.20)
 
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 32) {
                     PrivacySummary()
 
                     PrivacySection(
@@ -53,10 +50,10 @@ struct PrivacyStatementView: View {
                     Text("PRIVACY · ON DEVICE")
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                        .foregroundStyle(Palette.Text.tertiary)
                 }
-                .padding(.horizontal, 30)
-                .padding(.top, 18)
+                .padding(.horizontal, AppChromeMetrics.readingInset)
+                .padding(.top, 24)
                 .padding(.bottom, 36)
             }
         }
@@ -89,7 +86,7 @@ private struct PrivacySummary: View {
                     Text(L10n.text(key))
                         .font(Typography.readingCompact)
                         .tracking(Typography.readingCompactTracking)
-                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                        .foregroundStyle(Palette.Text.primary)
                 }
             }
         }
@@ -106,7 +103,7 @@ private struct PrivacySection: View {
     let text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(Typography.guide.weight(.medium))
                 .tracking(0.35)
@@ -115,7 +112,7 @@ private struct PrivacySection: View {
                 .font(Typography.readingBody)
                 .tracking(Typography.readingBodyTracking)
                 .lineSpacing(Typography.readingBodyLineSpacing)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -133,23 +130,23 @@ private struct DocumentLinkRow: View {
                     Text(title)
                         .font(Typography.guide)
                         .tracking(Typography.guideTracking)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .foregroundStyle(Palette.Text.secondary)
                     Text(label)
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                        .foregroundStyle(Palette.Text.tertiary)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "arrow.up.right")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .frame(width: 34, height: 44)
             }
             .frame(minHeight: 58)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) { ContentHairline() }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityHint(L10n.text("accessibility.open_browser"))
     }
 }

@@ -14,9 +14,9 @@ struct TargetMicroLabel: View {
 
     var body: some View {
         Text(label)
-            .font(.system(size: 9.5, weight: .medium, design: .monospaced))
+            .font(Typography.statusTag)
             .tracking(0.45)
-            .foregroundStyle(Palette.inkHigh.opacity(0.92))
+            .foregroundStyle(Palette.Text.primary)
             .lineLimit(1)
             .minimumScaleFactor(0.78)
             .padding(.horizontal, 9)
@@ -54,6 +54,7 @@ struct ArchiveOverlay: View {
     @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
     @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var presentationVisible = false
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
@@ -108,32 +109,32 @@ struct ArchiveOverlay: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(object.name)
-                .font(.system(size: 20, weight: .semibold, design: .rounded))
-                .foregroundStyle(Palette.inkHigh.opacity(0.97))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .padding(.trailing, 48)
+                .font(Typography.objectName)
+                .foregroundStyle(Palette.Text.primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, 44)
 
             identityHeader
                 .padding(.top, 8)
 
             Text(missionRoleSummary)
-                .font(.system(size: 12.5, weight: .regular))
-                .foregroundStyle(Palette.inkMid.opacity(0.9))
+                .font(Typography.readingCompact)
+                .foregroundStyle(Palette.Text.secondary)
                 .lineSpacing(2)
-                .lineLimit(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 8)
 
             telemetry
-                .padding(.top, 10)
+                .padding(.top, 16)
 
             archiveAction
-                .padding(.top, 10)
+                .padding(.top, 16)
         }
-        .padding(.horizontal, 15)
-        .padding(.top, 15)
-        .padding(.bottom, 12)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(glassSurface)
         .overlay(alignment: .topTrailing) {
@@ -164,6 +165,24 @@ struct ArchiveOverlay: View {
     }
 
     private var identityHeader: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 7) {
+                identityStatus
+                metadataDivider
+                Text(missionRoleTitle)
+                metadataDivider
+                Text(object.orbitClass)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                identityStatus
+                Text("\(missionRoleTitle) · \(object.orbitClass)")
+            }
+        }
+        .font(Typography.fieldLabel)
+        .foregroundStyle(Palette.Text.secondary)
+    }
+
+    private var identityStatus: some View {
         HStack(spacing: 7) {
             Circle()
                 .fill(statusColor.opacity(0.9))
@@ -172,22 +191,7 @@ struct ArchiveOverlay: View {
             Text(statusText)
                 .foregroundStyle(statusColor.opacity(0.9))
 
-            metadataDivider
-
-            Text(missionRoleTitle)
-                .foregroundStyle(Palette.inkMid.opacity(0.83))
-
-            metadataDivider
-
-            Text(object.orbitClass)
-                .foregroundStyle(Palette.inkLow.opacity(0.78))
-
-            Spacer(minLength: 8)
         }
-        .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-        .tracking(0.7)
-        .lineLimit(1)
-        .minimumScaleFactor(0.72)
     }
 
     private var metadataDivider: some View {
@@ -199,121 +203,109 @@ struct ArchiveOverlay: View {
     private var closeControl: some View {
         Button(action: onDismiss) {
             Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(Palette.inkMid.opacity(0.84))
-                .frame(width: 34, height: 34)
-                .background(
-                    Palette.voidBlack.opacity(0.2),
-                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-                )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Palette.inkFaint.opacity(0.26), lineWidth: 0.5)
-                }
+                .font(.footnote.weight(.medium))
+                .foregroundStyle(Palette.Text.secondary)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(copy("accessibility.close_detail"))
         .accessibilityHint(copy("accessibility.close_detail.hint"))
     }
 
     private var telemetry: some View {
-        HStack(spacing: 0) {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 12))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: 12))
+        return layout {
             telemetryCell(
                 title: copy("archive.field.range"),
-                value: ephemeris.map { String(format: "%.0f KM", $0.rangeKm) } ?? "—"
+                value: ephemeris.map { String(format: "%.0f", $0.rangeKm) } ?? "—",
+                unit: "KM"
             )
-            telemetryDivider
+            if !dynamicTypeSize.isAccessibilitySize { telemetryDivider }
             telemetryCell(
                 title: copy("archive.field.altitude"),
-                value: ephemeris.map { String(format: "%.0f KM", $0.altitudeKm) } ?? "—"
+                value: ephemeris.map { String(format: "%.0f", $0.altitudeKm) } ?? "—",
+                unit: "KM"
             )
-            telemetryDivider
+            if !dynamicTypeSize.isAccessibilitySize { telemetryDivider }
             telemetryCell(
                 title: copy("archive.field.speed"),
-                value: ephemeris.map { String(format: "%.2f KM/S", $0.velocityKmS) } ?? "—"
+                value: ephemeris.map { String(format: "%.2f", $0.velocityKmS) } ?? "—",
+                unit: "KM/S"
             )
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(
-            Palette.voidBlack.opacity(0.18),
-            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Palette.inkFaint.opacity(0.22), lineWidth: 0.5)
-        }
+        .padding(.vertical, 4)
     }
 
-    private func telemetryCell(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    private func telemetryCell(title: String, value: String, unit: String) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 12))
+            : AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+        return layout {
             Text(title)
-                .font(.system(size: 9.5, weight: .regular))
-                .foregroundStyle(Palette.inkMid.opacity(0.76))
-            Text(value)
-                .font(.system(size: 11.5, weight: .medium, design: .monospaced))
-                .foregroundStyle(Palette.inkHigh.opacity(0.94))
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+                .font(Typography.fieldLabel)
+                .foregroundStyle(Palette.Text.tertiary)
+            if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    telemetryValue(value)
+                    telemetryUnit(unit)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    telemetryValue(value)
+                    telemetryUnit(unit)
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func telemetryValue(_ value: String) -> some View {
+        Text(value)
+            .font(Typography.dataValue.weight(.medium))
+            .foregroundStyle(Palette.Text.primary)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func telemetryUnit(_ unit: String) -> some View {
+        Text(unit)
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary)
     }
 
     private var telemetryDivider: some View {
         Rectangle()
-            .fill(Palette.inkFaint.opacity(0.22))
-            .frame(width: 0.5, height: 28)
+            .fill(Palette.inkFaint.opacity(0.32))
+            .frame(width: 0.5, height: 44)
     }
 
     private var archiveAction: some View {
         Button(action: onOpenArchive) {
-            HStack(spacing: 8) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(object.identityTint.opacity(0.09))
-                        .frame(width: 26, height: 26)
-                    Image(systemName: "book.closed")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(object.identityTint.opacity(0.9))
-                }
+            HStack(spacing: 12) {
+                Image(systemName: "book.closed")
+                    .font(.footnote.weight(.medium))
                 Text(copy("action.view_archive"))
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(Typography.guide.weight(.medium))
                 Spacer(minLength: 8)
-                Text(copy("action.view_archive.subtitle"))
-                    .font(.system(size: 9.5, weight: .regular))
-                    .foregroundStyle(Palette.inkMid.opacity(0.72))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(object.identityTint.opacity(0.72))
+                Image(systemName: "arrow.right")
+                    .font(.footnote.weight(.medium))
             }
-            .foregroundStyle(Palette.inkHigh.opacity(0.88))
-            .padding(.horizontal, 8)
-            .frame(maxWidth: .infinity, minHeight: 40)
-            .background(
-                Palette.inkHigh.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    .stroke(object.identityTint.opacity(0.24), lineWidth: 0.55)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .foregroundStyle(Palette.signal)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.top, 4)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityHint(copy("action.view_archive.hint"))
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Palette.inkFaint.opacity(0.22))
-                .frame(height: 0.5)
-        }
+        .overlay(alignment: .top) { ContentHairline() }
     }
 
     @ViewBuilder
     private var glassSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous)
         if reduceTransparency {
             shape
                 .fill(Palette.sheetBackground)

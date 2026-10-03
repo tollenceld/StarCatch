@@ -180,8 +180,7 @@ private struct SkyCommandSlotButton: View {
                     .minimumScaleFactor(0.6)
             }
             .foregroundStyle(
-                (active ? Palette.signal : Palette.inkMid)
-                    .opacity(active ? 0.90 : 0.70)
+                active ? Palette.signal : Palette.Text.secondary
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay(alignment: .bottom) {

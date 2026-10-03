@@ -22,13 +22,14 @@ struct TimeDial: View {
     private static let accessibilityStep: TimeInterval = 30 * 60
 
     @AppStorage("timeDialHasInteracted") private var hasInteracted = false
+    @ScaledMetric(relativeTo: .caption2) private var tickFontSize: CGFloat = 11
     @State private var dragging = false
     @State private var lastDragX: CGFloat = 0
 
     var body: some View {
         Group {
             if showsSurface {
-                dialContent.modifier(DockSurface())
+                dialContent.modifier(DockSurface(timelinePresence: 1))
             } else {
                 dialContent
             }
@@ -59,15 +60,22 @@ struct TimeDial: View {
     }
 
     private var dialContent: some View {
-        VStack(spacing: 3) {
+        VStack(spacing: 8) {
             readout
+            if !hasInteracted {
+                Label(L10n.text("time.drag_hint"), systemImage: "arrow.left.and.right")
+                    .font(Typography.fieldLabel)
+                    .foregroundStyle(Palette.Text.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .allowsHitTesting(false)
+            }
             ruler
-                .frame(height: 48)
+                .frame(height: max(56, tickFontSize * 4.5))
                 // 刻度区优先接收横向手势；上方状态读数仍保留按钮点击。
                 .highPriorityGesture(dragGesture)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .padding(.top, 12)
         .padding(.bottom, 8)
     }
 
@@ -78,7 +86,7 @@ struct TimeDial: View {
             Text("−24 H")
                 .font(Typography.statusTag)
                 .tracking(0.7)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                .foregroundStyle(Palette.Text.tertiary)
                 .lineLimit(1)
 
             Spacer(minLength: 6)
@@ -90,7 +98,7 @@ struct TimeDial: View {
             Text("+24 H")
                 .font(Typography.statusTag)
                 .tracking(0.7)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                .foregroundStyle(Palette.Text.tertiary)
                 .lineLimit(1)
         }
         .frame(minHeight: 20)
@@ -107,7 +115,7 @@ struct TimeDial: View {
                 Text(L10n.text("time.live"))
                     .font(Typography.statusTag)
                     .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.secondary)
                     .lineLimit(1)
             }
         } else {
@@ -143,7 +151,7 @@ struct TimeDial: View {
     private var ruler: some View {
         Canvas { context, size in
             let midX = size.width / 2
-            let baselineY = size.height * 0.52
+            let baselineY = size.height * 0.40
             let pxPerSecond = 1.0 / Self.secondsPerPoint
             let shift = clock.offset * pxPerSecond
             let halfWindow = Double(size.width) / 2 * Self.secondsPerPoint
@@ -178,9 +186,9 @@ struct TimeDial: View {
                    x <= size.width - 18 {
                     context.draw(
                         Text(relativeTickLabel(seconds: t))
-                            .font(.system(size: 7.5, weight: .medium, design: .monospaced))
+                            .font(.system(size: tickFontSize, weight: .medium, design: .monospaced))
                             .tracking(0.45)
-                            .foregroundStyle(Palette.inkLow.opacity(0.72 * activity)),
+                            .foregroundStyle(Palette.Text.tertiary),
                         at: CGPoint(x: x, y: baselineY + 14),
                         anchor: .top
                     )
@@ -231,28 +239,10 @@ struct TimeDial: View {
             marker.closeSubpath()
             context.fill(marker, with: .color(Palette.signal.opacity(0.82)))
         }
-        .overlay(alignment: .topLeading) {
-            if !hasInteracted {
-                Label(L10n.text("time.drag_hint"), systemImage: "arrow.left.and.right")
-                    .font(.system(size: 8.5, weight: .medium))
-                    .foregroundStyle(Palette.inkMid.opacity(0.84))
-                    .padding(.horizontal, 7)
-                    .frame(height: 18)
-                    .background(
-                        Palette.voidBlack.opacity(0.72),
-                        in: Capsule()
-                    )
-                    .overlay {
-                        Capsule()
-                            .stroke(Palette.inkFaint.opacity(0.3), lineWidth: 0.5)
-                    }
-                    .allowsHitTesting(false)
-            }
-        }
     }
 
     private func relativeTickLabel(seconds: TimeInterval) -> String {
-        guard abs(seconds) >= 1 else { return "LIVE" }
+        guard abs(seconds) >= 1 else { return clock.isLive ? "" : "LIVE" }
         let sign = seconds < 0 ? "−" : "+"
         let minutes = Int((abs(seconds) / 60).rounded())
         if minutes >= 60 {

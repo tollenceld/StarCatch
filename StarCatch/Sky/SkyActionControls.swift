@@ -141,9 +141,13 @@ struct ReturnToLiveControl: View {
 }
 
 struct SkyCapsulePressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
+    @AppStorage("reducedMotion") private var reducedMotion = false
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .scaleEffect(configuration.isPressed && !systemReducedMotion && !previewReducedMotion && !reducedMotion ? 0.97 : 1)
             .brightness(configuration.isPressed ? 0.065 : 0)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }

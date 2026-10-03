@@ -150,7 +150,7 @@ struct SkyView: View {
                 .colorEffect(
                     ShaderLibrary.grain(
                         .float(Float(suppressMotion ? 0 : time)),
-                        .float(grainEnabled ? 0.024 : 0)
+                        .float(grainEnabled ? 0.012 : 0)
                     )
                 )
                 .onChange(of: timeline.date) { _, frameDate in
@@ -585,7 +585,7 @@ struct SkyView: View {
             )
         }
         .id(objectID)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
         .padding(.bottom, 8)
     }
 
@@ -856,7 +856,6 @@ struct SkyView: View {
                     + 10
                 : max(8, geo.safeAreaInsets.top + 8)
             GlobalOrbitHeader(
-                timeLabel: clock.isLive ? "LIVE" : clock.offsetLabel,
                 onBack: exitOverviewToLocal
             )
             .padding(.horizontal, AppChromeMetrics.edgeInset)

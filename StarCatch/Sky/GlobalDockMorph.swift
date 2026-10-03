@@ -1,8 +1,31 @@
 import SwiftUI
 
-private struct TimeDialHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 89
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
+/// Measures the complete dial before interpolating the surface height. A preference
+/// measured inside an already constrained frame can clip new hint / Dynamic Type rows.
+private struct GlobalDockLayout: Layout {
+    var progress: Double
+    var reducedMotion: Bool
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let dial = subviews.first else { return .zero }
+        let size = dial.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
+        let target = max(AppChromeMetrics.commandRailHeight, size.height)
+        return CGSize(
+            width: size.width,
+            height: reducedMotion ? target : DockMorphMetrics.height(progress: progress, target: target)
+        )
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            let size = subview.sizeThatFits(ProposedViewSize(width: bounds.width, height: nil))
+            subview.place(
+                at: CGPoint(x: bounds.minX, y: bounds.maxY),
+                anchor: .bottomLeading,
+                proposal: ProposedViewSize(width: bounds.width, height: size.height)
+            )
+        }
+    }
 }
 
 /// Only the bottom control changes shape; the globe uses its untouched scene choreography.
@@ -12,7 +35,6 @@ struct GlobalDockMorph: View, Animatable {
     let interactive: Bool
     let clock: SkyClock
     let filtersActive: Bool
-    @State private var dialHeight: CGFloat = 89
 
     var animatableData: Double {
         get { progress }
@@ -20,15 +42,9 @@ struct GlobalDockMorph: View, Animatable {
     }
 
     var body: some View {
-        let height = reducedMotion ? dialHeight : DockMorphMetrics.height(progress: progress, target: dialHeight)
-        ZStack(alignment: .bottom) {
+        GlobalDockLayout(progress: progress, reducedMotion: reducedMotion) {
             TimeDial(clock: clock, showsSurface: false)
                 .fixedSize(horizontal: false, vertical: true)
-                .background {
-                    GeometryReader { geometry in
-                        Color.clear.preference(key: TimeDialHeightKey.self, value: geometry.size.height)
-                    }
-                }
                 .opacity(DockMorphMetrics.timelineReveal(progress))
                 .offset(y: reducedMotion ? 0 : 8 * (1 - DockMorphMetrics.timelineReveal(progress)))
                 .allowsHitTesting(interactive)
@@ -43,8 +59,6 @@ struct GlobalDockMorph: View, Animatable {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
-        .frame(height: height, alignment: .bottom)
-        .modifier(DockSurface(navigationPresence: 1 - progress))
-        .onPreferenceChange(TimeDialHeightKey.self) { dialHeight = max(AppChromeMetrics.commandRailHeight, $0) }
+        .modifier(DockSurface(navigationPresence: 1 - progress, timelinePresence: progress))
     }
 }

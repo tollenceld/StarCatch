@@ -59,9 +59,21 @@ enum Palette {
     /// 对象名称、锁定态主文字 —— 暖纸白，绝不用 #FFFFFF。
     static let inkHigh = Color(hex: 0xEEE9DE)
 
+    /// Opaque reading colors avoid compounded opacity on dark material surfaces.
+    enum Text {
+        static let primary = inkHigh
+        static let secondary = Color(hex: 0xC4BFB4)
+        static let tertiary = Color(hex: 0xA6A198)
+    }
+
+    enum Selection {
+        static let surface = Color(hex: 0x28271F)
+        static let border = Color(hex: 0x756A53)
+    }
+
     // MARK: - 信号色
 
-    /// 信号/捕捉指示 —— 暗琥珀，永远低透明度使用（≤ 0.65）。
+    /// 信号/捕捉指示与主要操作 —— 暗琥珀。文字直接使用，装饰按需降低透明度。
     static let signal = Color(hex: 0xD7BE8E)
 
     // MARK: - 轨道类别
@@ -98,7 +110,7 @@ enum Palette {
 
     // MARK: - 透明度层级
 
-    /// 全部信息层级由同一颜色的四档透明度构成。
+    /// 装饰与旧有天空图层的透明度；阅读文字优先使用 Text 语义色。
     enum Level {
         static let ghost: Double = 0.22
         static let faint: Double = 0.58

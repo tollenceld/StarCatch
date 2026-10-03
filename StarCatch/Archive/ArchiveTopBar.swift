@@ -10,6 +10,7 @@ enum AppChromeMetrics {
     static let compactCornerRadius: CGFloat = 16
     static let wingCornerRadius: CGFloat = 16
     static let edgeInset: CGFloat = 18
+    static let readingInset: CGFloat = 24
     static let topEdgeInset: CGFloat = 18
     static let itemSpacing: CGFloat = 10
     static let commandControlSize: CGFloat = 52
@@ -111,7 +112,7 @@ struct AppPageHeader: View {
             Text(title)
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                .foregroundStyle(Palette.Text.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity, alignment: .trailing)
@@ -321,7 +322,7 @@ struct ArchiveTopBar: View {
             Text(title)
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.primary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .fixedSize(horizontal: false, vertical: true)

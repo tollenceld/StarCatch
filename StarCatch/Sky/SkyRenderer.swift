@@ -83,7 +83,7 @@ enum SkyRenderer {
         let visible = min(1, max(0, presence))
         guard visible > 0.01 else { return }
         let focus = min(1, max(0, focusProgress))
-        let alpha = (0.48 + 0.24 * emphasis + (locked ? 0.08 : 0)) * visible
+        let alpha = (0.60 + 0.18 * emphasis + (locked ? 0.08 : 0)) * visible
         let gap: CGFloat = 6 - 1.2 * CGFloat(focus)
         let len: CGFloat = 10.5
         var path = Path()

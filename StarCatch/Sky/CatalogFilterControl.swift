@@ -53,6 +53,7 @@ struct CatalogFilterPage: View {
     let session: SkySession
     let onBack: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var scope: CatalogScope
     @State private var selections: Set<CatalogFilter>
     @State private var resultCount: Int
@@ -68,9 +69,11 @@ struct CatalogFilterPage: View {
         FilterSection(group: .constellation),
     ]
 
-    private static let adaptiveColumns = [
-        GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 10),
-    ]
+    private var adaptiveColumns: [GridItem] {
+        dynamicTypeSize.isAccessibilitySize
+            ? [GridItem(.flexible())]
+            : [GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 12)]
+    }
 
     init(session: SkySession, onBack: @escaping () -> Void = {}) {
         self.session = session
@@ -98,7 +101,7 @@ struct CatalogFilterPage: View {
                         }
                     }
                     .padding(.horizontal, AppChromeMetrics.edgeInset)
-                    .padding(.top, 20)
+                    .padding(.top, 16)
                     .padding(.bottom, 36)
                 }
             }
@@ -114,40 +117,26 @@ struct CatalogFilterPage: View {
     }
 
     private var selectionSummary: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(L10n.text("filter.filtered"))
-                        .font(Typography.guide)
-                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.present))
-                    Text(L10n.format("filter.visible", resultCount))
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
-                }
-
-                Spacer(minLength: 12)
-
+                Text(L10n.format("filter.visible", resultCount))
+                    .font(Typography.dataValue)
+                    .foregroundStyle(Palette.Text.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
                 if hasSelection {
                     Button(L10n.text("action.reset"), action: reset)
-                        .font(Typography.statusTag)
-                        .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.signal.opacity(Palette.Level.present))
-                        .buttonStyle(.plain)
+                        .font(Typography.readingCompact)
+                        .foregroundStyle(Palette.signal)
+                        .buttonStyle(SkyCapsulePressStyle())
                         .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                         .accessibilityLabel(L10n.text("filter.reset.accessibility"))
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    if summaryItems.isEmpty {
-                        summaryChip(
-                            title: CatalogScope.all.title,
-                            tint: Palette.inkMid,
-                            action: nil
-                        )
-                    } else {
+            if hasSelection {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
                         ForEach(summaryItems) { item in
                             summaryChip(
                                 title: item.title,
@@ -156,13 +145,12 @@ struct CatalogFilterPage: View {
                             )
                         }
                     }
+                    .padding(.vertical, 1)
                 }
-                .padding(.vertical, 1)
             }
         }
         .padding(.horizontal, AppChromeMetrics.edgeInset)
-        .padding(.top, 14)
-        .padding(.bottom, 13)
+        .padding(.vertical, 16)
         .background(Palette.sheetBackground)
         .overlay(alignment: .bottom) { ContentHairline() }
         .accessibilityElement(children: .contain)
@@ -178,7 +166,7 @@ struct CatalogFilterPage: View {
                 Button(action: action) {
                     chipContent(title: title, tint: tint, removable: true)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SkyCapsulePressStyle())
                 .accessibilityLabel("\(title), \(L10n.text("action.delete"))")
             } else {
                 chipContent(title: title, tint: tint, removable: false)
@@ -201,9 +189,9 @@ struct CatalogFilterPage: View {
                     .font(.system(size: 8, weight: .semibold))
             }
         }
-        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+        .foregroundStyle(Palette.Text.secondary)
         .padding(.horizontal, 12)
-        .frame(minHeight: 32)
+        .frame(minHeight: 44)
         .background(tint.opacity(removable ? 0.1 : 0.055), in: Capsule())
         .overlay {
             Capsule()
@@ -215,7 +203,7 @@ struct CatalogFilterPage: View {
     private var frequentLenses: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(.overview)
-            LazyVGrid(columns: Self.adaptiveColumns, spacing: 10) {
+            LazyVGrid(columns: adaptiveColumns, spacing: 10) {
                 ForEach(CatalogFilter.frequentLenses) { filter in
                     filterTile(
                         filter,
@@ -254,13 +242,14 @@ struct CatalogFilterPage: View {
                 }
             }
             .background(Palette.sheetSurface)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
     private func filterSection(_ group: CatalogFilterGroup) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeader(group)
-            LazyVGrid(columns: Self.adaptiveColumns, spacing: 10) {
+            LazyVGrid(columns: adaptiveColumns, spacing: 10) {
                 ForEach(group.filters) { filter in
                     filterTile(
                         filter,
@@ -276,7 +265,7 @@ struct CatalogFilterPage: View {
         sectionTitle(
             symbol: group.symbolName,
             title: group.title,
-            subtitle: group.subtitle,
+            subtitle: nil,
             tint: group.tint
         )
     }
@@ -295,11 +284,11 @@ struct CatalogFilterPage: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(Typography.guide)
-                    .foregroundStyle(Palette.inkHigh.opacity(0.9))
+                    .foregroundStyle(Palette.Text.primary)
                 if let subtitle {
                     Text(subtitle)
                         .font(Typography.readingCompact)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                        .foregroundStyle(Palette.Text.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -316,17 +305,19 @@ struct CatalogFilterPage: View {
                     .frame(width: 22)
                 Text(item.title)
                     .font(Typography.guide)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.secondary)
                 Spacer(minLength: 8)
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle((selected ? Palette.signal : Palette.inkFaint).opacity(0.82))
             }
             .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .frame(minHeight: 50)
+            .background(selected ? Palette.Selection.surface : Color.clear)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
@@ -342,8 +333,8 @@ struct CatalogFilterPage: View {
                     .foregroundStyle(filter.tint.opacity(selected ? 0.96 : 0.68))
                     .frame(width: 20)
                 Text(filter.title)
-                    .font(.system(size: 13, weight: selected ? .medium : .regular))
-                    .foregroundStyle(Palette.inkHigh.opacity(selected ? 0.94 : 0.76))
+                    .font(Typography.guide.weight(selected ? .medium : .regular))
+                    .foregroundStyle(selected ? Palette.Text.primary : Palette.Text.secondary)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: selected ? "checkmark" : "plus")
@@ -352,16 +343,17 @@ struct CatalogFilterPage: View {
                         (selected ? filter.tint : Palette.inkLow).opacity(selected ? 0.9 : 0.5)
                     )
             }
-            .padding(.horizontal, 13)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
             .frame(minHeight: 58)
             .background(
-                selected ? filter.tint.opacity(0.105) : Palette.sheetSurface.opacity(0.72),
+                selected ? Palette.Selection.surface : Palette.sheetSurface,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(
-                        selected ? filter.tint.opacity(0.34) : Palette.inkFaint.opacity(0.22),
+                        selected ? Palette.Selection.border : Palette.inkFaint.opacity(0.22),
                         lineWidth: 0.6
                     )
             }

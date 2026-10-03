@@ -36,7 +36,7 @@ struct ManualBookView: View {
 
             ScrollView(showsIndicators: false) {
                 pageBody
-                    .padding(.horizontal, 34)
+                    .padding(.horizontal, AppChromeMetrics.readingInset)
                     .padding(.top, revisiting ? 18 : 64)
                     .padding(.bottom, 24)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -54,7 +54,7 @@ struct ManualBookView: View {
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             footer
-                .padding(.horizontal, 34)
+                .padding(.horizontal, AppChromeMetrics.readingInset)
                 .padding(.vertical, 8)
                 .background(Palette.voidBlack.opacity(0.96))
                 .overlay(alignment: .top) { ContentHairline() }
@@ -86,30 +86,30 @@ struct ManualBookView: View {
     private var pageBody: some View {
         let page = pages[pageIndex]
 
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             HStack(alignment: .center, spacing: 12) {
                 Text(page.chapterMark)
                     .font(Typography.fieldLabel)
                     .tracking(Typography.fieldLabelTracking + 0.6)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.tertiary)
                 Spacer(minLength: 8)
                 Text(String(format: "%02d / %02d", pageIndex + 1, pages.count))
                     .font(Typography.statusTag)
                     .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                    .foregroundStyle(Palette.Text.tertiary)
                 if !revisiting {
                     Button(copy("manual.skip")) { finish(interrupted: true) }
                         .font(Typography.statusTag)
-                        .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                        .foregroundStyle(Palette.Text.secondary)
                         .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
                 }
             }
             .modifier(LineReveal(index: 0, revealed: pageRevealed))
 
             Text(page.title)
-                .font(Typography.objectName)
+                .instrumentFont(24, relativeTo: .title2, weight: .semibold)
                 .tracking(language == .english ? Typography.objectNameTracking + 0.5 : 0.15)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                .foregroundStyle(Palette.Text.primary)
             .modifier(LineReveal(index: 1, revealed: pageRevealed))
 
             ManualChapterVisual(pageIndex: pageIndex, revealed: pageRevealed)
@@ -161,7 +161,7 @@ struct ManualBookView: View {
                         .frame(minWidth: 22, minHeight: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SkyCapsulePressStyle())
                 .accessibilityLabel(
                     L10n.format("manual.page", language: language, index + 1)
                 )
@@ -181,22 +181,16 @@ struct ManualBookView: View {
                 )
                     .font(Typography.guide)
                     .tracking(Typography.guideTracking + 0.4)
-                    .foregroundStyle(
-                        isLast
-                            ? Palette.signal.opacity(0.82)
-                            : Palette.inkMid.opacity(Palette.Level.present)
-                    )
-                Rectangle()
-                    .fill(
-                        (isLast ? Palette.signal : Palette.inkLow)
-                            .opacity(isLast ? 0.72 : Palette.Level.present)
-                    )
-                    .frame(width: 28, height: 0.75)
+                    .foregroundStyle(Palette.signal)
+                    .fontWeight(.medium)
+                Image(systemName: "arrow.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.signal)
             }
             .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(
             isLast
                 ? copy(revisiting ? "manual.finish_reading" : "manual.begin")
@@ -281,7 +275,7 @@ struct ManualBookView: View {
             .font(Typography.readingBody)
             .tracking(Typography.readingBodyTracking)
             .lineSpacing(Typography.readingBodyLineSpacing)
-            .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+            .foregroundStyle(Palette.Text.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 
@@ -290,12 +284,12 @@ struct ManualBookView: View {
             Text(label)
                 .font(Typography.fieldLabel)
                 .tracking(Typography.fieldLabelTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.tertiary)
                 .frame(width: 96, alignment: .leading)
             Text(value)
                 .font(Typography.dataValue)
                 .tracking(Typography.dataValueTracking)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.full))
+                .foregroundStyle(Palette.Text.secondary)
         }
     }
 
@@ -303,7 +297,7 @@ struct ManualBookView: View {
     private var starfield: some View {
         StaticDustBackdrop()
             .ignoresSafeArea()
-            .opacity(0.35)
+            .opacity(0.12)
     }
 
     // MARK: - 字段值解析

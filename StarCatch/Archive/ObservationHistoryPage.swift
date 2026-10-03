@@ -130,11 +130,13 @@ struct ObservationHistoryPage: View {
                     } header: {
                         historySectionLabel(for: section.day)
                             .textCase(nil)
+                            .listRowInsets(EdgeInsets(top: 8, leading: AppChromeMetrics.edgeInset, bottom: 0, trailing: AppChromeMetrics.edgeInset))
                     }
                 }
             }
         }
         .listStyle(.plain)
+        .listSectionSpacing(.custom(8))
         .scrollContentBackground(.hidden)
         .background(Color.clear)
     }
@@ -144,10 +146,12 @@ struct ObservationHistoryPage: View {
     }
 
     private var historyMetrics: some View {
-        HStack(alignment: .center, spacing: 22) {
+        HStack(alignment: .top, spacing: 24) {
             metric(
                 copy("observations.metric.identified"),
-                "\(log.totalObjects) / \(session.catalog.objects.count)"
+                "\(log.totalObjects)",
+                suffix: "/ \(session.catalog.objects.count)",
+                prominent: true
             )
             metric(copy("observations.metric.locks"), "\(totalLockCount)")
 
@@ -163,24 +167,28 @@ struct ObservationHistoryPage: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SkyCapsulePressStyle())
                 .accessibilityLabel(copy("observations.clear_all"))
             }
         }
-        .padding(.vertical, 2)
+        .padding(.bottom, 16)
         .overlay(alignment: .bottom) { ContentHairline() }
     }
 
-    private func metric(_ label: String, _ value: String) -> some View {
+    private func metric(_ label: String, _ value: String, suffix: String? = nil, prominent: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                .foregroundStyle(Palette.Text.tertiary)
             Text(value)
-                .font(Typography.dataValue)
-                .tracking(Typography.dataValueTracking)
-                .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                .instrumentFont(prominent ? 24 : 16, relativeTo: .callout, weight: .medium, design: .monospaced)
+                .foregroundStyle(Palette.Text.primary)
+            if let suffix {
+                Text(suffix)
+                    .font(Typography.statusTag)
+                    .foregroundStyle(Palette.Text.tertiary)
+            }
         }
     }
 
@@ -201,9 +209,8 @@ struct ObservationHistoryPage: View {
         return Text(label)
             .font(Typography.statusTag)
             .tracking(1.1)
-            .foregroundStyle(Palette.inkMid.opacity(Palette.Level.secondary))
-            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-            .padding(.horizontal, 18)
+            .foregroundStyle(Palette.Text.secondary)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
             .background(Palette.sheetBackground)
     }
 
@@ -217,8 +224,8 @@ struct ObservationHistoryPage: View {
                         Text(entry.objectName)
                             .font(Typography.guide)
                             .tracking(Typography.guideTracking)
-                            .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
-                            .lineLimit(1)
+                            .foregroundStyle(Palette.Text.primary)
+                            .lineLimit(2)
                             .truncationMode(.tail)
                             .layoutPriority(1)
                         if entry.count > 1 {
@@ -233,25 +240,25 @@ struct ObservationHistoryPage: View {
                         Text(category)
                             .font(Typography.statusTag)
                             .tracking(Typography.statusTagTracking)
-                            .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                            .foregroundStyle(Palette.Text.tertiary)
                     }
                 }
                 Spacer(minLength: 8)
                 Text(Self.historyTimeFormatter.string(from: entry.lastSeen))
                     .font(Typography.statusTag)
                     .tracking(Typography.statusTagTracking)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.secondary))
+                    .foregroundStyle(Palette.Text.secondary)
                     .frame(width: 48, alignment: .trailing)
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.tertiary)
                     .frame(width: 20, height: 34)
             }
             .frame(minHeight: 62)
             .contentShape(Rectangle())
             .overlay(alignment: .bottom) { ContentHairline() }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SkyCapsulePressStyle())
         .accessibilityLabel(
             L10n.format(
                 "observations.row.accessibility",
@@ -274,11 +281,11 @@ struct ObservationHistoryPage: View {
             Text(copy("observations.empty.title"))
                 .font(Typography.guide)
                 .tracking(Typography.guideTracking)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.secondary)
             Text(copy("observations.empty.body"))
                 .font(Typography.statusTag)
                 .tracking(0.45)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.readableSecondary))
+                .foregroundStyle(Palette.Text.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.vertical, 18)
@@ -306,13 +313,13 @@ struct ObservationHistoryPage: View {
                     Text(object.name)
                         .font(Typography.archiveObjectName)
                         .tracking(Typography.objectNameTracking)
-                        .foregroundStyle(Palette.inkHigh.opacity(Palette.Level.full))
+                        .foregroundStyle(Palette.Text.primary)
                         .lineLimit(2)
 
                     Text("\(object.cosparId)  ·  N\(object.noradId)")
                         .font(Typography.statusTag)
                         .tracking(Typography.statusTagTracking)
-                        .foregroundStyle(Palette.inkLow.opacity(Palette.Level.faint))
+                        .foregroundStyle(Palette.Text.tertiary)
                         .padding(.top, 6)
 
                     Text(roleTitle(for: object))
@@ -333,7 +340,7 @@ struct ObservationHistoryPage: View {
                     .font(Typography.archivePoetic)
                     .tracking(Typography.archivePoeticTracking)
                     .lineSpacing(Typography.archivePoeticLineSpacing)
-                    .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                    .foregroundStyle(Palette.Text.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 10)
                     .padding(.bottom, 24)
@@ -372,7 +379,7 @@ struct ObservationHistoryPage: View {
                     detailField(copy("observations.field.launch"), object.launched)
                     detailField(copy("observations.field.status"), statusText(for: object.status))
                 }
-                .padding(.horizontal, 30)
+                .padding(.horizontal, AppChromeMetrics.edgeInset)
                 .padding(.top, 18)
                 .padding(.bottom, 28)
             }
@@ -458,12 +465,12 @@ struct ObservationHistoryPage: View {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(Typography.statusTagTracking)
-                .foregroundStyle(Palette.inkLow.opacity(Palette.Level.secondary))
+                .foregroundStyle(Palette.Text.tertiary)
                 .frame(width: 72, alignment: .leading)
             Text(value)
                 .font(Typography.archiveDataValue)
                 .tracking(Typography.dataValueTracking)
-                .foregroundStyle(Palette.inkMid.opacity(Palette.Level.present))
+                .foregroundStyle(Palette.Text.secondary)
             Spacer(minLength: 0)
         }
         .frame(minHeight: 30)
@@ -474,7 +481,7 @@ struct ObservationHistoryPage: View {
         Text(text)
             .font(Typography.fieldLabel)
             .tracking(Typography.fieldLabelTracking + 0.5)
-            .foregroundStyle(Palette.inkLow.opacity(Palette.Level.present))
+            .foregroundStyle(Palette.Text.tertiary)
     }
 
     private func roleTitle(for object: CatalogObject) -> String {

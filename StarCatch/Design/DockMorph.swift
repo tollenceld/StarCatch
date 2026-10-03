@@ -101,6 +101,7 @@ extension EnvironmentValues {
 struct DockSurface: ViewModifier {
     var panelBlend: Double = 0
     var navigationPresence: Double = 0
+    var timelinePresence: Double = 0
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
     @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
@@ -112,7 +113,7 @@ struct DockSurface: ViewModifier {
 
     func body(content: Content) -> some View {
         surface(content)
-            .overlay { shape.stroke(Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34 - 0.12 * navigationPresence), lineWidth: 0.6) }
+            .overlay { shape.stroke(Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34 - 0.12 * navigationPresence - 0.14 * timelinePresence), lineWidth: 0.6) }
             .clipShape(shape)
     }
 
@@ -120,14 +121,14 @@ struct DockSurface: ViewModifier {
         if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
             content
                 .background(Palette.sheetBackground.opacity(panelBlend))
-                .glassEffect(.regular.tint(Palette.voidBlack.opacity(0.1 - 0.06 * navigationPresence)).interactive(), in: shape)
+                .glassEffect(.regular.tint(Palette.voidBlack.opacity(0.1 - 0.06 * navigationPresence + 0.3 * timelinePresence)).interactive(), in: shape)
         } else if reduceTransparency {
             content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
                 .background(Palette.voidBlack.opacity(0.97), in: shape)
         } else {
             content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
                 .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.76 - 0.14 * navigationPresence), in: shape)
+                .background(Palette.voidBlack.opacity(0.76 - 0.14 * navigationPresence + 0.12 * timelinePresence), in: shape)
         }
     }
 }
