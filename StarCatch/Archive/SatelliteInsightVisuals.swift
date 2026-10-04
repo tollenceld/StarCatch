@@ -211,3 +211,97 @@ struct SatellitePassArcView: View {
         }
     }
 }
+
+
+/// The solid segment precedes the observation; the dashed segment follows it.
+/// This is an elevation/time plot of actual cached samples, not a looping orbit animation.
+struct SatelliteMotionTraceView: View {
+    let trace: SatelliteTrackSnapshot
+    let tint: Color
+    var compact = false
+
+    private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
+
+    var body: some View {
+        let points = trace.finitePoints
+        let bounds = trace.elevationBounds
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(copy("archive.reading.trace_title"))
+                Spacer(minLength: 8)
+                Text(trace.referenceDate, format: .dateTime.hour().minute().second())
+                    .monospacedDigit()
+            }
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary)
+
+            Canvas { context, size in
+                guard points.count > 1,
+                      let first = points.first, let last = points.last,
+                      last.offset > first.offset else { return }
+                let inset: CGFloat = 5
+                func position(_ point: TrackSampler.TrackPoint) -> CGPoint {
+                    CGPoint(
+                        x: inset + (size.width - 2 * inset) * (point.offset - first.offset) / (last.offset - first.offset),
+                        y: inset + (size.height - 2 * inset) * (1 - (point.elevation * 180 / .pi - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
+                    )
+                }
+                for level in [bounds.lowerBound, 0, bounds.upperBound] {
+                    guard bounds.contains(level) else { continue }
+                    let y = inset + (size.height - 2 * inset) * (1 - (level - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
+                    var line = Path()
+                    line.move(to: CGPoint(x: 0, y: y))
+                    line.addLine(to: CGPoint(x: size.width, y: y))
+                    context.stroke(line, with: .color(Palette.inkFaint.opacity(level == 0 ? 0.6 : 0.22)), style: StrokeStyle(lineWidth: 0.5))
+                }
+                for pair in zip(points, points.dropFirst()) {
+                    // A missing propagation sample must remain a gap, not a fabricated line.
+                    guard pair.1.offset - pair.0.offset <= 21 else { continue }
+                    var line = Path()
+                    line.move(to: position(pair.0))
+                    line.addLine(to: position(pair.1))
+                    let future = pair.0.offset >= 0
+                    context.stroke(line, with: .color(future ? tint : Palette.Text.primary), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: future ? [3, 4] : []))
+                }
+                if let current = points.first(where: { abs($0.offset) < 0.01 }) {
+                    let center = position(current)
+                    var stem = Path()
+                    stem.move(to: CGPoint(x: center.x, y: 0))
+                    stem.addLine(to: CGPoint(x: center.x, y: size.height))
+                    context.stroke(stem, with: .color(tint.opacity(0.25)), lineWidth: 0.5)
+                    context.fill(Path(ellipseIn: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)), with: .color(tint))
+                }
+            }
+            .frame(height: compact ? 42 : 92)
+            .accessibilityHidden(true)
+
+            HStack(alignment: .top) {
+                sampleLabel(points.first, alignment: .leading)
+                Spacer(minLength: 8)
+                Text(copy("archive.reading.observation"))
+                    .foregroundStyle(tint)
+                Spacer(minLength: 8)
+                sampleLabel(points.last, alignment: .trailing)
+            }
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.secondary)
+            if !compact {
+                Text(copy("archive.reading.trace_note"))
+                    .font(Typography.readingCompact)
+                    .foregroundStyle(Palette.Text.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func sampleLabel(_ point: TrackSampler.TrackPoint?, alignment: HorizontalAlignment) -> some View {
+        VStack(alignment: alignment, spacing: 4) {
+            if let point {
+                Text(String(format: "%+.0f MIN", point.offset / 60))
+                Text(String(format: "EL %+.1f°", point.elevation * 180 / .pi))
+            } else {
+                Text("—")
+            }
+        }
+    }
+}

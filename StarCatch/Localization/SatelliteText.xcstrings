@@ -1,6 +1,5344 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "archive.editorial.term.能源" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Power"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "能源"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.任务" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.现状" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Status"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "现状"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.研制" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Developer"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "研制"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.载荷" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Payload"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "载荷"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.主镜" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Primary mirror"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主镜"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.周期" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Period"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "周期"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.观测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.轨道" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.伙伴" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Partners"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伙伴"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.仪器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instruments"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仪器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.服务器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servicing vehicle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "服务器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.质量" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mass"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "质量"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.计划" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "计划"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.标称高度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nominal altitude"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标称高度"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.波段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bands"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "波段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.幅宽" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Swath"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "幅宽"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.全圆盘" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full disk"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全圆盘"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.轨道面" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.重复周期" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Repeat cycle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重复周期"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.工程" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工程"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.光谱" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spectrum"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光谱"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.单星重复" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Single-satellite repeat"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单星重复"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.核心仪器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Key instrument"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "核心仪器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.覆盖" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coverage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "覆盖"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.形态" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Architecture"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "形态"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.档案范围" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scope"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "档案范围"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.太阳能电池 + 电池" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solar cells and batteries"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太阳能电池 + 电池"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.地球形状与大气阻力测量" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earth shape and atmospheric drag measurements"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地球形状与大气阻力测量"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.失效 · 仍在轨" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inactive · remains in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失效 · 仍在轨"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.电视、电话与数据中继" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Television, telephone and data relay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "电视、电话与数据中继"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.卫星激光测距" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellite laser ranging"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星激光测距"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.426 个角反射器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "426 corner reflectors"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "426 个角反射器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.被动目标 · 仍在轨" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passive target · remains in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "被动目标 · 仍在轨"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 95 MIN" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 95 MIN"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 95 MIN"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.超过 170 万次" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More than 1.7 million"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超过 170 万次"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 400 KM 近地轨道" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low Earth orbit, about 400 KM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 400 KM 近地轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.美国、俄罗斯、欧洲、日本、加拿大" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "United States, Russia, Europe, Japan and Canada"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "美国、俄罗斯、欧洲、日本、加拿大"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.载人驻留与微重力研究" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Human habitation and microgravity research"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "载人驻留与微重力研究"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.地球系统综合观测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Integrated Earth system observations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地球系统综合观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.太阳同步近地轨道" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sun-synchronous low Earth orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太阳同步近地轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.地球同步轨道" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geosynchronous orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地球同步轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.通信与在轨寿命延长" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Communications and orbital life extension"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信与在轨寿命延长"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 8.2 T" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 8.2 T"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 8.2 T"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.10 台地球观测仪器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 Earth-observation instruments"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "10 台地球观测仪器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.地球水循环观测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earth’s water cycle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "地球水循环观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.六台地球观测仪器" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Six Earth-observation instruments"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "六台地球观测仪器"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 817 KM" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 817 KM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 817 KM"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.太阳同步极轨" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sun-synchronous polar orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "太阳同步极轨"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.业务气象与气候监测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operational weather and climate monitoring"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "业务气象与气候监测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.陆地与沿海连续观测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuous land and coastal observations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "陆地与沿海连续观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 10 MIN" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 10 MIN"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 10 MIN"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.静止气象与台风监测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geostationary weather and typhoon monitoring"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "静止气象与台风监测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.MEO · 约 23,222 KM 标称高度" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEO · nominal altitude about 23,222 KM"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEO · 约 23,222 KM 标称高度"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.民用定位、导航与授时" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Civil positioning, navigation and timing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "民用定位、导航与授时"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.天气、环境与气候观测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weather, environmental and climate observations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天气、环境与气候观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.全球海平面参考测量" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Global reference sea-level measurements"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全球海平面参考测量"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.核心控制与载人驻留" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Core control and human habitation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "核心控制与载人驻留"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.中国载人航天工程" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "China Manned Space Program"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "中国载人航天工程"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.全球陆地变化监测" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Global land-change monitoring"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全球陆地变化监测"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.约 90% 地球表面" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "About 90% of Earth’s surface"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约 90% 地球表面"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.海洋与陆地水体测高" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ocean and inland-water altimetry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "海洋与陆地水体测高"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.移动卫星通信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mobile satellite communications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动卫星通信"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.低轨节点与地面网关" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-orbit nodes and ground gateways"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨节点与地面网关"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.Globalstar 系统共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Globalstar system background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Globalstar 系统共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.低轨卫星互联网" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-Earth-orbit satellite internet"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨卫星互联网"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.多节点通信星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multi-node communications constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多节点通信星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.国网项目共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Guowang program background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国网项目共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.全球移动语音与数据" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Global mobile voice and data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全球移动语音与数据"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.高倾角低轨星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High-inclination low-orbit constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高倾角低轨星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.Iridium 系统共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Iridium system background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iridium 系统共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.低轨宽带通信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-Earth-orbit broadband"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨宽带通信"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.卫星、网关与用户终端系统" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellites, gateways and user terminals"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星、网关与用户终端系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.Project Kuiper 共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Project Kuiper background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Kuiper 共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.高倾角多轨道面星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "High-inclination, multi-plane constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "高倾角多轨道面星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.OneWeb 项目共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared OneWeb program background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OneWeb 项目共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.物联网与资产通信" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "IoT and asset communications"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "物联网与资产通信"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.低轨窄带数据星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-orbit narrowband data constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨窄带数据星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.Orbcomm 系统共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Orbcomm system background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbcomm 系统共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.分批部署的大型星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large constellation deployed in batches"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分批部署的大型星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.千帆项目共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Qianfan program background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "千帆项目共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.多轨道面大型星座" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large multi-plane constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多轨道面大型星座"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.Starlink 项目共同介绍" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared Starlink program background"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starlink 项目共同介绍"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.部署阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deployment phase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部署阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.运行阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operational phase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "运行阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.此刻" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Catalogue snapshot"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此刻"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.组网阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network formation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "组网阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.初代系统" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First-generation system"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "初代系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.更新阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renewal phase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.验证阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Validation phase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "验证阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.term.扩展阶段" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Expansion phase"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "扩展阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A satellite that fell silent decades ago remains one of humanity’s longest-lived witnesses in orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它早已停止发声，却仍是人类航天史里持续时间最长的一次在轨见证。"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Why it matters"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为什么重要"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vanguard 1 was the second US satellite, the fourth artificial satellite to reach orbit, and the first powered by solar cells. Small changes in its orbit helped researchers establish that Earth is not a perfect sphere."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vanguard 1 是美国第二颗卫星、世界第四颗进入轨道的人造卫星，也是第一颗太阳能供电卫星。它对轨道的细微变化帮助研究者确认地球并非完美球体。"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "After the silence"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "沉默之后"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its radio transmissions ended in 1964. A mission can end while its spacecraft remains: this metal sphere, about 16 centimetres across, still follows an eccentric orbit and is expected to remain there for a long time."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无线电信号在 1964 年停止。任务结束并不等于物体消失：这枚直径约 16 厘米的金属球仍沿高偏心轨道绕行，并将继续停留很长时间。"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched from Cape Canaveral"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从卡纳维拉尔角进入轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last radio signal received"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最后一次收到无线电信号"
+          }
+        }
+      }
+    },
+    "archive.editorial.5.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The oldest satellite still in Earth orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仍是地球轨道上最古老的卫星"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Before live global television became ordinary, a small sphere covered in solar cells carried real-time television across the Atlantic."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在全球直播成为日常以前，一枚布满太阳能电池的小球第一次把实时电视信号送过大西洋。"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting continents"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把大陆连起来"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telstar 1 used an elliptical orbit, rather than the geosynchronous orbit common among communications satellites today. Ground stations could connect only during short passes, but those windows demonstrated transatlantic television, telephone and data relay."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Telstar 1 进入的是椭圆轨道，并非今天通信卫星常用的地球同步轨道。地面站只能在它越过视野的短窗口内建立链路，但这已经足以证明跨洋电视、电话与数据中继可行。"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A short working life"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短暂的工作寿命"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A high-altitude nuclear test the day before launch intensified the near-Earth radiation environment. Electronics subsequently failed. Engineers briefly restored operation, but the mission ended in 1963. The spacecraft remained in orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发射前一天进行的高空核试验增强了近地辐射环境。电子设备随后出现故障，虽然工程团队一度恢复工作，任务最终在 1963 年结束。物体本身仍在轨。"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A Delta rocket launched Telstar 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delta 火箭将 Telstar 1 送入轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "First public live transatlantic television broadcast"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次面向公众的跨大西洋直播"
+          }
+        }
+      }
+    },
+    "archive.editorial.340.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The mission ended; the orbital relic remained"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务停止，轨道遗迹保留至今"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It has no camera and transmits no data. Ground stations send it laser pulses, then read Earth through the time it takes them to return."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它没有相机，也不主动发送数据；地面向它发射激光，再从返回时间里读取地球。"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A satellite as a measuring reference"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把卫星做成标尺"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAGEOS 1 is a passive laser-ranging satellite covered with retroreflectors. Its dense, stable body experiences relatively little atmospheric drag, making it useful for measuring crustal motion, Earth’s rotation and gravity."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LAGEOS 1 是被动激光测距卫星，表面布满回射器。它稳定、致密、受大气阻力影响较小，因此适合测量地壳运动、地球自转和重力场。"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordinates for the distant future"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "给未来的坐标"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inside is a plaque designed by Carl Sagan, depicting continents in the past, present and distant future. The satellite is expected to remain in orbit for millions of years."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星内部放置了一块由卡尔·萨根设计的铭牌，用大陆轮廓记录过去、现在与遥远未来。它预期会在轨道上停留数百万年。"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entered a circular orbit about 5,900 kilometres high"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进入约 5,900 公里高度的圆轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Served for decades as a global laser-ranging reference"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持续作为全球激光测距基准"
+          }
+        }
+      }
+    },
+    "archive.editorial.8820.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its plaque accompanies the satellite for future observers"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "铭牌随卫星留给未来观察者"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An observatory that astronauts could repair was placed above the atmosphere—and made the distant universe part of our shared visual memory."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它把一台可以被宇航员维修的天文台放在大气层之外，也把遥远宇宙变成了公众共同的视觉记忆。"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An eye above atmospheric turbulence"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不受大气扰动的眼睛"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hubble observes from ultraviolet to near-infrared wavelengths. Decades of consistent data have helped researchers measure cosmic expansion, study galaxy evolution and identify components of exoplanet atmospheres."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hubble 在紫外到近红外波段观测。数十年的稳定数据帮助研究者测量宇宙膨胀、研究星系演化，并辨认系外行星大气中的成分。"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A failure that could be repaired"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一次可被修正的失败"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spherical aberration in the primary mirror blurred the first images. In 1993, shuttle astronauts installed corrective optics. Later servicing missions upgraded the instruments. Maintainability became one of the mission’s defining engineering legacies."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主镜球差让最初图像失焦。1993 年，航天飞机宇航员安装矫正光学设备；后续维护任务又多次升级仪器。可维护性成为这项任务最重要的工程遗产之一。"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched aboard Space Shuttle Discovery"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随 Discovery 号航天飞机升空"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first servicing mission corrected the mirror’s aberration"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首次维护任务矫正主镜球差"
+          }
+        }
+      }
+    },
+    "archive.editorial.20580.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continued observations from low Earth orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续在近地轨道执行观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is not a single satellite, but an orbital facility assembled piece by piece, where people live and work for extended periods."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这不是一颗单体卫星，而是一座逐段建成、有人长期生活和工作的轨道设施。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assembled in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在轨组装"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beginning with the Zarya module, the station expanded through dozens of launches. Modules, trusses, solar arrays and experimental equipment made by different countries were joined into one orbital system."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从曙光号功能货舱开始，空间站通过数十次发射逐步扩展。不同国家制造的舱段、桁架、太阳翼和实验设备在轨道上组合成同一套系统。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A microgravity laboratory"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "微重力实验室"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The station supports life science, materials, fluids, Earth observation and technology demonstrations. Long-duration habitation also provides a continuous record of how the human body adapts to space."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间站支持生命科学、材料、流体、地球观测和技术验证。长期驻留也提供了人体如何适应太空环境的连续记录。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zarya became the first module in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "曙光号成为首个入轨舱段"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuous human occupation began"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始持续载人驻留"
+          }
+        }
+      }
+    },
+    "archive.editorial.25544.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Circles Earth approximately every 90 minutes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "约每 90 分钟环绕地球一次"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Five instruments read land, atmosphere, oceans and energy exchange during the same pass, giving different disciplines a shared cross-section of Earth."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "五台仪器在同一次过境中阅读陆地、大气、海洋与能量交换，让不同学科第一次共享同一幅地球剖面。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earth as a system"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "把地球作为系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terra is a flagship mission of NASA’s Earth Observing System. Beyond images of the surface, it measures clouds, aerosols, vegetation, oceans, thermal radiation and air pollution to study how these components interact."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terra 是 NASA 地球观测系统的旗舰任务。它不只拍摄地表，而是同步测量云、气溶胶、植被、海洋、热辐射与大气污染，研究这些部分如何相互作用。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A record spanning more than two decades"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨越二十余年的连续记录"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consistent observations allow scientists to compare seasonal, disaster-related and climate-scale changes. Fires, volcanoes, forests and urban expansion can be studied along a common timeline."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长期一致的观测让科学家能够比较季节、灾害与气候尺度的变化。火灾、火山、森林和城市扩张因此被放进同一条时间线上。"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched from Vandenberg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从范登堡基地发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reached its final sun-synchronous observation orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进入最终太阳同步观测轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.25994.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributed to the long-term Earth system record"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持续构成长期地球系统数据记录"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A servicing spacecraft docked with it in a graveyard orbit, took over attitude and orbit control, and returned an ageing satellite to work."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一艘服务飞行器在墓地轨道与它对接，接管姿态与轨道控制，让一颗老卫星重新工作。"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Servicing in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在轨服务"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In 2020, Mission Extension Vehicle-1 docked with Intelsat 901. It was the first commercial spacecraft mission to provide this kind of life-extension service in geosynchronous orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2020 年，Mission Extension Vehicle-1 与 Intelsat 901 对接。这是商业航天器首次在地球同步轨道完成此类寿命延长服务。"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellites need not be disposable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星不再一定是一次性用品"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEV-1 does not repair internal electronics. It supplies propulsion, attitude control and navigation, demonstrating that an expensive high-orbit asset can extend its mission through an external service."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEV-1 不修理内部电子设备，而是提供推进、姿态控制和导航能力。它证明昂贵的高轨资产可以通过外部服务延长任务周期。"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intelsat 901 launched"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Intelsat 901 发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEV-1 completed its historic docking"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MEV-1 完成历史性对接"
+          }
+        }
+      }
+    },
+    "archive.editorial.26824.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Commercial communications service resumed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复商业通信服务"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Once the largest civilian Earth-observation satellite, it became one of the most conspicuous large inactive objects in orbit after contact was lost."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它曾是最大的民用地球观测卫星；失去联系之后，也成为轨道环境中最醒目的大型失效物体之一。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten instruments observing Earth together"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "十台仪器共同观察地球"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envisat measured the atmosphere, oceans, land and ice sheets, providing continuous data for climate research and disaster monitoring. Its complex payload demonstrated the capabilities of a large integrated observatory."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envisat 同时测量大气、海洋、陆地与冰盖，为气候研究和灾害监测提供连续数据。其复杂载荷展示了大型综合观测平台的能力。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sudden interruption"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "突然中断"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ground contact was lost in April 2012. Without a controlled deorbit, its large mass and sun-synchronous orbit also made it an important object in studies of long-term space-debris risk."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "2012 年 4 月，地面与卫星失去联系。它没有执行受控离轨，巨大的质量和太阳同步轨道使它也成为长期空间碎片风险研究的重要对象。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ariane 5 placed Envisat in orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ariane 5 将 Envisat 送入轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Communications stopped unexpectedly"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "通信突然中断"
+          }
+        }
+      }
+    },
+    "archive.editorial.27386.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remained in orbit as an inactive spacecraft"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以失效状态继续绕行"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqua means water. It follows evaporation, water vapour, clouds, precipitation, snow and sea ice to trace water through the Earth system."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqua 的名字就是“水”：它沿着蒸发、水汽、云、降水、积雪和海冰，追踪水在地球系统中的迁移。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The whole water cycle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整的水循环"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqua’s observations extend from ocean evaporation to atmospheric water vapour, clouds and precipitation, then to soil moisture, snow and ice. It also measures temperature, aerosols, vegetation and ocean colour."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aqua 的观测从海洋蒸发延伸到大气水汽、云和降水，再到土壤水分、积雪与冰盖。它也测量温度、气溶胶、植被与海洋颜色。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beyond its design life"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "超出设计寿命"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Originally designed for six years, the mission produced more than two decades of global observations. Its long record supports weather, fire, ocean and climate research."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务原始设计寿命为六年，却形成了二十余年的全球观测记录。长期数据被用于天气、火灾、海洋与气候研究。"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched into orbit from Vandenberg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从范登堡基地进入轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Operated as a key member of the A-Train observing formation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为 A-Train 观测队列的重要成员运行"
+          }
+        }
+      }
+    },
+    "archive.editorial.27424.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Contributed to global Earth science data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续贡献全球地球科学数据"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From polar orbit it reads atmospheric temperature and humidity, sea-surface winds and trace gases, feeding repeated global scans into modern weather forecasts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它从极轨近距离读取大气温湿结构、海面风和痕量气体，把一次次全球扫描送进现代数值天气预报。"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Global inputs for forecasting"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预报模型的全球输入"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MetOp is Europe’s first operational polar-orbiting weather satellite series. Unlike a geostationary satellite watching one region, it circles in a sun-synchronous orbit, supplying detailed vertical atmospheric information for medium-range forecasts."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "MetOp 是欧洲首个业务极轨气象卫星系列。与静止卫星持续凝视一个区域不同，它沿太阳同步轨道覆盖全球，为中期预报提供细致的垂直大气资料。"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An international instrument system"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跨机构的仪器系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ESA developed the mission to EUMETSAT requirements, integrating instruments supplied by CNES and NOAA. Temperature and humidity profiles, ocean winds, ozone and surface imagery work together on one platform."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务由 ESA 按 EUMETSAT 需求研制，并整合 CNES 与 NOAA 提供的仪器。温湿度廓线、海面风、臭氧和地表影像在同一平台上协同工作。"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched by Soyuz/Fregat from Baikonur"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Soyuz/Fregat 从拜科努尔发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entered EUMETSAT polar-orbiting operational service"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进入 EUMETSAT 极轨业务服务"
+          }
+        }
+      }
+    },
+    "archive.editorial.38771.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Formed part of the long-term weather and climate record"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为长期气象与气候记录的一部分"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Its purpose is not a single beautiful view of Earth, but repeated measurements at the same scale and wavelengths—so that change becomes meaningful."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它不是为了拍摄一张漂亮的地球，而是为了以相同尺度、相同波段不断重拍，从变化里得到意义。"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thirteen spectral bands"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "十三个光谱波段"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel-2A’s multispectral imager spans visible, near-infrared and short-wave infrared bands, revealing vegetation condition, water, soil, fires and urban change."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel-2A 的多光谱成像仪覆盖可见光、近红外和短波红外，可用于识别植被状态、水体、土壤、火灾与城市变化。"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open data infrastructure"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开放的数据基础设施"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copernicus makes continuous observations available to researchers, public agencies and commercial applications. The satellite’s value comes from accessible, consistent long-term data as well as its hardware."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copernicus 将连续观测数据开放给科研、公共机构与商业应用。卫星价值不仅来自硬件，也来自长期一致、可访问的数据体系。"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on Vega from Kourou"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Vega 火箭从库鲁发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Acquired its first images"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取得首批影像"
+          }
+        }
+      }
+    },
+    "archive.editorial.40697.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Observed alongside later Sentinel-2 members"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与后续 Sentinel-2 成员协同观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Watching over the western Pacific, it tracks the growth of typhoons and cloud systems with full-Earth scans every ten minutes and faster regional observations."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它守在西太平洋上空，以十分钟一次的完整地球扫描和更快的区域扫描，追踪台风与云系的生长。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A sustained watch over one ocean"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "持续凝视同一片海域"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geostationary orbit lets Himawari-9 observe Asia, Oceania and the western Pacific continuously. Its 16-band AHI imager distinguishes clouds, water vapour, sea ice and surface conditions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "静止轨道让 Himawari-9 长时间观察亚洲、大洋洲和西太平洋。AHI 成像仪以 16 个波段辨认云、水汽、海冰和地表状态。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Time resolution for rapid change"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为快速变化保留时间分辨率"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Full-disk observations update about every ten minutes. Japan and priority regions such as typhoons can be observed about every 2.5 minutes. These sequences reveal developing convection better than a single image."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完整圆盘约每十分钟更新，日本区域和台风等重点区域可约每 2.5 分钟观测。高频序列比单幅图像更能揭示强对流的发展。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on H-IIA Flight 31"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 H-IIA 31 号机发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Began serving as Himawari-8’s orbital backup"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开始作为 Himawari-8 的在轨备份"
+          }
+        }
+      }
+    },
+    "archive.editorial.41836.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Took over as the primary observing satellite"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接替成为主要观测星"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An orbital clock in Europe’s civilian navigation system: a position emerges from the timing differences between several satellites, not from one alone."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它不是孤立的导航卫星，而是欧洲民用全球导航系统的一只轨道时钟；定位来自多颗卫星的时间差。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broadcast time, then determine position"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "先广播时间，再得到位置"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo satellites continuously broadcast precise time, ephemerides and system status. A receiver compares signal arrival times from several satellites to determine its own position."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo 卫星持续广播精密时间、星历与系统状态。接收机比较多颗卫星信号的到达时间，才解算出自身位置。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Three medium-Earth orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "三组中地轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo operates as a constellation. Satellites occupy medium-Earth orbital planes inclined at about 56 degrees, supporting global positioning, navigation, timing and search and rescue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo 的工作尺度是整个星座：卫星分布在倾角约 56° 的中地轨道面，在全球范围提供定位、导航、授时与搜救支持。"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on the first four-satellite Ariane 5 Galileo mission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随首次 Ariane 5 Galileo 四星任务发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo Initial Services began"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Galileo 初始服务开始提供"
+          }
+        }
+      }
+    },
+    "archive.editorial.41859.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Broadcast as a member of the navigation constellation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为在轨导航星座成员广播信号"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Crossing the poles repeatedly each day, it supplies global atmosphere, ocean and land observations to weather forecasts and the long-term environmental record."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它每天多次越过两极，把全球大气、海洋和陆地观测送入天气预报，也延续长期环境记录。"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Five cooperating instruments"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "五台协同仪器"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NOAA-20 carries VIIRS, CrIS, ATMS, OMPS-N and CERES. Together they measure clouds, temperature and humidity, ozone, the surface and Earth’s energy balance."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "NOAA-20 搭载 VIIRS、CrIS、ATMS、OMPS-N 与 CERES。它们共同读取云、温湿度、臭氧、地表和地球能量收支。"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From Suomi NPP to JPSS"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从 Suomi NPP 走向 JPSS"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JPSS is the next generation of US operational polar-orbiting environmental satellites. Originally named JPSS-1, NOAA-20 operates at a time offset from Suomi NPP to improve observation continuity."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "JPSS 是美国新一代业务极轨环境卫星系统。NOAA-20 原名 JPSS-1，与 Suomi NPP 错时运行，提高全球观测的连续性。"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched from Vandenberg as JPSS-1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 JPSS-1 名义从范登堡发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Officially named NOAA-20"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正式命名为 NOAA-20"
+          }
+        }
+      }
+    },
+    "archive.editorial.43013.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entered NOAA operational service"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进入 NOAA 业务运行"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It follows a repeatedly calibrated altimetry orbit to extend more than thirty years of sea-level measurements, connecting millimetre-scale trends to one reference."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它沿一条被反复校准的测高轨道延续三十余年的海平面记录，把毫米级的长期变化连接到同一基准。"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measuring the sea surface from orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从轨道测量海面高度"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The Poseidon-4 radar altimeter sends pulses toward the ocean and measures their return time. A microwave radiometer and precise orbit determination help correct atmospheric water-vapour and orbital errors."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Poseidon-4 雷达测高仪向海面发送脉冲并测量回波时间；微波辐射计和精密定轨系统共同修正水汽与轨道误差。"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A climate record across generations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一项跨代际的气候记录"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel-6 continues the sea-surface-height record established by TOPEX/Poseidon and the Jason missions, providing a reference for sea-level rise, operational oceanography and coastal risk studies."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sentinel-6 延续 TOPEX/Poseidon 与 Jason 系列建立的海面高度时间序列，为海平面上升、业务海洋学和沿海风险研究提供基准。"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on Falcon 9 from Vandenberg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Falcon 9 从范登堡发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed calibration and became a reference altimetry mission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成校准并成为参考测高任务"
+          }
+        }
+      }
+    },
+    "archive.editorial.46984.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The two-satellite program aims to extend the sea-level record"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双星计划延续海平面记录"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tianhe is the control and living centre of China’s space station, and the core of an expanding laboratory in orbit."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天和核心舱是中国空间站的控制与生活中心，也是一座持续扩展的在轨实验室。"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The station’s core"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间站的核心"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tianhe provides propulsion, attitude control, life support, living space and docking interfaces. Laboratory modules and visiting spacecraft join it to form the Tiangong space station."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天和提供推进、姿态控制、生命保障、居住空间和对接接口。后续实验舱与来访飞船围绕它形成完整的天宫空间站。"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long-duration habitation"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长期驻留"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Successive crewed missions turn short flights into sustained operations, supporting microgravity research, space life science and technology demonstrations."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "连续载人任务把短期飞行变成长期运营，支持微重力科学、空间生命科学和航天技术验证。"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Long March 5B launched Tianhe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长征五号 B 将天和送入轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first crew entered Tianhe"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "首批航天员进入天和"
+          }
+        }
+      }
+    },
+    "archive.editorial.48274.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The station’s basic configuration was completed"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "空间站基本构型完成"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "It continues half a century of land observation. Its value lies not in one image, but in making measurements from different decades reliably comparable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它把半个世纪的陆地观测延续到今天；价值不在某一张影像，而在不同年代能够被可靠比较。"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Measuring the surface with the same ruler"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一把尺持续测量地表"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Landsat 9 data remain consistent with Landsat 8, allowing forests, farmland, cities, water quality and glaciers to be compared across years. Together the two satellites increase revisit frequency."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Landsat 9 的数据与 Landsat 8 保持一致，使森林、农田、城市、水质和冰川的变化能够跨年份比较。两星配合提高了重访频率。"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spectral and thermal views"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "光谱与热红外"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OLI-2 records visible, near-infrared and short-wave infrared bands, while TIRS-2 measures thermal radiation. The images reveal vegetation, moisture and temperature as well as appearance."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OLI-2 记录可见光、近红外与短波红外，TIRS-2 读取地表热辐射。影像不仅描述外观，也揭示植被、水分和温度。"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on Atlas V from Vandenberg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Atlas V 从范登堡发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "USGS took over mission operations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "USGS 接管任务运行"
+          }
+        }
+      }
+    },
+    "archive.editorial.49260.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Worked with Landsat 8 to extend the global land record"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与 Landsat 8 协同延续全球陆地记录"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Instead of measuring height along a narrow line, SWOT uses wide-swath interferometric radar to map the height of oceans, rivers, lakes and reservoirs in two dimensions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SWOT 不只沿一条细线测高；它用宽幅干涉雷达把海洋、河流、湖泊和水库的高度铺成二维图。"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wide-swath radar interferometry"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "宽幅雷达干涉测高"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KaRIn receives echoes through antennas at opposite ends of a boom, resolving smaller ocean structures and inland waters that conventional single-track altimeters cannot easily capture."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "KaRIn 由分置在桁架两端的天线接收回波，能够分辨传统单线测高难以看到的中小尺度海洋结构和陆地水体。"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "One mission connecting oceanography and hydrology"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一项任务连接海洋与水文"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SWOT studies ocean circulation and inland freshwater storage together. It measures changes in lakes, reservoirs, rivers and wetlands to improve understanding of the global water cycle."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SWOT 同时研究海洋环流与陆地淡水储量，测量湖泊、水库、河流和湿地如何随时间变化，并帮助理解全球水循环。"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Launched on Falcon 9 from Vandenberg"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由 Falcon 9 从范登堡发射"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Completed calibration in its fast-repeat orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成快速重复轨道校准阶段"
+          }
+        }
+      }
+    },
+    "archive.editorial.54754.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Began global water measurements on a 21-day repeat cycle"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 21 天重复周期开展全球水体测量"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A mobile satellite network whose low-orbit nodes relay voice and data links to ground stations in view."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动卫星通信网络。低轨节点把语音与数据链路转交给可见的地面站。"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A network shared by space and ground"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星与地面共同完成的网络"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Globalstar’s low-Earth-orbit satellites relay signals from mobile terminals to ground gateways within coverage. Service depends on the combined layout of orbital nodes and ground infrastructure."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Globalstar 的低轨卫星负责把移动终端信号转交给覆盖范围内的地面网关。它的服务能力来自轨道节点与地面设施的共同布局。"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each node has its own identifier, position and speed. The constellation archive brings together the shared mission and system architecture."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单个节点的编号、位置和速度保持独立；共同任务与系统结构则集中在这份星座档案中。"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Low-orbit nodes were deployed across multiple orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨节点进入多个轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellites relayed mobile links to ground gateways"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星把移动链路转交给地面网关"
+          }
+        }
+      }
+    },
+    "archive.editorial.globalstar.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app calculates each publicly catalogued node separately"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "公开轨道节点继续由 APP 分别推算"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A low-Earth-orbit internet system. Its nodes form a coverage network rather than repeating independent scientific missions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨卫星互联网系统。节点共同组成覆盖网络，而不是彼此重复的独立科学任务。"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading the system as a whole"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作为一个整体阅读"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guowang nodes belong to a common satellite-internet system. Their different orbits and coordinated operation provide coverage, so the program background is more useful for deep reading than an isolated identifier."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "国网节点属于同一卫星互联网体系。它们沿不同轨道运动，通过系统协作形成覆盖，因此项目背景比单个编号更适合作为深入阅读主体。"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The sky view retains each satellite’s real position. The archive describes the system’s purpose while keeping the currently observed node’s orbital readings separate."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "主天空仍把每枚卫星画成真实点位；进入深入档案后，内容转向整个系统的任务语境，同时保留当前节点的即时轨道读数。"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Communications nodes were deployed into different orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨通信节点按计划进入不同轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The nodes jointly established communications coverage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "节点共同形成面向地面的通信覆盖"
+          }
+        }
+      }
+    },
+    "archive.editorial.hulianwang.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The local catalogue stores publicly identified orbital objects"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地目录按真实编号保存已公开的轨道对象"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A global mobile communications constellation. Its polar-orbiting nodes work together to keep high latitudes and distant oceans connected."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全球移动通信星座。极轨节点通过系统协作，为高纬度与远洋区域维持连接。"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Links beyond the edge of conventional networks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "越过世界尽头的链路"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iridium uses high-inclination low-orbit satellites for mobile voice and data. Successive nodes pass over observers, enabling connections across remote land, oceans and high latitudes."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iridium 以高倾角低轨卫星服务移动语音与数据通信。相邻节点依次掠过观察者上空，使偏远陆地、海洋和高纬度区域也能建立链路。"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every Iridium point has its own orbital identity. The archive explains the mobile network they operate together."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个 Iridium 点位都拥有独立轨道编号；深入档案讲述的是它们共同承担的移动通信网络。"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The first global low-orbit mobile communications system was established"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全球低轨移动通信网络建立"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Later nodes continued and renewed constellation capabilities"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后续节点延续并更新星座能力"
+          }
+        }
+      }
+    },
+    "archive.editorial.iridium.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publicly identified nodes remain individually observable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "可公开识别的节点继续分别出现在本地天空"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A low-Earth-orbit broadband constellation. Nodes across multiple orbital planes transfer data between gateways and user terminals."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近地轨道宽带星座。多轨道面的节点共同向地面网关与用户终端传递数据。"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "From nodes to a network"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从节点到网络"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Kuiper combines low-Earth-orbit satellites, ground gateways and user terminals into a broadband system. A single point in the sky is one part of this infrastructure."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Kuiper 通过近地轨道卫星、地面网关与用户终端共同建立宽带系统。天空中的单颗节点只是这套基础设施的一部分。"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Different Kuiper identifiers have distinct real-time positions, while sharing program history and purpose. Each leads to the common system archive."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不同 Kuiper 编号的实时位置各不相同，但项目历史和共同功能相同，因此任意节点都进入同一份系统档案。"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prototype and early nodes tested the orbital and communications systems"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原型与早期节点用于验证轨道和通信系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network nodes were progressively deployed into planned orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "网络节点逐步进入计划轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.kuiper.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Publicly catalogued objects are calculated independently from the local snapshot"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已公开轨道对象由本地快照独立推算"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A low-orbit communications network. Satellites in near-polar orbits establish wide-area connections for fixed and mobile terminals."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨通信网络。卫星沿近极轨道分布，为地面与移动终端建立广域连接。"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A network reaching high latitudes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "越过高纬度的轨道网"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OneWeb nodes repeatedly cover Earth from high-inclination orbits. They jointly connect ground stations, businesses and mobile users rather than serving as independent missions."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OneWeb 的节点沿高倾角轨道反复覆盖地球。它们不是彼此独立的任务，而是共同承担连接地面站、企业与移动用户的网络角色。"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every OneWeb point corresponds to an individual orbital object. The archive describes their common system, keeping shared background distinct from each node’s identity."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天空中的每个 OneWeb 点位都对应一个独立轨道对象；深入档案则聚焦它们共同构成的系统，避免用相同文字伪装成不同故事。"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Satellites were launched in batches into high-inclination low orbits"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "卫星被分批送入高倾角近地轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Several orbital planes worked together to provide continuous coverage"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "多个轨道面协同形成连续通信覆盖"
+          }
+        }
+      }
+    },
+    "archive.editorial.oneweb.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each node remains independently observable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每枚节点仍以独立轨道点位接受观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A low-orbit network for the Internet of Things and asset communications, connecting remote terminals through narrowband data."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "面向物联网与资产通信的低轨网络，以窄带数据连接偏远区域的终端。"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short messages for machines"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为机器传递短消息"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbcomm nodes mainly support asset tracking, sensors and machine communications. The aim is not high-bandwidth imagery, but keeping equipment connected beyond conventional networks."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbcomm 的轨道节点主要服务资产跟踪、传感器与机器数据通信。它关注的不是大带宽画面，而是让远离常规网络的设备保持联系。"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each node has a real orbital identity. The common archive explains their roles within the same narrowband communications system."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "天空中的节点各有真实轨道身份；深入档案使用一份共同说明，表达它们在同一窄带通信系统中的角色。"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Narrowband communications nodes entered low Earth orbit"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "窄带通信节点进入近地轨道"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbital nodes linked remote assets to ground networks"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道节点连接偏远资产与地面网络"
+          }
+        }
+      }
+    },
+    "archive.editorial.orbcomm.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Every public node remains individually observable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个公开节点仍以独立点位接受观测"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An expanding low-orbit communications constellation. Each catalogue point is an individual orbital node in the same network."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在扩展的低轨通信星座。目录中的每个点都是同一网络的一枚独立轨道节点。"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A system taking shape"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一项正在形成的系统"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Qianfan uses many low-Earth-orbit satellites to form a communications network. Bands of points in the sky arise from neighbouring orbital planes, not from repeated drawings of one satellite."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "千帆以大量近地轨道卫星构成通信网络。观测时看到的长带状点位来自相邻轨道面，而不是同一颗卫星的重复绘制。"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Each identifier retains its own orbital identity and current position. Program background, shared purpose and system architecture are collected in the common archive."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个编号仍保留自己的轨道身份和实时位置；项目背景、共同任务与系统形态集中在这份共享档案中。"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The system established low-orbit nodes through batch launches"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统以批次方式建立近地轨道节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Additional orbital planes gradually changed the density of visible points"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增轨道面逐步改变天空中的点位密度"
+          }
+        }
+      }
+    },
+    "archive.editorial.qianfan.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app calculates each catalogued node from offline elements"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "APP 使用离线元素分别推算已收录节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.lead" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A low-Earth-orbit broadband network. Many nodes occupy multiple orbital shells, handing coverage between satellites as they move past ground terminals."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "低轨宽带网络。大量节点分布在多个轨道壳层，以连续接力覆盖地面终端。"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.chapter-0.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A network constantly in motion"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一张持续移动的网络"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.chapter-0.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starlink is a communications system made of many low-Earth-orbit nodes, not a mission carried by one satellite. Each node crosses the horizon while other nodes continue coverage."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starlink 不是一颗卫星的任务，而是由许多近地轨道节点共同组成的通信系统。单个节点不断越过地平线，网络通过其他节点接续覆盖。"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.chapter-1.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何阅读这枚节点"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.chapter-1.body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "You are observing one real satellite in this system. Different identifiers have their own orbital positions, but share the same program purpose and constellation archive."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "你此刻对准的是这个系统中的一枚真实卫星。不同编号拥有各自的轨道位置，但它们共享同一项目目的，因此都进入这份星座档案。"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.milestone-0.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Batch launches placed satellites into several low-Earth orbital planes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统通过批量发射把卫星送入多个近地轨道面"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.milestone-1.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Orbital nodes, terminals and gateways established broadband links together"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道节点与地面终端和网关共同建立宽带链路"
+          }
+        }
+      }
+    },
+    "archive.editorial.starlink.milestone-2.event" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The local snapshot calculates each identifiable node separately"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地轨道快照继续分别推算每枚可识别节点的位置"
+          }
+        }
+      }
+    },
+    "archive.reading.motion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How it moves past you"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此刻，它正如何经过你"
+          }
+        }
+      }
+    },
+    "archive.reading.mission" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Behind the mission"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务背后"
+          }
+        }
+      }
+    },
+    "archive.reading.passes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The next encounter"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一次相遇"
+          }
+        }
+      }
+    },
+    "archive.reading.identity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This object’s orbital record"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这颗卫星的轨道档案"
+          }
+        }
+      }
+    },
+    "archive.reading.organization" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Organizations"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "机构／运营方"
+          }
+        }
+      }
+    },
+    "archive.reading.program" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Program"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "所属项目"
+          }
+        }
+      }
+    },
+    "archive.reading.family_scope" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shared program story · orbital readings are for this node"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系列背景 · 轨道读数仅属于当前节点"
+          }
+        }
+      }
+    },
+    "archive.reading.object_scope" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Object-specific story · from the bundled mission archive"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本星资料 · 来自随包任务档案"
+          }
+        }
+      }
+    },
+    "archive.reading.trace_title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "±3 MIN · SKY ELEVATION"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前后 3 分钟 · 天空仰角"
+          }
+        }
+      }
+    },
+    "archive.reading.observation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OBSERVED"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观测时刻"
+          }
+        }
+      }
+    },
+    "archive.reading.trace_note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solid: before the observation. Dashed: after it. Calculated from the local orbital snapshot. EL is elevation above the horizon; negative values are below it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "实线是观测时刻之前，虚线是之后；依据本地轨道快照计算。EL 为地平线仰角，负值代表位于地平线以下。"
+          }
+        }
+      }
+    },
+    "archive.reading.motion_loading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing this object’s motion trace…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备此目标的运动轨迹…"
+          }
+        }
+      }
+    },
+    "archive.reading.verified" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verified"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "核验日期"
+          }
+        }
+      }
+    },
+    "archive.reading.retrieved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retrieved"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "资料快照"
+          }
+        }
+      }
+    },
+    "archive.reading.undated" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No verification date recorded in the source"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "原始资料未标注核验日期"
+          }
+        }
+      }
+    },
     "accessibility.close_detail" : {
       "extractionState" : "stale",
       "localizations" : {

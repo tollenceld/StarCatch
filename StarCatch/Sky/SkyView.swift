@@ -81,6 +81,12 @@ struct SkyView: View {
     @State private var presentedStoryObjectID: String?
     @State private var presentedPassForecast: PassForecast?
     @State private var engagedPreciseEphemeris: Ephemeris?
+    @State private var engagedTrace: SatelliteTrackSnapshot?
+    @State private var engagedStory: SatelliteStory?
+    @State private var presentedStory: SatelliteStory?
+    @State private var presentedInsight: SatelliteInsightSnapshot?
+    @State private var presentedTrace: SatelliteTrackSnapshot?
+    @State private var presentedEphemeris: Ephemeris?
     @State private var engagedInsight: SatelliteInsightSnapshot?
 
     private var suppressMotion: Bool { reducedMotion || systemReducedMotion }
@@ -297,8 +303,11 @@ struct SkyView: View {
                 }
             }
             if arguments.contains("--openSatelliteStory") {
+                let requestedNORAD = arguments.firstIndex(of: "--archiveNORAD").flatMap { index in
+                    index + 1 < arguments.count ? Int(arguments[index + 1]) : nil
+                }
                 presentedStoryObjectID = session.catalog.objects.first(where: {
-                    $0.id == "hst"
+                    $0.noradId == (requestedNORAD ?? 20_580)
                 })?.id
                 onStoryPresentationChanged(presentedStoryObjectID != nil)
             }
@@ -308,7 +317,7 @@ struct SkyView: View {
             await prepareEngagedTargetData(for: capture.engagedObjectId)
         }
         .task(id: presentedStoryObjectID) {
-            await preparePresentedForecast(for: presentedStoryObjectID)
+            await preparePresentedArchive(for: presentedStoryObjectID)
         }
         .onChange(of: capture.phase) { oldPhase, newPhase in
             if case .acquiring(let id) = oldPhase, case .exploring = newPhase {
@@ -573,6 +582,10 @@ struct SkyView: View {
             ArchiveOverlay(
                 object: object,
                 ephemeris: engagedDisplayEphemeris(for: objectID),
+                story: engagedStory?.noradID == object.noradId ? engagedStory : nil,
+                insight: engagedInsight?.objectID == objectID ? engagedInsight : nil,
+                trace: session.tracks.preparedSnapshot(for: objectID)
+                    ?? (engagedTrace?.objectID == objectID ? engagedTrace : nil),
                 dismissalProgress: dismissalPresentationProgress(at: timeline.date),
                 onOpenArchive: {
                     if object.hasDeepArchive {
@@ -1777,15 +1790,16 @@ struct SkyView: View {
     private var satelliteStoryLayer: some View {
         if let id = presentedStoryObjectID,
            let object = session.catalog.objectsByID[id],
-           let presentation = object.deepArchivePresentation() {
+           let story = presentedStory, story.noradID == object.noradId {
            SatelliteStoryView(
                 object: object,
-                story: presentation.story,
-                ephemeris: engagedDisplayEphemeris(for: id),
-                insight: engagedInsight?.objectID == id ? engagedInsight : nil,
+                story: story,
+                ephemeris: presentedEphemeris?.objectId == id ? presentedEphemeris : nil,
+                insight: presentedInsight?.objectID == id ? presentedInsight : nil,
                 forecast: presentedPassForecast?.objectID == id
                     ? presentedPassForecast
                     : nil,
+                trace: presentedTrace?.objectID == id ? presentedTrace : nil,
                 onDismiss: {
                     withAnimation(
                         suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.22)
@@ -1886,7 +1900,10 @@ struct SkyView: View {
     private func prepareEngagedTargetData(for objectID: String?) async {
         engagedPreciseEphemeris = nil
         engagedInsight = nil
+        engagedStory = nil
+        engagedTrace = nil
         guard let objectID else { return }
+        engagedStory = session.catalog.objectsByID[objectID]?.deepArchivePresentation()?.story
         let observation = clock.observationTime()
         let live = clock.isLive
         session.tracks.prepareTrack(
@@ -1904,25 +1921,41 @@ struct SkyView: View {
             observer: session.observer.coordinates,
             at: observation
         )
-        let (precise, insight) = await (preciseTask, insightTask)
+        async let traceTask = session.tracks.snapshot(
+            for: objectID, observer: session.observer.coordinates, at: observation
+        )
+        let (precise, insight, trace) = await (preciseTask, insightTask, traceTask)
         guard !Task.isCancelled,
               capture.engagedObjectId == objectID
         else { return }
         engagedPreciseEphemeris = precise
         engagedInsight = insight
+        engagedTrace = trace
     }
 
     /// Full-day propagation belongs to the reading surface, not first focus.
     /// The task modifier cancels this work as soon as the archive closes or the
     /// selected target changes.
-    private func preparePresentedForecast(for objectID: String?) async {
+    private func preparePresentedArchive(for objectID: String?) async {
         presentedPassForecast = nil
+        presentedStory = nil
+        presentedInsight = nil
+        presentedTrace = nil
+        presentedEphemeris = nil
         guard let objectID else { return }
-        let forecast = await session.insights.forecast(
-            for: objectID,
-            observer: session.observer.coordinates,
-            at: clock.observationTime()
-        )
+        presentedStory = session.catalog.objectsByID[objectID]?.deepArchivePresentation()?.story
+        let date = clock.observationTime()
+        let observer = session.observer.coordinates
+        async let forecastTask = session.insights.forecast(for: objectID, observer: observer, at: date)
+        async let insightTask = session.insights.insight(for: objectID, observer: observer, at: date)
+        async let traceTask = session.tracks.snapshot(for: objectID, observer: observer, at: date)
+        async let ephemerisTask = session.ephemeris.preparePreciseEphemeris(objectID, at: date, live: clock.isLive)
+        let (insight, trace, ephemeris) = await (insightTask, traceTask, ephemerisTask)
+        guard !Task.isCancelled, presentedStoryObjectID == objectID else { return }
+        presentedInsight = insight
+        presentedTrace = trace
+        presentedEphemeris = ephemeris
+        let forecast = await forecastTask
         guard !Task.isCancelled, presentedStoryObjectID == objectID else { return }
         presentedPassForecast = forecast
     }

@@ -305,6 +305,52 @@ final class OrbitTests: XCTestCase {
         XCTAssertNotNil(sharedLaunch)
     }
 
+    func testEditorialReadingPreservesMissionDetailsAndFamilyScopeInBothLanguages() throws {
+        let store = Self.store
+        for object in store.objects where object.story?.reviewStatus == "migrated" {
+            let source = try XCTUnwrap(object.deepArchiveStory)
+            for language in SupportedLanguage.allCases {
+                let story = try XCTUnwrap(object.deepArchivePresentation(language: language)?.story)
+                XCTAssertEqual(story.organization, source.organization)
+                XCTAssertEqual(story.chapters.count, source.chapters.count)
+                XCTAssertEqual(story.facts.count, source.facts.count)
+                XCTAssertEqual(story.milestones.count, source.milestones.count)
+                XCTAssertEqual(story.leadSourceIDs, source.leadSourceIDs)
+                XCTAssertFalse(story.lead.contains("archive.editorial."))
+                XCTAssertTrue(story.chapters.allSatisfy { !$0.body.contains("archive.editorial.") })
+                XCTAssertTrue(story.facts.allSatisfy { !$0.value.contains("archive.editorial.") })
+            }
+        }
+        for family in CatalogFamily.allCases {
+            let object = try XCTUnwrap(store.objects.first { $0.family == family })
+            for language in SupportedLanguage.allCases {
+                let story = try XCTUnwrap(object.deepArchivePresentation(language: language)?.story)
+                XCTAssertEqual(story.scope, .family)
+                XCTAssertTrue(story.lead.contains(object.name))
+                XCTAssertGreaterThanOrEqual(story.chapters.count, 3)
+                XCTAssertTrue(story.chapters.allSatisfy { !$0.body.contains("archive.editorial.") })
+                XCTAssertTrue(story.facts.allSatisfy { !$0.value.contains("archive.editorial.") })
+            }
+        }
+    }
+
+    func testMotionTraceRetainsChronologyAndDoesNotExaggerateStationaryObjects() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        let points: [TrackSampler.TrackPoint] = [
+            .init(azimuth: 1, elevation: 0.3, offset: 180),
+            .init(azimuth: 1, elevation: .nan, offset: 20),
+            .init(azimuth: 1, elevation: 0.299, offset: -180),
+            .init(azimuth: 1, elevation: 0.3, offset: 0)
+        ]
+        let trace = SatelliteTrackSnapshot(objectID: "geo", referenceDate: date, points: points)
+        XCTAssertEqual(trace.finitePoints.map(\.offset), [-180, 0, 180])
+        XCTAssertGreaterThanOrEqual(trace.elevationBounds.upperBound - trace.elevationBounds.lowerBound, 20)
+        XCTAssertTrue(trace.elevationBounds.contains(0.3 * 180 / .pi))
+        let empty = SatelliteTrackSnapshot(objectID: "missing", referenceDate: date, points: [])
+        XCTAssertTrue(empty.elevationBounds.lowerBound.isFinite)
+        XCTAssertTrue(empty.elevationBounds.upperBound.isFinite)
+    }
+
     func testEveryCatalogObjectHasLanguageNeutralArchivePresentation() throws {
         let store = Self.store
         let encoder = JSONEncoder()

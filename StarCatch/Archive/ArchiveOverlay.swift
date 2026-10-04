@@ -45,6 +45,9 @@ struct TargetMicroLabel: View {
 struct ArchiveOverlay: View {
     let object: CatalogObject
     let ephemeris: Ephemeris?
+    var story: SatelliteStory? = nil
+    var insight: SatelliteInsightSnapshot? = nil
+    var trace: SatelliteTrackSnapshot? = nil
     var dismissalProgress: Double = 0
     var onOpenArchive: () -> Void = {}
     var onDismiss: () -> Void = {}
@@ -108,26 +111,15 @@ struct ArchiveOverlay: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(object.name)
-                .font(Typography.objectName)
-                .foregroundStyle(Palette.Text.primary)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.trailing, 44)
-
-            identityHeader
-                .padding(.top, 8)
-
-            Text(missionRoleSummary)
-                .font(Typography.readingCompact)
-                .foregroundStyle(Palette.Text.secondary)
-                .lineSpacing(2)
-                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8)
-
-            telemetry
-                .padding(.top, 16)
+            if dynamicTypeSize.isAccessibilitySize {
+                ScrollView {
+                    summaryContent
+                }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(height: 380)
+            } else {
+                summaryContent
+            }
 
             archiveAction
                 .padding(.top, 16)
@@ -161,6 +153,49 @@ struct ArchiveOverlay: View {
             ) {
                 presentationVisible = true
             }
+        }
+    }
+
+    private var summaryContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(object.name)
+                .font(Typography.objectName)
+                .foregroundStyle(Palette.Text.primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, 44)
+
+            identityHeader
+                .padding(.top, 8)
+            if let story, story.scope == .family {
+                Text(copy("archive.reading.family_scope"))
+                    .font(Typography.fieldLabel)
+                    .foregroundStyle(object.identityTint)
+                    .padding(.top, 8)
+            }
+
+            Text(story?.lead ?? missionRoleSummary)
+                .font(Typography.readingCompact)
+                .foregroundStyle(Palette.Text.secondary)
+                .lineSpacing(2)
+                .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 8)
+
+            if let trace {
+                SatelliteMotionTraceView(trace: trace, tint: object.identityTint, compact: true)
+                    .padding(.top, 16)
+            }
+            if let movement = insight?.movementLabel(language: language) {
+                Text(movement)
+                    .font(Typography.readingCompact)
+                    .foregroundStyle(object.identityTint)
+                    .padding(.top, 8)
+            }
+
+            telemetry
+                .padding(.top, 16)
+
         }
     }
 

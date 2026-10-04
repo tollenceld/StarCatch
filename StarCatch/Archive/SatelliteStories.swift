@@ -94,7 +94,7 @@ struct SatelliteStory: Codable, Sendable {
             eyebrow: eyebrow,
             organization: organization,
             program: "\(program) · \(object.name)",
-            lead: "当前节点 \(object.name) 以 \(object.cosparId) / N\(object.noradId) 收录；身份与轨道由本地 GP/OMM 快照计算，以下任务说明属于 \(program) 系列。",
+            lead: "\(lead) 当前节点 \(object.name) 属于这一系列，轨道身份为 \(object.cosparId) / N\(object.noradId)。",
             leadSourceIDs: sources.map(\.id),
             scope: .family,
             reviewStatus: reviewStatus,
@@ -140,11 +140,7 @@ struct SatelliteStoryPresentation: Sendable {
                 table: table,
                 language: .simplifiedChinese
             ),
-            organization: L10n.text(
-                "archive.generated.organization",
-                table: table,
-                language: .simplifiedChinese
-            ),
+            organization: source.organization,
             program: object.family?.title(language: .simplifiedChinese) ?? source.program,
             lead: source.lead,
             leadSourceIDs: source.leadSourceIDs,
@@ -363,6 +359,30 @@ struct SatelliteStoryPresentation: Sendable {
                 verifiedAt: source.verifiedAt
             )
         }
+        let editorialKey = "archive.editorial.\(object.family?.rawValue ?? String(object.noradId))."
+        let translatedLead = L10n.text(editorialKey + "lead", table: table, language: .english)
+        let hasEditorial = translatedLead != editorialKey + "lead"
+        let editorialChapters = source.chapters.map { chapter in
+            if chapter.id.hasPrefix("current-node-") { return identityChapter }
+            return SatelliteStory.Chapter(
+                id: chapter.id,
+                title: L10n.text(editorialKey + chapter.id + ".title", table: table, language: .english),
+                body: L10n.text(editorialKey + chapter.id + ".body", table: table, language: .english),
+                sourceIDs: chapter.sourceIDs
+            )
+        }
+        let editorialFacts = source.facts.map { fact in
+            SatelliteStory.Fact(id: fact.id, label: englishEditorialTerm(fact.label),
+                                value: englishEditorialTerm(fact.value), sourceIDs: fact.sourceIDs)
+        }
+        let editorialMilestones = source.milestones.map { milestone in
+            if milestone.id.hasPrefix("node-launch-") { return launch }
+            return SatelliteStory.Milestone(
+                id: milestone.id, time: englishEditorialTerm(milestone.time),
+                event: L10n.text(editorialKey + milestone.id + ".event", table: table, language: .english),
+                sourceIDs: milestone.sourceIDs
+            )
+        }
         return SatelliteStory(
             noradID: object.noradId,
             eyebrow: L10n.text(
@@ -370,17 +390,24 @@ struct SatelliteStoryPresentation: Sendable {
                 table: table,
                 language: .english
             ),
-            organization: L10n.text("archive.generated.organization", table: table, language: .english),
-            program: program,
-            lead: lead,
-            leadSourceIDs: sourceIDs,
+            organization: hasEditorial ? source.organization : L10n.text("archive.generated.organization", table: table, language: .english),
+            program: hasEditorial ? (object.family?.title(language: .english) ?? source.program) : program,
+            lead: hasEditorial
+                ? translatedLead + (object.family == nil ? "" : " \(object.name) · NORAD \(object.noradId).")
+                : lead,
+            leadSourceIDs: hasEditorial ? source.leadSourceIDs : sourceIDs,
             scope: source.scope,
             reviewStatus: L10n.text("archive.generated.review", table: table, language: .english),
-            chapters: [identityChapter, orbitChapter],
-            milestones: [launch],
-            facts: facts,
+            chapters: hasEditorial ? editorialChapters : [identityChapter, orbitChapter],
+            milestones: hasEditorial ? editorialMilestones : [launch],
+            facts: hasEditorial ? editorialFacts : facts,
             sources: sources
         )
+    }
+
+    private static func englishEditorialTerm(_ value: String) -> String {
+        guard value.unicodeScalars.contains(where: { $0.properties.isIdeographic }) else { return value }
+        return L10n.text("archive.editorial.term." + value, table: "SatelliteText", language: .english)
     }
 
     private static func englishSourceTitle(_ source: StorySource) -> String {

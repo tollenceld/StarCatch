@@ -1,6 +1,29 @@
 import Foundation
 import SatelliteKit
 
+/// Factual local-sky samples, stamped at their observation time. Reading views
+/// consume this value without scheduling propagation from their drawing code.
+struct SatelliteTrackSnapshot: Sendable {
+    let objectID: String
+    let referenceDate: Date
+    let points: [TrackSampler.TrackPoint]
+
+    var finitePoints: [TrackSampler.TrackPoint] {
+        points.filter { $0.offset.isFinite && $0.elevation.isFinite && $0.azimuth.isFinite }
+            .sorted { $0.offset < $1.offset }
+    }
+
+    /// Keep at least 20 degrees on the vertical axis so GEO motion is not exaggerated.
+    var elevationBounds: ClosedRange<Double> {
+        let values = finitePoints.map { $0.elevation * 180 / .pi }
+        let lower = floor((values.min() ?? -10) / 10) * 10 - 5
+        let upper = ceil((values.max() ?? 10) / 10) * 10 + 5
+        let middle = (lower + upper) / 2
+        let halfSpan = max(10, (upper - lower) / 2)
+        return (middle - halfSpan) ... (middle + halfSpan)
+    }
+}
+
 /// 锁定对象的轨迹弧采样：t ± 3min，每 20s 一点。
 /// 结果是 az/el 折线，投影后由渲染层平滑。
 @MainActor
@@ -71,6 +94,33 @@ final class TrackSampler {
                 self.preparationTask = nil
             }
         }
+    }
+
+    /// Return cached data only. Safe for a view's presentation assembly.
+    func preparedSnapshot(for objectID: String) -> SatelliteTrackSnapshot? {
+        guard cachedObjectId == objectID, let referenceDate = cachedObservation,
+              !cachedTrack.isEmpty else { return nil }
+        return SatelliteTrackSnapshot(objectID: objectID, referenceDate: referenceDate, points: cachedTrack)
+    }
+
+    /// A reading page owns one immutable trace, even while the sky is suspended.
+    func snapshot(
+        for objectID: String,
+        observer: ObserverLocation.Coordinates,
+        at date: Date
+    ) async -> SatelliteTrackSnapshot? {
+        if cacheIsValid(for: objectID, at: date) { return preparedSnapshot(for: objectID) }
+        if preparingObjectId == objectID, let preparationTask {
+            await preparationTask.value
+            guard !Task.isCancelled else { return nil }
+            if cacheIsValid(for: objectID, at: date) { return preparedSnapshot(for: objectID) }
+        }
+        guard let satellite = store.satellites[objectID] else { return nil }
+        let points = await Task.detached(priority: .userInitiated) {
+            Self.sampleTrack(satellite: satellite, observer: observer, at: date)
+        }.value
+        guard !Task.isCancelled, !points.isEmpty else { return nil }
+        return SatelliteTrackSnapshot(objectID: objectID, referenceDate: date, points: points)
     }
 
     /// 启动叙事期间只运行一次 SatelliteKit 的多时刻传播路径。结果无需保留；
