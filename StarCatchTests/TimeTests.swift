@@ -1623,6 +1623,36 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(chrome.resetAction, .localField)
     }
 
+    func testFirstCaptureSampleShowsIdentityBeforeLockedSummary() {
+        let capture = CaptureStateMachine()
+        let start = Date(timeIntervalSince1970: 900)
+        capture.update(nearest: ("iss", 0), trackedDistance: 0, now: start)
+        XCTAssertEqual(capture.acquisitionProgress, 0)
+        let first = makeChrome(phase: capture.phase)
+        XCTAssertEqual(first.acquisitionObjectID, "iss")
+        XCTAssertEqual(first.dockMode, .sensing)
+        for step in 1 ... 17 {
+            capture.update(nearest: ("iss", 0), trackedDistance: 0,
+                           now: start.addingTimeInterval(Double(step) * 0.1))
+            XCTAssertEqual(makeChrome(phase: capture.phase).acquisitionObjectID, "iss")
+            XCTAssertEqual(makeChrome(phase: capture.phase).dockMode, .sensing)
+        }
+        capture.update(nearest: ("iss", 0), trackedDistance: 0, now: start.addingTimeInterval(1.81))
+        XCTAssertNil(makeChrome(phase: capture.phase).acquisitionObjectID)
+        XCTAssertEqual(makeChrome(phase: capture.phase).dockMode, .targetSummary)
+    }
+
+    func testAcquisitionIdentityClearsWithCancellationAndSceneChanges() {
+        let capture = CaptureStateMachine()
+        capture.update(nearest: ("iss", 0), now: Date())
+        capture.cancelAcquisition()
+        XCTAssertNil(makeChrome(phase: capture.phase).acquisitionObjectID)
+        for scene in [SkyPresentationMode.global, .enteringGlobal, .previewingGlobal] {
+            XCTAssertNil(makeChrome(presentation: scene, phase: .acquiring(objectId: "iss")).acquisitionObjectID)
+        }
+        XCTAssertNil(makeChrome(phase: .dismissing(objectId: "iss", startedAt: Date())).acquisitionObjectID)
+    }
+
     func testSkyChromeCapturePriorityHidesExplorationDock() {
         let sensing = makeChrome(
             phase: .acquiring(objectId: "iss")

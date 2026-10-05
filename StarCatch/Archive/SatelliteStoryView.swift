@@ -352,17 +352,17 @@ struct SatelliteStoryView: View {
             layout {
                 observationCell(
                     label: "EL",
-                    value: String(format: "%+.1f°", ephemeris.elevation * 180 / .pi)
+                    value: String(format: "%+.1f", ephemeris.elevation * 180 / .pi), unit: "°"
                 )
                 if !dynamicTypeSize.isAccessibilitySize { observationDivider }
                 observationCell(
                     label: copy("archive.field.range"),
-                    value: String(format: "%.0f KM", ephemeris.rangeKm)
+                    value: String(format: "%.0f", ephemeris.rangeKm), unit: "KM"
                 )
                 if !dynamicTypeSize.isAccessibilitySize { observationDivider }
                 observationCell(
                     label: copy("archive.field.speed"),
-                    value: String(format: "%.2f KM/S", ephemeris.velocityKmS)
+                    value: String(format: "%.2f", ephemeris.velocityKmS), unit: "KM/S"
                 )
             }
 
@@ -465,18 +465,13 @@ struct SatelliteStoryView: View {
         }
     }
 
-    private func observationCell(label: String, value: String) -> some View {
+    private func observationCell(label: String, value: String, unit: String) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(label)
                 .font(Typography.statusTag)
                 .tracking(0.85)
                 .foregroundStyle(Palette.Text.tertiary)
-            Text(value)
-                .font(Typography.archiveDataValue)
-                .tracking(0.25)
-                .foregroundStyle(Palette.Text.primary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            SatelliteReadout(value: value, unit: unit)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -786,10 +781,13 @@ private struct PassForecastLedgerView: View {
                 )
             }
 
+            Text(text("archive.forecast.key_events"))
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.tertiary)
             Canvas { context, size in
                 drawPass(pass, now: now, context: &context, size: size)
             }
-            .frame(height: 62)
+            .frame(height: 32)
             .accessibilityHidden(true)
 
             layout {
@@ -874,28 +872,33 @@ private struct PassForecastLedgerView: View {
         context: inout GraphicsContext,
         size: CGSize
     ) {
-        let baseline = size.height - 9
-        let inset: CGFloat = 5
-        let peakRatio = CGFloat(min(1, max(0.16, (pass.maximumElevationDegrees ?? 30) / 90)))
-        let peakY = baseline - 18 - peakRatio * 29
-        var path = Path()
-        path.move(to: CGPoint(x: inset, y: baseline))
-        path.addCurve(
-            to: CGPoint(x: size.width - inset, y: baseline),
-            control1: CGPoint(x: size.width * 0.31, y: peakY),
-            control2: CGPoint(x: size.width * 0.69, y: peakY)
-        )
-        context.stroke(path, with: .color(tint.opacity(0.56)), style: StrokeStyle(lineWidth: 0.7, lineCap: .round))
-
-        var horizon = Path()
-        horizon.move(to: CGPoint(x: 0, y: baseline))
-        horizon.addLine(to: CGPoint(x: size.width, y: baseline))
-        context.stroke(horizon, with: .color(Palette.inkFaint.opacity(0.3)), style: StrokeStyle(lineWidth: 0.5, dash: [2, 4]))
-
-        guard let progress = pass.progress(at: now),
-              let point = path.trimmedPath(from: 0, to: max(0.002, progress)).currentPoint
-        else { return }
-        context.fill(Path(ellipseIn: CGRect(x: point.x - 2.5, y: point.y - 2.5, width: 5, height: 5)), with: .color(tint.opacity(0.92)))
+        guard let rise = pass.rise, let set = pass.set, set > rise else { return }
+        let inset: CGFloat = 6
+        let centerY = size.height / 2
+        func x(_ date: Date) -> CGFloat {
+            inset + (size.width - 2 * inset) * min(1, max(0, date.timeIntervalSince(rise) / set.timeIntervalSince(rise)))
+        }
+        // Tick marks show elapsed time, not an invented elevation curve.
+        for index in 0 ... 36 {
+            let date = rise.addingTimeInterval(set.timeIntervalSince(rise) * Double(index) / 36)
+            let major = index.isMultiple(of: 6)
+            let height: CGFloat = major ? 10 : 4
+            var tick = Path()
+            tick.move(to: CGPoint(x: x(date), y: centerY - height / 2))
+            tick.addLine(to: CGPoint(x: x(date), y: centerY + height / 2))
+            context.stroke(tick, with: .color(date <= now ? Palette.Text.primary.opacity(0.5) : tint.opacity(0.35)), lineWidth: 1)
+        }
+        for date in [pass.rise, pass.peak, pass.set].compactMap({ $0 }) {
+            let marker = Path(ellipseIn: CGRect(x: x(date) - 3.5, y: centerY - 3.5, width: 7, height: 7))
+            context.fill(marker, with: .color(date <= now ? Palette.Text.primary : Palette.sheetBackground))
+            context.stroke(marker, with: .color(tint), lineWidth: 1.2)
+        }
+        if rise ... set ~= now {
+            var cursor = Path()
+            cursor.move(to: CGPoint(x: x(now), y: 0))
+            cursor.addLine(to: CGPoint(x: x(now), y: size.height))
+            context.stroke(cursor, with: .color(Palette.Text.primary), lineWidth: 1)
+        }
     }
 
     private func ledgerMetric(_ label: String, _ value: String, prominent: Bool = false) -> some View {

@@ -213,109 +213,23 @@ struct SatellitePassArcView: View {
 }
 
 
-/// Compact summaries retain the trace; full reading uses discrete elevation samples.
-/// This is an elevation/time plot of actual cached samples, not a looping orbit animation.
+/// The same sampled elevation plot at reading and summary densities.
 struct SatelliteMotionTraceView: View {
     let trace: SatelliteTrackSnapshot
     let tint: Color
     var compact = false
 
-    private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
-
     var body: some View {
-        if compact {
-            compactTrace
-        } else {
-            SatelliteElevationPlot(trace: trace, tint: tint)
-        }
-    }
-
-    @ViewBuilder
-    private var compactTrace: some View {
-        let points = trace.finitePoints
-        let bounds = trace.elevationBounds
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(copy("archive.reading.trace_title"))
-                Spacer(minLength: 8)
-                Text(trace.referenceDate, format: .dateTime.hour().minute().second())
-                    .monospacedDigit()
-            }
-            .font(Typography.statusTag)
-            .foregroundStyle(Palette.Text.tertiary)
-
-            Canvas { context, size in
-                guard points.count > 1,
-                      let first = points.first, let last = points.last,
-                      last.offset > first.offset else { return }
-                let inset: CGFloat = 5
-                func position(_ point: TrackSampler.TrackPoint) -> CGPoint {
-                    CGPoint(
-                        x: inset + (size.width - 2 * inset) * (point.offset - first.offset) / (last.offset - first.offset),
-                        y: inset + (size.height - 2 * inset) * (1 - (point.elevation * 180 / .pi - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
-                    )
-                }
-                for level in [bounds.lowerBound, 0, bounds.upperBound] {
-                    guard bounds.contains(level) else { continue }
-                    let y = inset + (size.height - 2 * inset) * (1 - (level - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
-                    var line = Path()
-                    line.move(to: CGPoint(x: 0, y: y))
-                    line.addLine(to: CGPoint(x: size.width, y: y))
-                    context.stroke(line, with: .color(Palette.inkFaint.opacity(level == 0 ? 0.6 : 0.22)), style: StrokeStyle(lineWidth: 0.5))
-                }
-                for pair in zip(points, points.dropFirst()) {
-                    // A missing propagation sample must remain a gap, not a fabricated line.
-                    guard pair.1.offset - pair.0.offset <= 21 else { continue }
-                    var line = Path()
-                    line.move(to: position(pair.0))
-                    line.addLine(to: position(pair.1))
-                    let future = pair.0.offset >= 0
-                    context.stroke(line, with: .color(future ? tint : Palette.Text.primary), style: StrokeStyle(lineWidth: 1.4, lineCap: .round, dash: future ? [3, 4] : []))
-                }
-                if let current = points.first(where: { abs($0.offset) < 0.01 }) {
-                    let center = position(current)
-                    var stem = Path()
-                    stem.move(to: CGPoint(x: center.x, y: 0))
-                    stem.addLine(to: CGPoint(x: center.x, y: size.height))
-                    context.stroke(stem, with: .color(tint.opacity(0.25)), lineWidth: 0.5)
-                    context.fill(Path(ellipseIn: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)), with: .color(tint))
-                }
-            }
-            .frame(height: 42)
-            .accessibilityHidden(true)
-
-            HStack(alignment: .top) {
-                sampleLabel(points.first, alignment: .leading)
-                Spacer(minLength: 8)
-                Text(copy("archive.reading.observation"))
-                    .foregroundStyle(tint)
-                Spacer(minLength: 8)
-                sampleLabel(points.last, alignment: .trailing)
-            }
-            .font(Typography.statusTag)
-            .foregroundStyle(Palette.Text.secondary)
-
-        }
-    }
-
-    private func sampleLabel(_ point: TrackSampler.TrackPoint?, alignment: HorizontalAlignment) -> some View {
-        VStack(alignment: alignment, spacing: 4) {
-            if let point {
-                Text(String(format: "%+.0f MIN", point.offset / 60))
-                Text(String(format: "EL %+.1f°", point.elevation * 180 / .pi))
-            } else {
-                Text("—")
-            }
-        }
+        SatelliteElevationPlot(trace: trace, tint: tint, compact: compact)
     }
 }
-
 
 /// A six-minute scientific strip plot. Each mark is an actual 20-second sample;
 /// gaps stay empty and the elevation scale retains at least 20 degrees of range.
 private struct SatelliteElevationPlot: View {
     let trace: SatelliteTrackSnapshot
     let tint: Color
+    var compact = false
     @ScaledMetric(relativeTo: .caption) private var axisWidth: CGFloat = 38
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -343,14 +257,17 @@ private struct SatelliteElevationPlot: View {
                 VStack(alignment: .trailing, spacing: 0) {
                     degreeLabel(bounds.upperBound)
                     Spacer(minLength: 0)
-                    degreeLabel((bounds.lowerBound + bounds.upperBound) / 2)
-                    Spacer(minLength: 0)
+                    if !compact {
+                        degreeLabel((bounds.lowerBound + bounds.upperBound) / 2)
+                        Spacer(minLength: 0)
+                    }
                     degreeLabel(bounds.lowerBound)
                 }
                 .frame(width: axisWidth, alignment: .trailing)
                 plot(points: points, bounds: bounds)
             }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 144 : 116)
+            .frame(height: compact ? (dynamicTypeSize.isAccessibilitySize ? 88 : 64)
+                          : (dynamicTypeSize.isAccessibilitySize ? 144 : 116))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(copy("archive.reading.elevation"))
             .accessibilityValue(points.map {
@@ -384,10 +301,12 @@ private struct SatelliteElevationPlot: View {
             .foregroundStyle(Palette.Text.tertiary)
             .padding(.leading, axisWidth + 10)
 
-            Text(copy("archive.reading.sample_note"))
-                .font(Typography.readingCompact)
-                .foregroundStyle(Palette.Text.tertiary)
-                .fixedSize(horizontal: false, vertical: true)
+            if !compact {
+                Text(copy("archive.reading.sample_note"))
+                    .font(Typography.readingCompact)
+                    .foregroundStyle(Palette.Text.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
@@ -460,7 +379,7 @@ private struct SatelliteElevationPlot: View {
                 stem.addLine(to: CGPoint(x: center.x, y: size.height - inset))
                 context.stroke(stem, with: .color(color.opacity(0.16)),
                                style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
-                let radius: CGFloat = current ? 4 : 2.7
+                let radius: CGFloat = current ? (compact ? 3.2 : 4) : (compact ? 2 : 2.7)
                 let marker = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                                    width: radius * 2, height: radius * 2))
                 context.fill(marker, with: .color(point.offset <= 0 ? color : Palette.voidBlack))
@@ -472,6 +391,42 @@ private struct SatelliteElevationPlot: View {
                     context.stroke(ring, with: .color(tint.opacity(0.5)), lineWidth: 0.7)
                 }
             }
+        }
+    }
+}
+
+
+/// Consistent numerical hierarchy across the locked card and full archive.
+struct SatelliteReadout: View {
+    let value: String
+    let unit: String
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                number
+                suffix
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                number
+                suffix
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var number: some View {
+        Text(value)
+            .font(Typography.dataValue.weight(.medium))
+            .foregroundStyle(Palette.Text.primary)
+            .fixedSize(horizontal: true, vertical: false)
+    }
+
+    @ViewBuilder private var suffix: some View {
+        if !unit.isEmpty {
+            Text(unit)
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.tertiary)
         }
     }
 }

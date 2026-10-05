@@ -25,12 +25,19 @@ struct SkyChromeState: Equatable {
     let scene: Scene
     let dockMode: DockMode
     let resetAction: ResetAction?
+    /// Immediate identity, exclusive with the locked story panel.
+    let acquisitionObjectID: String?
 
     init(
         presentationMode: SkyPresentationMode,
         capturePhase: CaptureStateMachine.Phase,
         localFieldResetAvailable: Bool
     ) {
+        if presentationMode == .local, case .acquiring(let id) = capturePhase {
+            acquisitionObjectID = id
+        } else {
+            acquisitionObjectID = nil
+        }
         switch presentationMode {
         case .previewingGlobal, .cancellingGlobal, .enteringGlobal, .exitingGlobal:
             scene = .transitioning

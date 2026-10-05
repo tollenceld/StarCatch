@@ -20,7 +20,9 @@ struct SatelliteTrackSnapshot: Sendable {
         let upper = ceil((values.max() ?? 10) / 10) * 10 + 5
         let middle = (lower + upper) / 2
         let halfSpan = max(10, (upper - lower) / 2)
-        return (middle - halfSpan) ... (middle + halfSpan)
+        let clippedUpper = min(90, middle + halfSpan)
+        let clippedLower = max(-90, min(middle - halfSpan, clippedUpper - 20))
+        return clippedLower ... min(90, max(clippedUpper, clippedLower + 20))
     }
 }
 

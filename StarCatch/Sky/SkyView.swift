@@ -144,8 +144,6 @@ struct SkyView: View {
                         .contentShape(Rectangle())
                     crosshairLayer
                         .opacity(localChromePresence)
-                    targetMicroLabelLayer(observation: obsTime)
-                        .opacity(localChromePresence)
                     if clock.isLive {
                         guideLayer
                             .opacity(localChromePresence)
@@ -159,6 +157,9 @@ struct SkyView: View {
                         .float(grainEnabled ? 0.012 : 0)
                     )
                 )
+                .overlay(alignment: .topLeading) {
+                    targetMicroLabelLayer.opacity(localChromePresence)
+                }
                 .onChange(of: timeline.date) { _, frameDate in
                     guard !renderingSuspended else { return }
                     updateFrame(
@@ -1821,78 +1822,22 @@ struct SkyView: View {
         }
     }
 
-    /// 感应阶段只在目标附近放一条识别信息；完成识别或锁定后让位给底部摘要。
+    /// A stable identity plaque appears immediately below the reticle. Only its
+    /// progress changes during acquisition; the full card belongs to locked state.
     @ViewBuilder
-    private func targetMicroLabelLayer(observation: Date) -> some View {
+    private var targetMicroLabelLayer: some View {
         GeometryReader { geo in
-            if capture.isAcquiring,
-               !archivePresentationReady,
-               let id = capture.engagedObjectId,
-               let object = session.catalog.objectsByID[id],
-               let point = relationshipTarget(
-                    objectID: id,
-                    observation: observation,
-                    in: geo.size
-                )?.projected?.point {
-                let labelWidth: CGFloat = 188
-                // 标签从目标朝屏幕内侧展开：左半边向右，右半边向左。
-                let placeOnRight = point.x < geo.size.width / 2
-                let horizontalGap: CGFloat = 20
-                let proposedX = placeOnRight
-                    ? point.x + horizontalGap
-                    : point.x - labelWidth - horizontalGap
-                let x = min(max(12, proposedX), geo.size.width - labelWidth - 12)
-                let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
-                let nearCrosshair = hypot(point.x - center.x, point.y - center.y) < 48
-                let proposedY: CGFloat = {
-                    if point.y < 132 { return point.y + 12 }
-                    if point.y > geo.size.height - 205 { return point.y - 39 }
-                    if nearCrosshair { return point.y + 20 }
-                    return point.y - 14
-                }()
-                let y = min(max(96, proposedY), geo.size.height - 184)
-                let labelEdgeX = placeOnRight ? x : x + labelWidth
-                let labelEdgeY = y + 13.5
-                let targetEdgeX = point.x + (placeOnRight ? 6 : -6)
-
-                ZStack(alignment: .topLeading) {
-                    Path { path in
-                        path.move(to: CGPoint(x: targetEdgeX, y: point.y))
-                        path.addLine(
-                            to: CGPoint(
-                                x: targetEdgeX + (placeOnRight ? 7 : -7),
-                                y: point.y
-                            )
-                        )
-                        path.addLine(to: CGPoint(x: labelEdgeX, y: labelEdgeY))
-                    }
-                    .stroke(
-                        object.identityTint.opacity(0.54),
-                        style: StrokeStyle(lineWidth: 0.55, lineCap: .round, lineJoin: .round)
-                    )
-
-                    TargetMicroLabel(
-                        object: object,
-                        ephemeris: session.ephemeris.cachedEphemeris(
-                            id,
-                            at: observation,
-                            live: clock.isLive
-                        )
-                    )
-                    .frame(width: labelWidth)
-                    .offset(x: x, y: y)
-                }
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
-                .opacity(0.36 + 0.64 * capture.acquisitionProgress)
-                .id(id)
-                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+            if let id = chromeState.acquisitionObjectID,
+               let object = session.catalog.objectsByID[id] {
+                TargetMicroLabel(object: object, progress: capture.acquisitionProgress)
+                    .frame(width: min(324, max(0, geo.size.width - 36)))
+                    .frame(maxWidth: .infinity)
+                    .offset(y: min(geo.size.height / 2 + 64, max(100, geo.size.height - 270)))
+                    .id(id)
+                    .transition(.opacity)
             }
         }
         .allowsHitTesting(false)
-        .animation(
-            suppressMotion ? .easeOut(duration: 0.1) : Motion.interfaceExpand,
-            value: capture.engagedObjectId
-        )
     }
 
     /// 感应阶段在后台准备锁定后才需要的精确速度和轨迹。任务 id 随目标变化，

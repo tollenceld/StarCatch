@@ -346,6 +346,15 @@ final class OrbitTests: XCTestCase {
         XCTAssertEqual(trace.finitePoints.map(\.offset), [-180, 0, 180])
         XCTAssertGreaterThanOrEqual(trace.elevationBounds.upperBound - trace.elevationBounds.lowerBound, 20)
         XCTAssertTrue(trace.elevationBounds.contains(0.3 * 180 / .pi))
+        for elevation in [-89.9, 89.9] {
+            let edge = SatelliteTrackSnapshot(objectID: "edge", referenceDate: date, points: [
+                .init(azimuth: 0, elevation: elevation * .pi / 180, offset: 0)
+            ])
+            XCTAssertGreaterThanOrEqual(edge.elevationBounds.lowerBound, -90)
+            XCTAssertLessThanOrEqual(edge.elevationBounds.upperBound, 90)
+            XCTAssertGreaterThanOrEqual(edge.elevationBounds.upperBound - edge.elevationBounds.lowerBound, 20)
+            XCTAssertTrue(edge.elevationBounds.contains(elevation))
+        }
         let empty = SatelliteTrackSnapshot(objectID: "missing", referenceDate: date, points: [])
         XCTAssertTrue(empty.elevationBounds.lowerBound.isFinite)
         XCTAssertTrue(empty.elevationBounds.upperBound.isFinite)

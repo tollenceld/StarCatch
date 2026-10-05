@@ -1,43 +1,63 @@
 import SwiftUI
 
-/// 目标进入感应范围后出现的最小识别标签。
-///
-/// 它只回答“这是什么”，不提前承担档案阅读；短引线由调用方把它放在目标附近。
+/// Identity is available on the first acquisition sample; it never waits for
+/// the background story, precise ephemeris, or track preparation.
 struct TargetMicroLabel: View {
     let object: CatalogObject
-    let ephemeris: Ephemeris?
+    let progress: Double
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
 
-    private var label: String {
-        let range = ephemeris.map { String(format: "%.0f KM", $0.rangeKm) } ?? "— KM"
-        return "\(object.cosparId)  ·  \(range)  ·  \(object.orbitClass)"
+    private var identity: String {
+        let role = targetRoleKey(object.kind).map {
+            L10n.text("archive.role.\($0).title", table: "SatelliteText")
+        } ?? object.category.title
+        return "\(role) · \(object.orbitClass) · N\(object.noradId)"
     }
 
     var body: some View {
-        Text(label)
-            .font(Typography.statusTag)
-            .tracking(0.45)
-            .foregroundStyle(Palette.Text.primary)
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
-            .padding(.horizontal, 9)
-            .frame(height: 27)
-            .background(.ultraThinMaterial, in: Capsule())
-            .background(Palette.voidBlack.opacity(0.48), in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(object.identityTint.opacity(0.26), lineWidth: 0.5)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(object.name)
+                .instrumentFont(16, relativeTo: .headline, weight: .semibold)
+                .foregroundStyle(Palette.Text.primary)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(identity)
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 12) {
+                Text(L10n.text("capture.identity.hold", table: "SatelliteText"))
+                    .font(Typography.statusTag)
+                    .foregroundStyle(Palette.signal)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                HStack(spacing: 3) {
+                    ForEach(0 ..< 12, id: \.self) { index in
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Double(index) < progress * 12 ? Palette.signal : Palette.Text.tertiary.opacity(0.22))
+                            .frame(width: 3, height: 8)
+                    }
+                }
+                .accessibilityHidden(true)
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(
-                L10n.format(
-                    "accessibility.micro_label",
-                    table: "SatelliteText",
-                    object.name,
-                    ephemeris.map { String(format: "%.0f KM", $0.rangeKm) }
-                        ?? L10n.text("value.unknown", table: "SatelliteText"),
-                    object.orbitClass
-                )
-            )
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
+            if reduceTransparency || previewReduceTransparency {
+                shape.fill(Palette.sheetBackground)
+            } else {
+                shape.fill(.ultraThinMaterial)
+                    .overlay(shape.fill(Palette.voidBlack.opacity(0.5)))
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Palette.signal.opacity(0.3), lineWidth: 0.5)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -86,18 +106,7 @@ struct ArchiveOverlay: View {
         object.status.isActive ? Palette.activeTint : Palette.derelictTint
     }
 
-    private var missionRoleKey: String? {
-        switch object.kind {
-        case "telescope": "telescope"
-        case "station": "station"
-        case "nav": "navigation"
-        case "comms": "communications"
-        case "weather": "weather"
-        case "science": "science"
-        case "debris", "rocket_body": "orbital_remnant"
-        default: nil
-        }
-    }
+    private var missionRoleKey: String? { targetRoleKey(object.kind) }
 
     private var missionRoleTitle: String {
         missionRoleKey.map { copy("archive.role.\($0).title") }
@@ -195,7 +204,6 @@ struct ArchiveOverlay: View {
 
             telemetry
                 .padding(.top, 16)
-
         }
     }
 
@@ -283,32 +291,10 @@ struct ArchiveOverlay: View {
                 .font(Typography.fieldLabel)
                 .foregroundStyle(Palette.Text.tertiary)
             if dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    telemetryValue(value)
-                    telemetryUnit(unit)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    telemetryValue(value)
-                    telemetryUnit(unit)
-                }
-            }
+            SatelliteReadout(value: value, unit: unit)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-    }
-
-    private func telemetryValue(_ value: String) -> some View {
-        Text(value)
-            .font(Typography.dataValue.weight(.medium))
-            .foregroundStyle(Palette.Text.primary)
-            .fixedSize(horizontal: true, vertical: false)
-    }
-
-    private func telemetryUnit(_ unit: String) -> some View {
-        Text(unit)
-            .font(Typography.statusTag)
-            .foregroundStyle(Palette.Text.tertiary)
     }
 
     private var telemetryDivider: some View {
@@ -367,5 +353,19 @@ struct ArchiveOverlay: View {
                     shape.stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.6)
                 }
         }
+    }
+}
+
+
+private func targetRoleKey(_ kind: String) -> String? {
+    switch kind {
+    case "telescope": "telescope"
+    case "station": "station"
+    case "nav": "navigation"
+    case "comms": "communications"
+    case "weather": "weather"
+    case "science": "science"
+    case "debris", "rocket_body": "orbital_remnant"
+    default: nil
     }
 }
