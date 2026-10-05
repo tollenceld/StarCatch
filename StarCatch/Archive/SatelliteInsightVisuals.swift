@@ -213,7 +213,7 @@ struct SatellitePassArcView: View {
 }
 
 
-/// The solid segment precedes the observation; the dashed segment follows it.
+/// Compact summaries retain the trace; full reading uses discrete elevation samples.
 /// This is an elevation/time plot of actual cached samples, not a looping orbit animation.
 struct SatelliteMotionTraceView: View {
     let trace: SatelliteTrackSnapshot
@@ -223,6 +223,15 @@ struct SatelliteMotionTraceView: View {
     private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
 
     var body: some View {
+        if compact {
+            compactTrace
+        } else {
+            SatelliteElevationPlot(trace: trace, tint: tint)
+        }
+    }
+
+    @ViewBuilder
+    private var compactTrace: some View {
         let points = trace.finitePoints
         let bounds = trace.elevationBounds
         VStack(alignment: .leading, spacing: 8) {
@@ -272,7 +281,7 @@ struct SatelliteMotionTraceView: View {
                     context.fill(Path(ellipseIn: CGRect(x: center.x - 3, y: center.y - 3, width: 6, height: 6)), with: .color(tint))
                 }
             }
-            .frame(height: compact ? 42 : 92)
+            .frame(height: 42)
             .accessibilityHidden(true)
 
             HStack(alignment: .top) {
@@ -285,12 +294,7 @@ struct SatelliteMotionTraceView: View {
             }
             .font(Typography.statusTag)
             .foregroundStyle(Palette.Text.secondary)
-            if !compact {
-                Text(copy("archive.reading.trace_note"))
-                    .font(Typography.readingCompact)
-                    .foregroundStyle(Palette.Text.tertiary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+
         }
     }
 
@@ -301,6 +305,172 @@ struct SatelliteMotionTraceView: View {
                 Text(String(format: "EL %+.1f°", point.elevation * 180 / .pi))
             } else {
                 Text("—")
+            }
+        }
+    }
+}
+
+
+/// A six-minute scientific strip plot. Each mark is an actual 20-second sample;
+/// gaps stay empty and the elevation scale retains at least 20 degrees of range.
+private struct SatelliteElevationPlot: View {
+    let trace: SatelliteTrackSnapshot
+    let tint: Color
+    @ScaledMetric(relativeTo: .caption) private var axisWidth: CGFloat = 38
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
+
+    var body: some View {
+        let bounds = trace.elevationBounds
+        let points = trace.finitePoints.filter { (-180 ... 180).contains($0.offset) }
+        VStack(alignment: .leading, spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    Text(copy("archive.reading.elevation"))
+                    Spacer(minLength: 8)
+                    timestamp
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(copy("archive.reading.elevation"))
+                    timestamp
+                }
+            }
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary)
+
+            HStack(spacing: 10) {
+                VStack(alignment: .trailing, spacing: 0) {
+                    degreeLabel(bounds.upperBound)
+                    Spacer(minLength: 0)
+                    degreeLabel((bounds.lowerBound + bounds.upperBound) / 2)
+                    Spacer(minLength: 0)
+                    degreeLabel(bounds.lowerBound)
+                }
+                .frame(width: axisWidth, alignment: .trailing)
+                plot(points: points, bounds: bounds)
+            }
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 144 : 116)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(copy("archive.reading.elevation"))
+            .accessibilityValue(points.map {
+                String(format: "%+.0f S, EL %+.1f°", $0.offset, $0.elevation * 180 / .pi)
+            }.joined(separator: "; "))
+
+            Group {
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(spacing: 8) {
+                        Text(copy("archive.reading.observation"))
+                            .foregroundStyle(tint)
+                            .frame(maxWidth: .infinity)
+                        HStack {
+                            legend(future: false)
+                            Spacer(minLength: 12)
+                            legend(future: true)
+                        }
+                    }
+                } else {
+                    HStack(alignment: .firstTextBaseline) {
+                        legend(future: false)
+                        Spacer(minLength: 8)
+                        Text(copy("archive.reading.observation"))
+                            .foregroundStyle(tint)
+                        Spacer(minLength: 8)
+                        legend(future: true)
+                    }
+                }
+            }
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary)
+            .padding(.leading, axisWidth + 10)
+
+            Text(copy("archive.reading.sample_note"))
+                .font(Typography.readingCompact)
+                .foregroundStyle(Palette.Text.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var timestamp: some View {
+        Text(trace.referenceDate, format: .dateTime.hour().minute().second())
+            .monospacedDigit()
+    }
+
+    private func degreeLabel(_ value: Double) -> some View {
+        Text(String(format: "%+.0f°", value))
+            .font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary)
+            .fixedSize()
+    }
+
+    private func legend(future: Bool) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(future ? Color.clear : Palette.Text.primary)
+                .overlay(Circle().stroke(future ? tint : Color.clear, lineWidth: 1.2))
+                .frame(width: 6, height: 6)
+                .accessibilityHidden(true)
+            Text(future ? "+3 MIN" : "−3 MIN")
+                .accessibilityLabel(copy(future ? "archive.reading.after" : "archive.reading.before") + " 3 MIN")
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func plot(points: [TrackSampler.TrackPoint], bounds: ClosedRange<Double>) -> some View {
+        Canvas { context, size in
+            let inset: CGFloat = 6
+            let width = size.width - inset * 2
+            let height = size.height - inset * 2
+            func x(_ offset: Double) -> CGFloat { inset + width * (offset + 180) / 360 }
+            func y(_ elevation: Double) -> CGFloat {
+                inset + height * (1 - (elevation - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
+            }
+
+            // Quiet dot matrix supplies a time/elevation reference, not invented data.
+            for column in 0 ... 18 {
+                for row in 0 ... 6 {
+                    let center = CGPoint(x: inset + width * Double(column) / 18,
+                                         y: inset + height * Double(row) / 6)
+                    context.fill(Path(ellipseIn: CGRect(x: center.x - 0.65, y: center.y - 0.65,
+                                                       width: 1.3, height: 1.3)),
+                                 with: .color(Palette.Text.tertiary.opacity(0.3)))
+                }
+            }
+            if bounds.contains(0) {
+                var horizon = Path()
+                horizon.move(to: CGPoint(x: inset, y: y(0)))
+                horizon.addLine(to: CGPoint(x: size.width - inset, y: y(0)))
+                context.stroke(horizon, with: .color(Palette.Text.tertiary.opacity(0.55)),
+                               style: StrokeStyle(lineWidth: 0.7, dash: [2, 3]))
+            }
+            var observation = Path()
+            observation.move(to: CGPoint(x: x(0), y: 0))
+            observation.addLine(to: CGPoint(x: x(0), y: size.height))
+            context.stroke(observation, with: .color(tint.opacity(0.4)), lineWidth: 0.7)
+
+            for point in points {
+                let center = CGPoint(x: x(point.offset), y: y(point.elevation * 180 / .pi))
+                let current = abs(point.offset) < 0.01
+                let color = point.offset < 0 ? Palette.Text.primary : tint
+                // A light dotted stem helps scan each column without implying a zero baseline.
+                var stem = Path()
+                stem.move(to: CGPoint(x: center.x, y: center.y + 5))
+                stem.addLine(to: CGPoint(x: center.x, y: size.height - inset))
+                context.stroke(stem, with: .color(color.opacity(0.16)),
+                               style: StrokeStyle(lineWidth: 1, dash: [1, 4]))
+                let radius: CGFloat = current ? 4 : 2.7
+                let marker = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
+                                                   width: radius * 2, height: radius * 2))
+                context.fill(marker, with: .color(point.offset <= 0 ? color : Palette.voidBlack))
+                if point.offset > 0 {
+                    context.stroke(marker, with: .color(tint), lineWidth: 1.3)
+                }
+                if current {
+                    let ring = Path(ellipseIn: CGRect(x: center.x - 7, y: center.y - 7, width: 14, height: 14))
+                    context.stroke(ring, with: .color(tint.opacity(0.5)), lineWidth: 0.7)
+                }
             }
         }
     }
