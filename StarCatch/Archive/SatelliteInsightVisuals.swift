@@ -232,27 +232,29 @@ private struct SatelliteElevationPlot: View {
     var compact = false
     @ScaledMetric(relativeTo: .caption) private var axisWidth: CGFloat = 38
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var selectedOffset: Double?
+    @State private var zoom = 1.0
+    @State private var viewCenter = 0.0
 
     private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
+    private var viewport: ArchiveChartViewport {
+        ArchiveChartViewport(extent: -180...180, minimumSpan: 120, zoom: zoom, center: viewCenter)
+    }
+    private var selectedPoint: TrackSampler.TrackPoint? {
+        selectedOffset.flatMap { ArchiveChartSelection.nearestSample(in: trace, offset: $0) }
+    }
 
     var body: some View {
         let bounds = trace.elevationBounds
-        let points = trace.finitePoints.filter { (-180 ... 180).contains($0.offset) }
+        let range = viewport.visibleRange
+        let points = trace.finitePoints.filter { range.contains($0.offset) }
         VStack(alignment: .leading, spacing: 8) {
             ViewThatFits(in: .horizontal) {
-                HStack {
-                    Text(copy("archive.reading.elevation"))
-                    Spacer(minLength: 8)
-                    timestamp
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(copy("archive.reading.elevation"))
-                    timestamp
-                }
+                HStack { Text(copy("archive.reading.elevation")); Spacer(minLength: 8); timestamp }
+                VStack(alignment: .leading, spacing: 4) { Text(copy("archive.reading.elevation")); timestamp }
             }
             .font(Typography.statusTag)
             .foregroundStyle(Palette.Text.tertiary)
-
             HStack(spacing: 10) {
                 VStack(alignment: .trailing, spacing: 0) {
                     degreeLabel(bounds.upperBound)
@@ -264,92 +266,117 @@ private struct SatelliteElevationPlot: View {
                     degreeLabel(bounds.lowerBound)
                 }
                 .frame(width: axisWidth, alignment: .trailing)
-                plot(points: points, bounds: bounds)
+                plot(points: points, bounds: bounds, range: range)
+                    .overlay {
+                        ArchiveChartScrubber(zoom: zoom, maximumZoom: 3, onScrub: { fraction in
+                            selectedOffset = viewport.value(at: fraction)
+                        }, onZoom: { value in
+                            if zoom == 1 { viewCenter = selectedPoint?.offset ?? 0 }
+                            zoom = value
+                        })
+                        .padding(.horizontal, 6)
+                        .accessibilityHidden(true)
+                    }
             }
             .frame(height: compact ? (dynamicTypeSize.isAccessibilitySize ? 88 : 64)
                           : (dynamicTypeSize.isAccessibilitySize ? 144 : 116))
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(copy("archive.reading.elevation"))
-            .accessibilityValue(points.map {
-                String(format: "%+.0f S, EL %+.1f°", $0.offset, $0.elevation * 180 / .pi)
-            }.joined(separator: "; "))
-
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(spacing: 8) {
-                        Text(copy("archive.reading.observation"))
-                            .foregroundStyle(tint)
-                            .frame(maxWidth: .infinity)
-                        HStack {
-                            legend(future: false)
-                            Spacer(minLength: 12)
-                            legend(future: true)
-                        }
-                    }
-                } else {
-                    HStack(alignment: .firstTextBaseline) {
-                        legend(future: false)
-                        Spacer(minLength: 8)
-                        Text(copy("archive.reading.observation"))
-                            .foregroundStyle(tint)
-                        Spacer(minLength: 8)
-                        legend(future: true)
-                    }
+            .accessibilityValue(sampleDescription)
+            .accessibilityAdjustableAction { direction in
+                selectedOffset = min(180, max(-180, (selectedPoint?.offset ?? 0)
+                                               + (direction == .increment ? 20 : -20)))
+                if let selectedOffset, !viewport.visibleRange.contains(selectedOffset) {
+                    viewCenter = selectedOffset
                 }
+            }
+            .accessibilityAction(named: Text(copy("archive.chart.zoom_in"))) { setZoom(zoom * 1.5) }
+            .accessibilityAction(named: Text(copy("archive.chart.zoom_out"))) { setZoom(zoom / 1.5) }
+            .accessibilityAction(named: Text(copy("archive.chart.reset")), reset)
+
+            HStack {
+                Text(offsetText(range.lowerBound))
+                Spacer(minLength: 8)
+                Text(copy(selectedPoint == nil ? "archive.reading.observation" : "archive.chart.sample"))
+                    .foregroundStyle(tint)
+                Spacer(minLength: 8)
+                Text(offsetText(range.upperBound))
             }
             .font(Typography.statusTag)
             .foregroundStyle(Palette.Text.tertiary)
             .padding(.leading, axisWidth + 10)
-
+            if let point = selectedPoint {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { sampleTime(point); sampleValues(point) }
+                    VStack(alignment: .leading, spacing: 4) { sampleTime(point); sampleValues(point) }
+                }
+                .font(Typography.statusTag)
+                .foregroundStyle(Palette.Text.primary)
+            }
             if !compact {
+                ArchiveChartTools(zoom: zoom, hasSelection: selectedOffset != nil, onReset: reset)
                 Text(copy("archive.reading.sample_note"))
                     .font(Typography.readingCompact)
                     .foregroundStyle(Palette.Text.tertiary)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .onChange(of: trace.objectID) { _, _ in reset() }
+        #if DEBUG
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains("--previewChartSelection") {
+                selectedOffset = 60
+                viewCenter = 60
+                zoom = 2
+            }
+        }
+        #endif
     }
 
     private var timestamp: some View {
-        Text(trace.referenceDate, format: .dateTime.hour().minute().second())
+        Text(trace.referenceDate, format: .dateTime.hour().minute().second()).monospacedDigit()
+    }
+    private func sampleTime(_ point: TrackSampler.TrackPoint) -> some View {
+        Text(trace.referenceDate.addingTimeInterval(point.offset), format: .dateTime.hour().minute().second())
             .monospacedDigit()
     }
-
+    private func sampleValues(_ point: TrackSampler.TrackPoint) -> some View {
+        Text(String(format: "EL %+.1f°  ·  AZ %03.0f°", point.elevation * 180 / .pi,
+                    (point.azimuth * 180 / .pi + 360).truncatingRemainder(dividingBy: 360)))
+    }
+    private var sampleDescription: String {
+        let point = selectedPoint ?? ArchiveChartSelection.nearestSample(in: trace, offset: 0)
+        guard let point else { return "—" }
+        return trace.referenceDate.addingTimeInterval(point.offset).formatted(date: .omitted, time: .standard)
+            + String(format: ", EL %+.1f°, AZ %.1f°", point.elevation * 180 / .pi, point.azimuth * 180 / .pi)
+    }
+    private func reset() { selectedOffset = nil; zoom = 1; viewCenter = 0 }
+    private func setZoom(_ value: Double) {
+        if zoom == 1 { viewCenter = selectedPoint?.offset ?? 0 }
+        zoom = min(3, max(1, value))
+    }
     private func degreeLabel(_ value: Double) -> some View {
-        Text(String(format: "%+.0f°", value))
-            .font(Typography.statusTag)
-            .foregroundStyle(Palette.Text.tertiary)
-            .fixedSize()
+        Text(String(format: "%+.0f°", value)).font(Typography.statusTag)
+            .foregroundStyle(Palette.Text.tertiary).fixedSize()
+    }
+    private func offsetText(_ value: Double) -> String {
+        value == 0 ? "0" : String(format: "%+.1f MIN", value / 60)
     }
 
-    private func legend(future: Bool) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(future ? Color.clear : Palette.Text.primary)
-                .overlay(Circle().stroke(future ? tint : Color.clear, lineWidth: 1.2))
-                .frame(width: 6, height: 6)
-                .accessibilityHidden(true)
-            Text(future ? "+3 MIN" : "−3 MIN")
-                .accessibilityLabel(copy(future ? "archive.reading.after" : "archive.reading.before") + " 3 MIN")
-                .font(Typography.statusTag)
-                .foregroundStyle(Palette.Text.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private func plot(points: [TrackSampler.TrackPoint], bounds: ClosedRange<Double>) -> some View {
+    private func plot(points: [TrackSampler.TrackPoint], bounds: ClosedRange<Double>,
+                      range: ClosedRange<Double>) -> some View {
         Canvas { context, size in
             let inset: CGFloat = 6
             let width = size.width - inset * 2
             let height = size.height - inset * 2
-            func x(_ offset: Double) -> CGFloat { inset + width * (offset + 180) / 360 }
+            func x(_ offset: Double) -> CGFloat {
+                inset + width * (offset - range.lowerBound) / (range.upperBound - range.lowerBound)
+            }
             func y(_ elevation: Double) -> CGFloat {
                 inset + height * (1 - (elevation - bounds.lowerBound) / (bounds.upperBound - bounds.lowerBound))
             }
-
-            // Quiet dot matrix supplies a time/elevation reference, not invented data.
-            for column in 0 ... 18 {
-                for row in 0 ... 6 {
+            for column in 0...18 {
+                for row in 0...6 {
                     let center = CGPoint(x: inset + width * Double(column) / 18,
                                          y: inset + height * Double(row) / 6)
                     context.fill(Path(ellipseIn: CGRect(x: center.x - 0.65, y: center.y - 0.65,
@@ -364,16 +391,16 @@ private struct SatelliteElevationPlot: View {
                 context.stroke(horizon, with: .color(Palette.Text.tertiary.opacity(0.55)),
                                style: StrokeStyle(lineWidth: 0.7, dash: [2, 3]))
             }
-            var observation = Path()
-            observation.move(to: CGPoint(x: x(0), y: 0))
-            observation.addLine(to: CGPoint(x: x(0), y: size.height))
-            context.stroke(observation, with: .color(tint.opacity(0.4)), lineWidth: 0.7)
-
+            if range.contains(0) {
+                var observation = Path()
+                observation.move(to: CGPoint(x: x(0), y: 0))
+                observation.addLine(to: CGPoint(x: x(0), y: size.height))
+                context.stroke(observation, with: .color(tint.opacity(0.4)), lineWidth: 0.7)
+            }
             for point in points {
                 let center = CGPoint(x: x(point.offset), y: y(point.elevation * 180 / .pi))
                 let current = abs(point.offset) < 0.01
                 let color = point.offset < 0 ? Palette.Text.primary : tint
-                // A light dotted stem helps scan each column without implying a zero baseline.
                 var stem = Path()
                 stem.move(to: CGPoint(x: center.x, y: center.y + 5))
                 stem.addLine(to: CGPoint(x: center.x, y: size.height - inset))
@@ -383,13 +410,21 @@ private struct SatelliteElevationPlot: View {
                 let marker = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius,
                                                    width: radius * 2, height: radius * 2))
                 context.fill(marker, with: .color(point.offset <= 0 ? color : Palette.voidBlack))
-                if point.offset > 0 {
-                    context.stroke(marker, with: .color(tint), lineWidth: 1.3)
-                }
+                if point.offset > 0 { context.stroke(marker, with: .color(tint), lineWidth: 1.3) }
                 if current {
-                    let ring = Path(ellipseIn: CGRect(x: center.x - 7, y: center.y - 7, width: 14, height: 14))
-                    context.stroke(ring, with: .color(tint.opacity(0.5)), lineWidth: 0.7)
+                    context.stroke(Path(ellipseIn: CGRect(x: center.x - 7, y: center.y - 7, width: 14, height: 14)),
+                                   with: .color(tint.opacity(0.5)), lineWidth: 0.7)
                 }
+            }
+            if let point = selectedPoint, range.contains(point.offset) {
+                let center = CGPoint(x: x(point.offset), y: y(point.elevation * 180 / .pi))
+                var cursor = Path()
+                cursor.move(to: CGPoint(x: center.x, y: 0))
+                cursor.addLine(to: CGPoint(x: center.x, y: size.height))
+                context.stroke(cursor, with: .color(Palette.signal),
+                               style: StrokeStyle(lineWidth: 0.9, dash: [3,3]))
+                context.stroke(Path(ellipseIn: CGRect(x: center.x - 6, y: center.y - 6, width: 12, height: 12)),
+                               with: .color(Palette.signal), lineWidth: 1.4)
             }
         }
     }

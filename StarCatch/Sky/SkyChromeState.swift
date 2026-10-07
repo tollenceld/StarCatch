@@ -30,8 +30,20 @@ struct SkyChromeState: Equatable {
 
     init(
         presentationMode: SkyPresentationMode,
-        capturePhase: CaptureStateMachine.Phase
+        capturePhase: CaptureStateMachine.Phase,
+        archivePresented: Bool = false
     ) {
+        if archivePresented {
+            switch presentationMode {
+            case .local: scene = .local
+            case .global: scene = .global
+            default: scene = .transitioning
+            }
+            dockMode = .hidden
+            resetAction = nil
+            acquisitionObjectID = nil
+            return
+        }
         if presentationMode == .local, case .acquiring(let id) = capturePhase {
             acquisitionObjectID = id
         } else {

@@ -334,6 +334,102 @@ final class OrbitTests: XCTestCase {
         }
     }
 
+    func testWireframeRemainsFiniteThroughFullRotationsAndZoomLimits() {
+        var pose = SatelliteWireframePose()
+        pose.zoom(to: 100)
+        XCTAssertEqual(pose.scale, 1.65)
+        pose.zoom(to: .nan)
+        XCTAssertEqual(pose.scale, 1.65)
+        pose.zoom(to: 1)
+        let mesh = SatelliteWireframeMesh.generic
+        let vertices = mesh.faces.flatMap(\.vertices) + mesh.details.flatMap { [$0.a, $0.b] }
+        for _ in 0..<120 {
+            pose = pose.dragged(CGSize(width: 52, height: -39))
+            XCTAssertEqual(simd_length(pose.rotation.vector), 1, accuracy: 0.000_001)
+            let size = CGSize(width: 350, height: 170)
+            let unit = pose.projectionUnit(size: size)
+            for vertex in vertices {
+                let point = pose.project(vertex, size: size, unit: unit)
+                XCTAssertTrue(point.x.isFinite && point.y.isFinite)
+                XCTAssertTrue((0...size.width).contains(point.x) && (0...size.height).contains(point.y))
+            }
+        }
+        pose.zoom(to: 0)
+        XCTAssertEqual(pose.scale, 0.8)
+    }
+
+    func testWireframeProjectionChangesWithDepthAndViewpoint() {
+        var pose = SatelliteWireframePose()
+        pose.rotation = simd_quatd(angle: 0, axis: SIMD3(0, 1, 0))
+        let size = CGSize(width: 340, height: 170)
+        let near = pose.project(SIMD3(1, 0, 2), size: size)
+        let far = pose.project(SIMD3(1, 0, -2), size: size)
+        XCTAssertGreaterThan(near.x, far.x)
+        let turned = pose.dragged(CGSize(width: 180, height: 50))
+        XCTAssertNotEqual(turned.project(SIMD3(1, 0, 2), size: size), near)
+    }
+
+    func testChartViewportClampsZoomAndEdgesWithoutExtrapolation() {
+        var viewport = ArchiveChartViewport(extent: -180...180, minimumSpan: 120, zoom: 30, center: 180)
+        XCTAssertEqual(viewport.visibleRange, 60...180)
+        XCTAssertEqual(viewport.value(at: 3), 180)
+        XCTAssertEqual(viewport.value(at: -1), 60)
+        viewport.center = -180
+        XCTAssertEqual(viewport.visibleRange, -180 ... -60)
+        viewport.zoom = .nan
+        XCTAssertEqual(viewport.visibleRange, -180...180)
+        XCTAssertEqual(viewport.value(at: .nan), 0)
+        let empty = ArchiveChartViewport(extent: 0...0, minimumSpan: 60, zoom: 4)
+        XCTAssertEqual(empty.value(at: 0.4), 0)
+    }
+
+    func testChartInspectionUsesRealFiniteSamplesWithoutInterpolation() {
+        let trace = SatelliteTrackSnapshot(objectID: "sample", referenceDate: Date(), points: [
+            .init(azimuth: 1, elevation: 0.4, offset: -20),
+            .init(azimuth: 1, elevation: .nan, offset: 0),
+            .init(azimuth: 2, elevation: 0.8, offset: 20)
+        ])
+        let sample = ArchiveChartSelection.nearestSample(in: trace, offset: 13)
+        XCTAssertEqual(sample?.offset, 20)
+        XCTAssertEqual(sample?.elevation, 0.8)
+        XCTAssertNil(ArchiveChartSelection.nearestSample(in: .init(objectID: "empty", referenceDate: Date(), points: []), offset: 0))
+    }
+
+    func testPassInspectionSelectsContainingOrNearestValidWindow() {
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        func pass(_ start: Double, _ end: Double) -> PassWindow {
+            .init(phase: .approaching, rise: date.addingTimeInterval(start), peak: nil,
+                  set: date.addingTimeInterval(end), maximumElevationDegrees: 30)
+        }
+        let forecast = PassForecast(objectID: "sample", referenceDate: date,
+                                    endDate: date.addingTimeInterval(86400),
+                                    windows: [pass(100, 200), pass(400, 500), pass(600, 550)],
+                                    isStationary: false, stationaryElevationDegrees: nil)
+        XCTAssertEqual(ArchiveChartSelection.nearestPass(in: forecast, at: date.addingTimeInterval(180)), 0)
+        XCTAssertEqual(ArchiveChartSelection.nearestPass(in: forecast, at: date.addingTimeInterval(360)), 1)
+        XCTAssertEqual(ArchiveChartSelection.nearestPass(in: forecast, at: date.addingTimeInterval(700)), 1)
+        let empty = PassForecast(objectID: "empty", referenceDate: date, endDate: date,
+                                 windows: [], isStationary: true, stationaryElevationDegrees: 40)
+        XCTAssertNil(ArchiveChartSelection.nearestPass(in: empty, at: date))
+    }
+
+    func testChartDirectionPreservesVerticalReadingGestures() {
+        XCTAssertTrue(ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: CGPoint(x: -100, y: 20)))
+        XCTAssertFalse(ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: CGPoint(x: 20, y: 100)))
+        XCTAssertFalse(ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: .zero))
+        XCTAssertFalse(ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: CGPoint(x: Double.nan, y: 0)))
+    }
+
+    func testArchiveHidesSkyControlsWithoutChangingLockedIdentity() {
+        for phase: CaptureStateMachine.Phase in [.exploring, .acquiring(objectId: "iss"), .locked(objectId: "iss")] {
+            let chrome = SkyChromeState(presentationMode: .local, capturePhase: phase, archivePresented: true)
+            XCTAssertEqual(chrome.dockMode, .hidden)
+            XCTAssertNil(chrome.acquisitionObjectID)
+            XCTAssertNil(chrome.resetAction)
+        }
+        XCTAssertEqual(SkyChromeState(presentationMode: .local, capturePhase: .locked(objectId: "iss")).dockMode, .targetSummary)
+    }
+
     func testMotionTraceRetainsChronologyAndDoesNotExaggerateStationaryObjects() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let points: [TrackSampler.TrackPoint] = [

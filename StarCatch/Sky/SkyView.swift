@@ -116,7 +116,8 @@ struct SkyView: View {
     private var chromeState: SkyChromeState {
         SkyChromeState(
             presentationMode: presentationMode,
-            capturePhase: capture.phase
+            capturePhase: capture.phase,
+            archivePresented: presentedStoryObjectID != nil
         )
     }
     /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
@@ -182,10 +183,12 @@ struct SkyView: View {
         .simultaneousGesture(fieldMagnificationGesture)
         .overlay { transientDismissLayer }
         .overlay(alignment: .top) {
-            pointingReadout
+            if presentedStoryObjectID == nil {
+                pointingReadout
                 // 顶部功能翼必须和灵动岛共享同一条水平轴；默认 overlay 会从
                 // 安全区下缘开始布局，结果看起来仍是一条岛下工具栏。
                 .ignoresSafeArea(edges: .top)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomControlBand
@@ -415,6 +418,13 @@ struct SkyView: View {
             overviewTrails.clear()
             overviewAmbientTrails.clear()
         }
+        .onChange(of: presentedStoryObjectID) { _, objectID in
+            dismissTransientOverlay()
+            if objectID == nil {
+                capture.resumeSampling()
+                lastCaptureSample = -.infinity
+            }
+        }
         .onChange(of: isUtilityPagePresented) { _, presented in
             dockActivity.restart()
             if presented {
@@ -458,6 +468,7 @@ struct SkyView: View {
         }
 
         guard scenePhase == .active,
+              presentedStoryObjectID == nil,
               !isUtilityPagePresented,
               !clock.isScrubbing,
               session.canSampleCapture,
@@ -548,7 +559,7 @@ struct SkyView: View {
                     .transition(.identity)
             }
 
-            if presentationMode == .local {
+            if presentationMode == .local, chromeState.dockMode != .hidden {
                 Group {
                     if chromeState.dockMode == .targetSummary,
                        let id = capture.engagedObjectId,

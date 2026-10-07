@@ -1,5 +1,16 @@
 import SwiftUI
 
+enum SatelliteArchiveSection: String, CaseIterable, Identifiable {
+    case observation, mission, data
+    var id: String { rawValue }
+    var title: String { L10n.text("archive.tab." + rawValue, table: "SatelliteText") }
+    var firstNumber: String { self == .observation ? "01" : self == .mission ? "02" : "05" }
+    func moved(by delta: Int) -> Self {
+        let index = Self.allCases.firstIndex(of: self) ?? 0
+        return Self.allCases[min(Self.allCases.count - 1, max(0, index + delta))]
+    }
+}
+
 /// 单体卫星或大型星座的离线深度档案。策展事实与当前节点的实时轨道读数
 /// 明确分区，避免把故事和瞬时位置混成同一种“参数表”。
 struct SatelliteStoryView: View {
@@ -13,10 +24,12 @@ struct SatelliteStoryView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var revealed = false
+    @State private var section: SatelliteArchiveSection = .observation
 
-    private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
+    private var suppressMotion: Bool { systemReducedMotion || previewReducedMotion || reducedMotion }
     private var language: SupportedLanguage { .current }
 
     private func copy(_ key: String) -> String {
@@ -24,99 +37,133 @@ struct SatelliteStoryView: View {
     }
 
     var body: some View {
-        ZStack {
-            Palette.voidBlack.ignoresSafeArea()
-
-            ScrollViewReader { reader in
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        identityHero
-                        readingSection(number: "01", title: copy("archive.reading.motion")) {
-                            currentMotion
-                        }
-                        readingSection(number: "02", title: copy("archive.reading.mission")) {
-                            missionSection
-                        }
-                        readingSection(number: "03", title: copy("archive.history.title")) {
-                            milestoneRail
-                        }
-                        readingSection(number: "04", title: copy("archive.reading.passes")) {
-                            observationSection
-                        }
-                        readingSection(number: "05", title: copy("archive.reading.identity")) {
-                            dataSection
-                        }
-                        readingSection(number: "06", title: copy("archive.sources.title")) {
-                            sourceNote
+        GeometryReader { geometry in
+            ZStack {
+                Palette.voidBlack.ignoresSafeArea()
+                ScrollViewReader { reader in
+                    VStack(spacing: 0) {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            // At accessibility sizes the hero joins the single scroll flow,
+                            // preserving space for full names and reading content.
+                            ScrollView {
+                                VStack(spacing: 0) {
+                                    archiveHero(height: 150)
+                                    sectionControl
+                                    readingContents
+                                }
+                            }
+                        } else {
+                            archiveHero(height: min(210, max(150, geometry.size.height * 0.24)))
+                            sectionControl
+                            ScrollView(showsIndicators: false) { readingContents }
+                                .id(section)
                         }
                     }
-                    .padding(.horizontal, AppChromeMetrics.readingInset)
-                    .padding(.top, 16)
-                    .padding(.bottom, 42)
-                }
-                #if DEBUG
-                .task(id: trace?.referenceDate) {
-                    let args = ProcessInfo.processInfo.arguments
-                    if let index = args.firstIndex(of: "--archiveSection"), index + 1 < args.count {
-                        try? await Task.sleep(for: .milliseconds(150))
-                        guard !Task.isCancelled else { return }
-                        reader.scrollTo(args[index + 1], anchor: .top)
+                    #if DEBUG
+                    .task(id: trace?.referenceDate) {
+                        let args = ProcessInfo.processInfo.arguments
+                        if let index = args.firstIndex(of: "--archiveTab"), index + 1 < args.count,
+                           let value = SatelliteArchiveSection(rawValue: args[index + 1]) {
+                            section = value
+                        }
+                        if let index = args.firstIndex(of: "--archiveSection"), index + 1 < args.count {
+                            let number = args[index + 1]
+                            section = ["02", "03"].contains(number) ? .mission
+                                : ["05", "06"].contains(number) ? .data : .observation
+                            try? await Task.sleep(for: .milliseconds(150))
+                            guard !Task.isCancelled else { return }
+                            reader.scrollTo(number, anchor: .top)
+                        }
                     }
+                    #endif
                 }
-                #endif
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            ArchiveTopBar(
-                backTitle: copy("navigation.sky"),
-                title: copy("navigation.object_archive"),
-                onBack: onDismiss
-            )
-            .background(Palette.voidBlack.ignoresSafeArea(edges: .top))
+            ArchiveTopBar(backTitle: copy("navigation.sky"), title: copy("navigation.object_archive"), onBack: onDismiss)
+                .background(Palette.voidBlack.ignoresSafeArea(edges: .top))
         }
         .appEdgeBackGesture(action: onDismiss)
         .opacity(revealed ? 1 : 0)
         .offset(y: suppressMotion ? 0 : revealed ? 0 : 8)
         .onAppear {
-            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.28)) {
-                revealed = true
-            }
+            withAnimation(suppressMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.28)) { revealed = true }
         }
         .accessibilityElement(children: .contain)
     }
 
-    private var identityHero: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: missionRoleSymbol)
-                    .font(.system(size: 10, weight: .medium))
-                Text(missionRoleTitle)
-                Spacer(minLength: 8)
-            }
-            .font(Typography.statusTag)
-            .tracking(language == .english ? 0.85 : 0.18)
-            .foregroundStyle(object.identityTint.opacity(0.88))
-            .padding(.bottom, 10)
-
+    private func archiveHero(height: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(missionRoleTitle)
+                .font(Typography.statusTag)
+                .foregroundStyle(object.identityTint)
             Text(object.deepArchiveTitle)
-                .instrumentFont(28, relativeTo: .title, weight: .semibold)
-                .tracking(0.15)
+                .instrumentFont(24, relativeTo: .title, weight: .semibold)
                 .foregroundStyle(Palette.Text.primary)
                 .fixedSize(horizontal: false, vertical: true)
-
-            Text(story.lead)
-                .font(Typography.readingBody)
-                .foregroundStyle(Palette.Text.secondary)
-                .lineSpacing(6)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 16)
-
             Text(metadataLine)
                 .font(Typography.statusTag)
                 .foregroundStyle(Palette.Text.tertiary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 16)
+            SatelliteWireframeView(drawingHeight: dynamicTypeSize.isAccessibilitySize ? 150 : max(90, height - 62))
+                .id(object.id)
         }
+        .padding(.horizontal, AppChromeMetrics.readingInset)
+        .padding(.top, 12)
+    }
+
+    private var sectionControl: some View {
+        HStack(spacing: 4) {
+            ForEach(SatelliteArchiveSection.allCases) { item in
+                Button { select(item) } label: {
+                    Text(item.title)
+                        .font(Typography.readingCompact.weight(section == item ? .semibold : .regular))
+                        .foregroundStyle(section == item ? Palette.Text.primary : Palette.Text.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background {
+                            if section == item {
+                                Capsule().fill(Palette.glassLight.opacity(0.13))
+                            }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(section == item ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .modifier(SkyGlassSurface(shape: Capsule(), interactive: true))
+        .padding(.horizontal, AppChromeMetrics.readingInset)
+        .padding(.vertical, 8)
+        .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { value in
+            guard abs(value.translation.width) > 40,
+                  abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }
+            select(section.moved(by: value.translation.width < 0 ? 1 : -1))
+        })
+    }
+
+    private func select(_ value: SatelliteArchiveSection) {
+        guard value != section else { return }
+        withAnimation(.easeOut(duration: suppressMotion ? 0.14 : 0.18)) { section = value }
+    }
+
+    private var readingContents: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            switch section {
+            case .observation:
+                readingSection(number: "01", title: copy("archive.reading.motion")) { currentMotion }
+                readingSection(number: "04", title: copy("archive.reading.passes")) { observationSection }
+            case .mission:
+                readingSection(number: "02", title: copy("archive.reading.mission")) { missionSection }
+                readingSection(number: "03", title: copy("archive.history.title")) { milestoneRail }
+            case .data:
+                readingSection(number: "05", title: copy("archive.reading.identity")) { dataSection }
+                readingSection(number: "06", title: copy("archive.sources.title")) { sourceNote }
+            }
+        }
+        .padding(.horizontal, AppChromeMetrics.readingInset)
+        .padding(.bottom, 32)
     }
 
     private var metadataLine: String {
@@ -128,7 +175,7 @@ struct SatelliteStoryView: View {
     private func readingSection<Content: View>(
         number: String, title: String, @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(number)
                     .font(Typography.statusTag)
@@ -141,9 +188,9 @@ struct SatelliteStoryView: View {
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 24)
-        .overlay(alignment: .top) { ContentHairline() }
-        .padding(.top, 32)
+        .padding(.top, number == section.firstNumber ? 12 : 20)
+        .overlay(alignment: .top) { if number != section.firstNumber { ContentHairline() } }
+        .padding(.top, number == section.firstNumber ? 0 : 24)
         .id(number)
     }
 
@@ -198,36 +245,56 @@ struct SatelliteStoryView: View {
     }
 
     private var missionSection: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(story.scope == .family
-                     ? copy("archive.reading.family_scope")
-                     : copy("archive.reading.object_scope"))
-                    .font(Typography.readingCompact)
-                    .foregroundStyle(object.identityTint)
-                    .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 16) {
+            Text(story.lead)
+                .font(Typography.readingBody)
+                .foregroundStyle(Palette.Text.secondary)
+                .lineSpacing(4)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(copy(story.scope == .family ? "archive.reading.family_scope" : "archive.reading.object_scope"))
+                .font(Typography.statusTag)
+                .foregroundStyle(object.identityTint)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 0) {
                 storyField(copy("archive.reading.organization"), story.organization, narrative: true)
                 storyField(copy("archive.reading.program"), story.program, narrative: true)
-                ForEach(story.facts) { fact in
-                    storyField(fact.label, fact.value, narrative: true)
+            }
+            if !story.facts.isEmpty {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .topLeading),
+                                         count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+                          alignment: .leading, spacing: 16) {
+                    ForEach(story.facts) { fact in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(fact.label)
+                                .font(Typography.readingCompact)
+                                .foregroundStyle(object.identityTint)
+                            Text(fact.value)
+                                .font(Typography.readingBody)
+                                .foregroundStyle(Palette.Text.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityElement(children: .combine)
+                    }
                 }
+                .padding(.vertical, 4)
             }
             ForEach(story.chapters) { chapter in
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(chapter.title)
                         .font(.headline)
                         .foregroundStyle(Palette.Text.primary)
                         .accessibilityAddTraits(.isHeader)
                     Text(chapter.body)
                         .font(Typography.readingBody)
-                        .lineSpacing(Typography.readingBodyLineSpacing)
+                        .lineSpacing(4)
                         .foregroundStyle(Palette.Text.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                .padding(.top, 8)
+                .overlay(alignment: .top) { ContentHairline() }
             }
-            if let reference = story.officialReference {
-                officialReferenceLink(reference)
-            }
+            if let reference = story.officialReference { officialReferenceLink(reference) }
         }
     }
 
@@ -646,6 +713,9 @@ private struct PassForecastLedgerView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var forecastLoadedAt = Date()
+    @State private var selectedDate: Date?
+    @State private var zoom = 1.0
+    @State private var viewCenter: Double?
 
     private var copyLanguage: SupportedLanguage { .current }
 
@@ -662,11 +732,11 @@ private struct PassForecastLedgerView: View {
                         forecastEmptyState
                     } else {
                         forecastTimeline(forecast, now: forecastNow)
-                        if let index = forecast.defaultWindowIndex(at: forecastNow) {
+                        if let index = selectedIndex(in: forecast, now: forecastNow) {
                             let window = forecast.windows[index]
                             selectedPassPanel(window, now: forecastNow)
                         }
-                        upcomingPasses(forecast)
+                        upcomingPasses(forecast, now: forecastNow)
                     }
                 } else if let fallbackPass {
                     if fallbackPass.phase == .stationary {
@@ -683,6 +753,9 @@ private struct PassForecastLedgerView: View {
         }
         .onChange(of: forecast) { _, value in
             forecastLoadedAt = Date()
+            selectedDate = nil
+            zoom = 1
+            viewCenter = nil
         }
     }
 
@@ -690,70 +763,125 @@ private struct PassForecastLedgerView: View {
         L10n.text(key, table: "SatelliteText", language: copyLanguage)
     }
 
+    private func selectedIndex(in forecast: PassForecast, now: Date) -> Int? {
+        selectedDate.flatMap { ArchiveChartSelection.nearestPass(in: forecast, at: $0) }
+            ?? forecast.defaultWindowIndex(at: now)
+    }
+
+    private func viewport(for forecast: PassForecast) -> ArchiveChartViewport {
+        ArchiveChartViewport(extent: 0...max(1, forecast.endDate.timeIntervalSince(forecast.referenceDate)),
+                             minimumSpan: 3 * 3600, zoom: zoom, center: viewCenter)
+    }
+
     private func forecastTimeline(_ forecast: PassForecast, now: Date) -> some View {
-        VStack(spacing: 7) {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Palette.inkFaint.opacity(0.16))
-                        .frame(height: 2)
-
-                    ForEach(Array(forecast.windows.enumerated()), id: \.offset) { index, window in
-                        if let rise = window.rise, let set = window.set {
-                            let x = timeX(rise, forecast: forecast, width: proxy.size.width)
-                            let endX = timeX(set, forecast: forecast, width: proxy.size.width)
-                            Capsule()
-                                .fill(tint.opacity(0.7))
-                                .frame(width: max(7, endX - x), height: 4)
-                                .offset(x: x)
-                                .accessibilityHidden(true)
-                        }
-                    }
-
-                    if forecast.referenceDate ... forecast.endDate ~= now {
-                        Rectangle()
-                            .fill(Palette.inkHigh.opacity(0.76))
-                            .frame(width: 0.6, height: 15)
-                            .offset(x: timeX(now, forecast: forecast, width: proxy.size.width))
-                    }
+        let viewport = viewport(for: forecast)
+        let range = viewport.visibleRange
+        return VStack(alignment: .leading, spacing: 8) {
+            Canvas { context, size in
+                let baseline = size.height / 2
+                func x(_ offset: Double) -> CGFloat {
+                    size.width * (offset - range.lowerBound) / (range.upperBound - range.lowerBound)
                 }
-                .frame(maxHeight: .infinity)
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: baseline))
+                line.addLine(to: CGPoint(x: size.width, y: baseline))
+                context.stroke(line, with: .color(Palette.Text.tertiary.opacity(0.3)), lineWidth: 0.7)
+                for index in 0...24 {
+                    let offset = range.lowerBound + (range.upperBound-range.lowerBound) * Double(index) / 24
+                    let h: CGFloat = index.isMultiple(of: 6) ? 18 : 7
+                    var tick = Path()
+                    tick.move(to: CGPoint(x: x(offset), y: baseline - h / 2))
+                    tick.addLine(to: CGPoint(x: x(offset), y: baseline + h / 2))
+                    context.stroke(tick, with: .color(Palette.Text.tertiary.opacity(0.4)), lineWidth: 0.7)
+                }
+                for (index, pass) in forecast.windows.enumerated() {
+                    guard let rise = pass.rise, let set = pass.set else { continue }
+                    let start = max(range.lowerBound, rise.timeIntervalSince(forecast.referenceDate))
+                    let end = min(range.upperBound, set.timeIntervalSince(forecast.referenceDate))
+                    guard end >= start else { continue }
+                    let selected = index == selectedIndex(in: forecast, now: now)
+                    let mark = CGRect(x: x(start), y: baseline - 4, width: max(1, x(end)-x(start)), height: 8)
+                    context.fill(Path(roundedRect: mark, cornerRadius: 2),
+                                 with: .color(selected ? Palette.signal : tint.opacity(0.65)))
+                }
+                for (date, color) in [(now, Palette.Text.primary), (selectedDate, Palette.signal)] {
+                    guard let date else { continue }
+                    let offset = date.timeIntervalSince(forecast.referenceDate)
+                    guard range.contains(offset) else { continue }
+                    var cursor = Path()
+                    cursor.move(to: CGPoint(x: x(offset), y: 0))
+                    cursor.addLine(to: CGPoint(x: x(offset), y: size.height))
+                    context.stroke(cursor, with: .color(color), lineWidth: 1)
+                }
             }
-            .frame(height: 20)
-
+            .frame(height: 54)
+            .overlay {
+                ArchiveChartScrubber(zoom: zoom, onScrub: { fraction in
+                    selectedDate = forecast.referenceDate.addingTimeInterval(viewport.value(at: fraction))
+                }, onZoom: { value in
+                    if zoom == 1 { viewCenter = selectedDate?.timeIntervalSince(forecast.referenceDate) }
+                    zoom = value
+                }).accessibilityHidden(true)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(text("archive.chart.pass_hint"))
+            .accessibilityValue(selectedDate.map(passDateText) ?? text("archive.section.future_24h"))
+            .accessibilityAdjustableAction { direction in
+                let current = selectedIndex(in: forecast, now: now) ?? 0
+                let next = min(forecast.windows.count - 1, max(0, current + (direction == .increment ? 1 : -1)))
+                selectedDate = forecast.windows[next].rise ?? forecast.windows[next].peak
+                if zoom > 1 { viewCenter = selectedDate?.timeIntervalSince(forecast.referenceDate) }
+            }
+            .accessibilityAction(named: Text(text("archive.chart.zoom_in"))) { zoom = min(8, zoom * 2) }
+            .accessibilityAction(named: Text(text("archive.chart.zoom_out"))) { zoom = max(1, zoom / 2) }
             HStack {
-                Text("00H")
-                Spacer()
-                Text("06H")
-                Spacer()
-                Text("12H")
-                Spacer()
-                Text("18H")
-                Spacer()
-                Text("24H")
+                ForEach(0..<5) { index in
+                    if index > 0 { Spacer(minLength: 0) }
+                    Text(forecast.referenceDate.addingTimeInterval(viewport.value(at: Double(index) / 4)),
+                         format: .dateTime.hour().minute())
+                }
             }
             .font(Typography.statusTag)
-            .tracking(0.45)
             .foregroundStyle(Palette.Text.tertiary)
+            if let selectedDate {
+                Text(text("archive.chart.inspect_time") + " · " + passDateText(selectedDate))
+                    .font(Typography.statusTag)
+                    .foregroundStyle(Palette.signal)
+            }
+            ArchiveChartTools(zoom: zoom, hasSelection: selectedDate != nil) {
+                selectedDate = nil; zoom = 1; viewCenter = nil
+            }
         }
     }
 
-    private func upcomingPasses(_ forecast: PassForecast) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(Array(forecast.windows.enumerated()), id: \.offset) { _, window in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(window.rise.map(passDateText) ?? "—")  →  \(window.set.map(passDateText) ?? "—")")
-                        .font(Typography.dataValue)
-                        .foregroundStyle(Palette.Text.primary)
-                    Text(passAccessibility(window))
-                        .font(Typography.readingCompact)
-                        .foregroundStyle(Palette.Text.tertiary)
-                        .fixedSize(horizontal: false, vertical: true)
+    private func upcomingPasses(_ forecast: PassForecast, now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(forecast.windows.enumerated()), id: \.offset) { index, window in
+                Button {
+                    selectedDate = window.peak ?? window.rise
+                    if zoom > 1 { viewCenter = selectedDate?.timeIntervalSince(forecast.referenceDate) }
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("\(window.rise.map(passDateText) ?? "—")  →  \(window.set.map(passDateText) ?? "—")")
+                                .font(Typography.readingBody.monospacedDigit())
+                                .foregroundStyle(Palette.Text.primary)
+                            Text(passAccessibility(window))
+                                .font(Typography.readingCompact)
+                                .foregroundStyle(Palette.Text.tertiary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: index == selectedIndex(in: forecast, now: now) ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(index == selectedIndex(in: forecast, now: now) ? tint : Palette.Text.tertiary)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                    .overlay(alignment: .bottom) { ContentHairline() }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 8)
-                .overlay(alignment: .bottom) { ContentHairline() }
-                .accessibilityElement(children: .combine)
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(index == selectedIndex(in: forecast, now: now) ? .isSelected : [])
             }
         }
     }
@@ -765,8 +893,9 @@ private struct PassForecastLedgerView: View {
         return VStack(alignment: .leading, spacing: 12) {
             layout {
                 ledgerMetric(
-                    text(pass.phase == .visible ? "archive.forecast.current_event" : "archive.forecast.next_event"),
-                    eventValue(pass, now: now),
+                    text(selectedDate != nil ? "archive.forecast.rise"
+                         : pass.phase == .visible ? "archive.forecast.current_event" : "archive.forecast.next_event"),
+                    selectedDate != nil ? (pass.rise.map(timeText) ?? "—") : eventValue(pass, now: now),
                     prominent: true
                 )
                 if !dynamicTypeSize.isAccessibilitySize { ledgerDivider }
@@ -784,11 +913,8 @@ private struct PassForecastLedgerView: View {
             Text(text("archive.forecast.key_events"))
                 .font(Typography.statusTag)
                 .foregroundStyle(Palette.Text.tertiary)
-            Canvas { context, size in
-                drawPass(pass, now: now, context: &context, size: size)
-            }
-            .frame(height: 32)
-            .accessibilityHidden(true)
+            SatellitePassEventStrip(pass: pass, now: now, tint: tint)
+                .id(pass.rise)
 
             layout {
                 eventLabel(text("archive.forecast.rise"), date: pass.rise)
@@ -812,8 +938,7 @@ private struct PassForecastLedgerView: View {
             Palette.sheetBackground,
             in: RoundedRectangle(cornerRadius: 16, style: .continuous)
         )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(passAccessibility(pass))
+        .accessibilityElement(children: .contain)
     }
 
     private func stationaryState(_ forecast: PassForecast) -> some View {
@@ -858,47 +983,6 @@ private struct PassForecastLedgerView: View {
         .padding(.horizontal, 16)
         .frame(minHeight: 52)
         .background(Palette.inkHigh.opacity(0.02), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func timeX(_ date: Date, forecast: PassForecast, width: CGFloat) -> CGFloat {
-        let fraction = date.timeIntervalSince(forecast.referenceDate)
-            / forecast.endDate.timeIntervalSince(forecast.referenceDate)
-        return width * CGFloat(min(1, max(0, fraction)))
-    }
-
-    private func drawPass(
-        _ pass: PassWindow,
-        now: Date,
-        context: inout GraphicsContext,
-        size: CGSize
-    ) {
-        guard let rise = pass.rise, let set = pass.set, set > rise else { return }
-        let inset: CGFloat = 6
-        let centerY = size.height / 2
-        func x(_ date: Date) -> CGFloat {
-            inset + (size.width - 2 * inset) * min(1, max(0, date.timeIntervalSince(rise) / set.timeIntervalSince(rise)))
-        }
-        // Tick marks show elapsed time, not an invented elevation curve.
-        for index in 0 ... 36 {
-            let date = rise.addingTimeInterval(set.timeIntervalSince(rise) * Double(index) / 36)
-            let major = index.isMultiple(of: 6)
-            let height: CGFloat = major ? 10 : 4
-            var tick = Path()
-            tick.move(to: CGPoint(x: x(date), y: centerY - height / 2))
-            tick.addLine(to: CGPoint(x: x(date), y: centerY + height / 2))
-            context.stroke(tick, with: .color(date <= now ? Palette.Text.primary.opacity(0.5) : tint.opacity(0.35)), lineWidth: 1)
-        }
-        for date in [pass.rise, pass.peak, pass.set].compactMap({ $0 }) {
-            let marker = Path(ellipseIn: CGRect(x: x(date) - 3.5, y: centerY - 3.5, width: 7, height: 7))
-            context.fill(marker, with: .color(date <= now ? Palette.Text.primary : Palette.sheetBackground))
-            context.stroke(marker, with: .color(tint), lineWidth: 1.2)
-        }
-        if rise ... set ~= now {
-            var cursor = Path()
-            cursor.move(to: CGPoint(x: x(now), y: 0))
-            cursor.addLine(to: CGPoint(x: x(now), y: size.height))
-            context.stroke(cursor, with: .color(Palette.Text.primary), lineWidth: 1)
-        }
     }
 
     private func ledgerMetric(_ label: String, _ value: String, prominent: Bool = false) -> some View {
