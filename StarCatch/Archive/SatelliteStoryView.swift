@@ -4,6 +4,13 @@ enum SatelliteArchiveSection: String, CaseIterable, Identifiable {
     case observation, mission, data
     var id: String { rawValue }
     var title: String { L10n.text("archive.tab." + rawValue, table: "SatelliteText") }
+    var symbol: String {
+        switch self {
+        case .observation: "binoculars"
+        case .mission: "text.book.closed"
+        case .data: "chart.bar.xaxis"
+        }
+    }
     var firstNumber: String { self == .observation ? "01" : self == .mission ? "02" : "05" }
     func moved(by delta: Int) -> Self {
         let index = Self.allCases.firstIndex(of: self) ?? 0
@@ -48,13 +55,11 @@ struct SatelliteStoryView: View {
                             ScrollView {
                                 VStack(spacing: 0) {
                                     archiveHero(height: 150)
-                                    sectionControl
                                     readingContents
                                 }
                             }
                         } else {
                             archiveHero(height: min(210, max(150, geometry.size.height * 0.24)))
-                            sectionControl
                             ScrollView(showsIndicators: false) { readingContents }
                                 .id(section)
                         }
@@ -80,8 +85,10 @@ struct SatelliteStoryView: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            ArchiveTopBar(backTitle: copy("navigation.sky"), title: copy("navigation.object_archive"), onBack: onDismiss)
-                .background(Palette.voidBlack.ignoresSafeArea(edges: .top))
+            archiveHeader
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            sectionControl
         }
         .appEdgeBackGesture(action: onDismiss)
         .opacity(revealed ? 1 : 0)
@@ -112,30 +119,70 @@ struct SatelliteStoryView: View {
         .padding(.top, 12)
     }
 
+    /// Leaving the archive and switching its peer sections occupy separate edges.
+    private var archiveHeader: some View {
+        HStack(spacing: 16) {
+            Button(action: onDismiss) {
+                HStack(spacing: 8) {
+                    Image(systemName: "chevron.left")
+                        .font(.caption.weight(.semibold))
+                    Text(copy("navigation.return_sky"))
+                }
+                .font(Typography.guide)
+                .foregroundStyle(Palette.signal)
+                .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(copy("navigation.return_sky"))
+            Spacer(minLength: 0)
+            Text(copy("navigation.object_archive"))
+                .font(Typography.guide)
+                .foregroundStyle(Palette.Text.secondary)
+        }
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .frame(minHeight: ContentTopBarMetrics.height)
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .background(Palette.voidBlack.ignoresSafeArea(edges: .top))
+        .overlay(alignment: .bottom) { ContentHairline() }
+    }
+
     private var sectionControl: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 8) {
             ForEach(SatelliteArchiveSection.allCases) { item in
                 Button { select(item) } label: {
-                    Text(item.title)
-                        .font(Typography.readingCompact.weight(section == item ? .semibold : .regular))
-                        .foregroundStyle(section == item ? Palette.Text.primary : Palette.Text.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                        .background {
-                            if section == item {
-                                Capsule().fill(Palette.glassLight.opacity(0.13))
-                            }
+                    VStack(spacing: 6) {
+                        Image(systemName: item.symbol)
+                            .font(.system(size: 22, weight: .regular))
+                            .frame(height: 24)
+                        Text(item.title)
+                            .font(Typography.readingCompact.weight(section == item ? .semibold : .regular))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .foregroundStyle(section == item ? Palette.signal : Palette.Text.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .padding(.top, 6)
+                    .overlay(alignment: .top) {
+                        if section == item {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Palette.signal)
+                                .frame(width: 24, height: 3)
                         }
-                        .contentShape(Capsule())
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(item.title)
                 .accessibilityAddTraits(section == item ? .isSelected : [])
             }
         }
-        .padding(4)
+        .padding(.horizontal, AppChromeMetrics.edgeInset)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .modifier(SkyGlassSurface(shape: Capsule(), interactive: true))
-        .padding(.horizontal, AppChromeMetrics.readingInset)
-        .padding(.vertical, 8)
+        .background(Palette.sheetBackground.ignoresSafeArea(edges: .bottom))
+        .overlay(alignment: .top) { ContentHairline() }
+        .accessibilityElement(children: .contain)
         .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { value in
             guard abs(value.translation.width) > 40,
                   abs(value.translation.width) > abs(value.translation.height) * 1.5 else { return }

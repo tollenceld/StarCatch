@@ -7617,6 +7617,23 @@
         }
       }
     },
+    "navigation.return_sky" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back to sky"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "返回天空"
+          }
+        }
+      }
+    },
     "navigation.sky" : {
       "extractionState" : "stale",
       "localizations" : {
