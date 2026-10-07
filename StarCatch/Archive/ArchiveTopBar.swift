@@ -15,6 +15,12 @@ enum AppChromeMetrics {
     static let itemSpacing: CGFloat = 10
     static let commandControlSize: CGFloat = 52
     static let commandRailHeight: CGFloat = 56
+    static let recenterDiameter: CGFloat = 64
+    static let commandGroupSpacing: CGFloat = 12
+
+    static func commandCapsuleWidth(in width: CGFloat) -> CGFloat {
+        max(88, (width - recenterDiameter - commandGroupSpacing * 2) / 2)
+    }
     static let commandRailCornerRadius: CGFloat = 24
     static let mainActionWidth: CGFloat = 168
     static let strokeWidth: CGFloat = 0.55

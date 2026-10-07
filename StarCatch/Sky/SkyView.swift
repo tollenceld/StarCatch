@@ -619,12 +619,6 @@ struct SkyView: View {
                         recenterIssueUntil = 0
                     }
             }
-            if chromeState.resetAction == .localField {
-                FieldOfViewResetControl(action: resetLocalFieldOfView)
-                    .transition(suppressMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
-                    .opacity(isUtilityPagePresented ? 0 : 1)
-            }
-
             SkyCommandDock(
                 state: chromeState,
                 filtersActive: session.activeCatalogFilterCount > 0,
@@ -633,6 +627,8 @@ struct SkyView: View {
                 onOpenObservations: openObservations,
                 onEnterGlobal: enterGlobalOverview,
                 onOpenSettings: openInstrument,
+                onRecenter: resetLocalFieldOfView,
+                followsDevice: session.pointingMode == .following,
                 showsSurface: !isUtilityPagePresented
             )
             .opacity(keepsDockVisible ? 1 : dockActivity.opacity)
@@ -1493,6 +1489,8 @@ struct SkyView: View {
             // The globe Canvas owns the identical dust field during travel. Keep
             // this layer mounted without drawing a second full-screen background.
             if persistentOverviewPresented, !suppressMotion { return }
+
+            SkyRenderer.drawColdGlow(context, size: size, presence: 1 - overviewPresentationProgress)
 
             let pointing = session.pointing
             let dustTransform = StarDust.skyTransform(

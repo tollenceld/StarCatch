@@ -137,7 +137,11 @@ struct ArchiveOverlay: View {
         .padding(.top, 16)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(glassSurface)
+        .modifier(SkyGlassSurface(
+            shape: RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous),
+            darkening: 0.15,
+            interactive: false
+        ))
         .overlay(alignment: .topTrailing) {
             closeControl
                 .padding(.top, 2)

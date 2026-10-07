@@ -89,6 +89,73 @@ struct CommandDockFrameKey: PreferenceKey {
     }
 }
 
+struct CommandCapsuleFrameKey: PreferenceKey {
+    static var defaultValue: [SkyCommandGroup: CGRect] = [:]
+    static func reduce(value: inout [SkyCommandGroup: CGRect], nextValue: () -> [SkyCommandGroup: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
+    }
+}
+
+private struct ChromeGlassNamespaceKey: EnvironmentKey {
+    static let defaultValue: Namespace.ID? = nil
+}
+extension EnvironmentValues {
+    var chromeGlassNamespace: Namespace.ID? {
+        get { self[ChromeGlassNamespaceKey.self] }
+        set { self[ChromeGlassNamespaceKey.self] = newValue }
+    }
+}
+
+struct ChromeGlassContainer: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            GlassEffectContainer(spacing: 8) { content }
+        } else { content }
+    }
+}
+
+/// A single material per shape; the light is provided by the sky, not stacked fills.
+struct SkyGlassSurface<S: Shape>: ViewModifier {
+    let shape: S
+    var glassID: String? = nil
+    var darkening: Double = 0
+    var interactive = true
+    @Environment(\.chromeGlassNamespace) private var namespace
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
+    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 26.0, *), !systemReduceTransparency,
+           !previewReduceTransparency, !forceLegacyMaterial {
+            let glass = content
+                .background(Palette.voidBlack.opacity(darkening), in: shape)
+                .glassEffect(.regular.tint(Palette.skyGlow.opacity(0.04)).interactive(interactive), in: shape)
+            if let glassID, let namespace {
+                glass.glassEffectID(glassID, in: namespace)
+            } else { glass }
+        } else {
+            content
+                .background {
+                    if systemReduceTransparency || previewReduceTransparency {
+                        shape.fill(Palette.sheetBackground)
+                    } else {
+                        shape.fill(.ultraThinMaterial)
+                            .overlay { shape.fill(Palette.voidBlack.opacity(0.18 + darkening)) }
+                    }
+                }
+                .overlay {
+                    shape.stroke(LinearGradient(colors: [Palette.glassLight.opacity(0.38),
+                                                         Palette.glassLight.opacity(0.06),
+                                                         Palette.glassLight.opacity(0.2)],
+                                                startPoint: .topLeading, endPoint: .bottomTrailing),
+                                 lineWidth: 0.65)
+                }
+                .clipShape(shape)
+        }
+    }
+}
+
 private struct UtilityPanelProgressKey: EnvironmentKey { static let defaultValue = 1.0 }
 extension EnvironmentValues {
     var utilityPanelProgress: Double {

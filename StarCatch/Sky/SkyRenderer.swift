@@ -1043,6 +1043,24 @@ enum SkyRenderer {
 
     // MARK: - Vignette
 
+    /// Fixed screen atmosphere: not a claim about sunlight or the physical horizon.
+    static func drawColdGlow(_ context: GraphicsContext, size: CGSize, presence: Double) {
+        guard presence > 0 else { return }
+        var glow = context
+        glow.translateBy(x: size.width / 2, y: size.height * 1.025)
+        glow.scaleBy(x: 1.5, y: 1)
+        let gradient = Gradient(stops: [
+            .init(color: Palette.skyGlow.opacity(0.18 * presence), location: 0),
+            .init(color: Palette.skyGlow.opacity(0.10 * presence), location: 0.38),
+            .init(color: Palette.skyGlow.opacity(0.035 * presence), location: 0.7),
+            .init(color: .clear, location: 1),
+        ])
+        glow.fill(Path(CGRect(x: -size.width / 3, y: -size.height * 1.025,
+                              width: size.width / 1.5, height: size.height)),
+                  with: .radialGradient(gradient, center: .zero, startRadius: 0,
+                                        endRadius: size.height * 0.68))
+    }
+
     /// 更深的四周收拢让中心视野成为唯一的"透镜开口"：密集星野集中在画面中部，
     /// 边缘沉入真空，屏幕因此读作一个开口而不是一张贴满点的墙。
     static func drawVignette(_ context: GraphicsContext, size: CGSize) {
@@ -1054,9 +1072,13 @@ enum SkyRenderer {
             .init(color: Palette.voidEdge.opacity(0.30), location: 0.74),
             .init(color: Palette.voidEdge.opacity(0.72), location: 1),
         ])
-        context.fill(
-            Path(CGRect(origin: .zero, size: size)),
-            with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius)
-        )
+        context.drawLayer { layer in
+            let rect = Path(CGRect(origin: .zero, size: size))
+            layer.fill(rect, with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: radius))
+            layer.blendMode = .destinationIn
+            layer.fill(rect, with: .linearGradient(
+                Gradient(colors: [.white, .white, .white.opacity(0.28)]),
+                startPoint: .zero, endPoint: CGPoint(x: 0, y: size.height)))
+        }
     }
 }

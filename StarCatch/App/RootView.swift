@@ -24,6 +24,7 @@ struct RootView: View {
     /// 11 MB 轨道目录必须在首帧之后于后台解析；同步构造会让系统 Launch Screen
     /// 持续占据屏幕，用户只能看到一段没有反馈的纯黑。
     @State private var session: SkySession?
+    @Namespace private var chromeGlassNamespace
     @State private var establishment = ObservationEstablishment()
     @State private var capturePrewarmTask: Task<Void, Never>?
     @StateObject private var capture = CaptureStateMachine()
@@ -175,6 +176,8 @@ struct RootView: View {
                 .transition(.identity)
             }
         }
+        .modifier(ChromeGlassContainer())
+        .environment(\.chromeGlassNamespace, chromeGlassNamespace)
         .task { await prepareSession() }
         .task(id: scenePhase) { await establishObservation() }
         .onChange(of: session != nil) { _, _ in synchronizeSessionActivity() }

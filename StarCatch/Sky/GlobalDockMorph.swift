@@ -10,8 +10,10 @@ private struct GlobalDockLayout: Layout {
         guard let dial = subviews.first else { return .zero }
         let size = dial.sizeThatFits(ProposedViewSize(width: proposal.width, height: nil))
         let target = max(AppChromeMetrics.commandRailHeight, size.height)
+        let widthProgress = DockMorphMetrics.phase(progress, from: 0, to: 0.58)
+        let sourceWidth = AppChromeMetrics.commandCapsuleWidth(in: size.width)
         return CGSize(
-            width: size.width,
+            width: reducedMotion ? size.width : sourceWidth + (size.width - sourceWidth) * widthProgress,
             height: reducedMotion ? target : DockMorphMetrics.height(progress: progress, target: target)
         )
     }
@@ -51,14 +53,15 @@ struct GlobalDockMorph: View, Animatable {
                 .accessibilityHidden(!interactive)
 
             SkyCommandRow(configuration: SkyCommandConfiguration(
-                items: SkyCommandItem.allCases,
-                activeItems: filtersActive ? [.filters] : []
-            ))
+                items: SkyCommandGroup.right.items,
+                activeItems: []
+            ), selectedItem: .global)
             .frame(height: AppChromeMetrics.commandRailHeight)
             .opacity(DockMorphMetrics.commandsPresence(progress))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
         .modifier(DockSurface(navigationPresence: 1 - progress, timelinePresence: progress))
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }

@@ -38,6 +38,8 @@ enum Palette {
 
     /// 工具面板的抬升基底。仍属于 StarCatch 的暖黑谱系，但能从天空中读出轮廓。
     static let sheetBackground = Color(hex: 0x11110F)
+    static let skyGlow = Color(hex: 0x365568)
+    static let glassLight = Color(hex: 0xD1E1ED)
 
     /// 工具页内摘要、范围和设置分组使用的二级表面。
     static let sheetSurface = Color(hex: 0x181815)

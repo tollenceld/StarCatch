@@ -1693,7 +1693,7 @@ final class TimeTests: XCTestCase {
         XCTAssertNotNil(forecast.stationaryElevationDegrees)
     }
 
-    func testSkyChromeExplorationKeepsFourControlsAndLocalReset() {
+    func testSkyChromeExplorationKeepsTwoCapsulesAndCentralReset() {
         let chrome = makeChrome(
             localReset: true,
             phase: .exploring
@@ -1702,6 +1702,18 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(chrome.scene, .local)
         XCTAssertEqual(chrome.dockMode, .exploration)
         XCTAssertEqual(chrome.resetAction, .localField)
+        let dock = SkyCommandConfiguration.resolve(state: chrome, filtersActive: true,
+                                                   globalEntryEmphasized: false)
+        XCTAssertEqual(dock?.items, [.filters, .observations, .global, .settings])
+        XCTAssertEqual(SkyCommandGroup.left.items, [.filters, .observations])
+        XCTAssertEqual(SkyCommandGroup.right.items, [.global, .settings])
+        for screenWidth: CGFloat in [320, 393, 402] {
+            let width = screenWidth - AppChromeMetrics.edgeInset * 2
+            let capsule = AppChromeMetrics.commandCapsuleWidth(in: width)
+            XCTAssertGreaterThanOrEqual((capsule - 8) / 2, 44)
+            XCTAssertEqual(capsule * 2 + AppChromeMetrics.recenterDiameter
+                           + AppChromeMetrics.commandGroupSpacing * 2, width)
+        }
     }
 
     func testFirstCaptureSampleShowsIdentityBeforeLockedSummary() {
