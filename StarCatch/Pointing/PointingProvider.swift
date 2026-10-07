@@ -48,3 +48,103 @@ protocol PointingProvider: ObservableObject {
     func start()
     func stop()
 }
+
+/// Display navigation is independent of the sensor. A live device sample must never
+/// move a manually browsed sky, but remains available as the destination of a return.
+struct SkyPointingNavigation {
+    enum Mode: Equatable { case following, browsing, returning }
+
+    let deviceDriven: Bool
+    private(set) var mode: Mode
+    private(set) var pointing: Pointing = .initial
+    private(set) var availability: PointingAvailability = .idle
+    private var devicePointing: Pointing?
+    private var browseReference: Pointing?
+    private var returnOrigin: Pointing?
+    private var returnStarted: TimeInterval = 0
+    static let returnDuration: TimeInterval = 0.46
+
+    init(deviceDriven: Bool) {
+        self.deviceDriven = deviceDriven
+        mode = deviceDriven ? .following : .browsing
+        availability = deviceDriven ? .idle : .manual
+    }
+
+    mutating func ingestDevice(_ sample: Pointing, availability: PointingAvailability) {
+        self.availability = availability
+        devicePointing = availability == .tracking ? sample : nil
+        if mode == .following, availability == .tracking { pointing = sample }
+    }
+
+    mutating func ingestManual(_ sample: Pointing) {
+        if mode == .browsing { pointing = sample }
+    }
+
+    /// Returns the exact display pose used to seed the drag provider, including roll.
+    mutating func beginBrowsing() -> Pointing {
+        if browseReference == nil { browseReference = pointing }
+        mode = .browsing
+        returnOrigin = nil
+        return pointing
+    }
+
+    @discardableResult
+    mutating func recenter(at time: TimeInterval, reducedMotion: Bool) -> Bool {
+        guard let target = target else { return false }
+        if reducedMotion {
+            pointing = target
+            mode = deviceDriven ? .following : .browsing
+            browseReference = nil
+            returnOrigin = nil
+        } else {
+            returnOrigin = pointing
+            returnStarted = time
+            mode = .returning
+        }
+        return true
+    }
+
+    mutating func advance(at time: TimeInterval) {
+        guard mode == .returning, let origin = returnOrigin else { return }
+        guard let target else {
+            // A sensor failure cannot hand the camera back to an obsolete pose.
+            mode = .browsing
+            returnOrigin = nil
+            return
+        }
+        let progress = min(1, max(0, (time - returnStarted) / Self.returnDuration))
+        let eased = progress * progress * (3 - 2 * progress)
+        pointing = Self.interpolate(origin, target, progress: eased)
+        if progress >= 1 {
+            mode = deviceDriven ? .following : .browsing
+            returnOrigin = nil
+            browseReference = nil
+        }
+    }
+
+    private var target: Pointing? {
+        deviceDriven ? devicePointing : (browseReference ?? .initial)
+    }
+
+    /// Interpolating camera bases preserves roll and takes the short route across
+    /// north. Unlike azimuth interpolation it remains well defined at the zenith.
+    static func interpolate(_ from: Pointing, _ to: Pointing, progress: Double) -> Pointing {
+        if progress <= 0 { return from }
+        if progress >= 1 { return to }
+        func basis(_ pose: Pointing) -> simd_quatd {
+            let forward = pose.unitVector
+            let (right, up) = Projection.screenBasis(for: forward)
+            let screenRight = right * cos(pose.roll) + up * sin(pose.roll)
+            let screenUp = up * cos(pose.roll) - right * sin(pose.roll)
+            return simd_quatd(simd_double3x3(columns: (screenRight, screenUp, -forward)))
+        }
+        let rotation = simd_slerp(basis(from), basis(to), progress)
+        let forward = rotation.act(simd_double3(0, 0, -1))
+        let screenRight = rotation.act(simd_double3(1, 0, 0))
+        let azimuth = atan2(forward.x, forward.y)
+        let elevation = asin(min(1, max(-1, forward.z)))
+        let (right, up) = Projection.screenBasis(for: forward)
+        return Pointing(azimuth: azimuth, elevation: elevation,
+                        roll: atan2(simd_dot(screenRight, up), simd_dot(screenRight, right)))
+    }
+}

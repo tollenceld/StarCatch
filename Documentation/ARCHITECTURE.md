@@ -34,7 +34,7 @@ RootView
 | 状态 | 唯一所有者 | 说明 |
 | --- | --- | --- |
 | 启动准备、全屏阅读与当前工具面板 | `RootView` | `AppPageDestination` 互斥表达筛选、记录和设置；`UtilityPanelLifecycle` 的取消代次隔离转场完成回调，目录不得在首帧前同步解析 |
-| 设备指向、观察者、目录筛选、星历 | `SkySession` | 天空会话的共享事实源 |
+| 设备指向、显示方向、观察者、目录筛选、星历 | `SkySession` | 设备姿态持续采样；`SkyPointingNavigation` 解释跟随、手动浏览和回位，所有显示与捕获共享同一指向 |
 | 当前/过去/未来观测时刻 | `SkyClock` | 时间轴唯一事实源 |
 | 探索、聚焦、自动锁定、关闭消隐 | `CaptureStateMachine` | 1.8 秒驻留自动锁定；锁定目标只由叉号或无障碍 Escape 明确关闭 |
 | 主天空局部动画、缩放、面板测量与短时 Overlay | `SkyView` | `SkyTransientOverlay?` 保证状态/方向面板互斥，只影响当前视图生命周期 |

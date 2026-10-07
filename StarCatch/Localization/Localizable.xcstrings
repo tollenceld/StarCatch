@@ -5650,6 +5650,74 @@
         }
       }
     },
+    "view.recenter.unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motion data is not ready. Scale restored."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "方向数据尚未就绪，已恢复缩放。"
+          }
+        }
+      }
+    },
+    "view.recenter.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore the default scale and follow the direction your iPhone is pointing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复默认缩放，并跟随手机当前朝向。"
+          }
+        }
+      }
+    },
+    "view.recenter.following": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Following iPhone"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随手机"
+          }
+        }
+      }
+    },
+    "view.recenter.browsing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browsing sky"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览天空"
+          }
+        }
+      }
+    },
     "view.reset" : {
       "extractionState" : "stale",
       "localizations" : {

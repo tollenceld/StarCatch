@@ -10,6 +10,8 @@ final class SkySession: ObservableObject {
 
     let manualProvider: ManualPointingProvider?
     let motionProvider: MotionPointingProvider?
+    private var pointingNavigation: SkyPointingNavigation
+    @Published private(set) var pointingMode: SkyPointingNavigation.Mode
     let observer = ObserverLocation()
     let catalog: CatalogStore
     let ephemeris: EphemerisEngine
@@ -135,17 +137,24 @@ final class SkySession: ObservableObject {
         let manual = ManualPointingProvider()
         manualProvider = manual
         motionProvider = nil
+        pointingNavigation = SkyPointingNavigation(deviceDriven: false)
+        pointingMode = .browsing
         bind(manual)
         #else
         if CMMotionManager().isDeviceMotionAvailable {
             let motion = MotionPointingProvider()
             motionProvider = motion
-            manualProvider = nil
+            manualProvider = ManualPointingProvider()
+            pointingNavigation = SkyPointingNavigation(deviceDriven: true)
+            pointingMode = .following
             bind(motion)
+            bind(manualProvider!)
         } else {
             let manual = ManualPointingProvider()
             manualProvider = manual
             motionProvider = nil
+            pointingNavigation = SkyPointingNavigation(deviceDriven: false)
+            pointingMode = .browsing
             bind(manual)
         }
         #endif
@@ -182,16 +191,20 @@ final class SkySession: ObservableObject {
     /// 写入之前，会把上一帧姿态复制到会话里，并在设备停止移动时永久落后一帧。
     private func bind(_ provider: ManualPointingProvider) {
         provider.$pointing
-            .receive(on: DispatchQueue.main)
             .sink { [weak self, weak provider] pointing in
                 guard let self, let provider else { return }
-                self.pointing = pointing
-                self.confidence = provider.confidence
-                self.pointingAvailability = .manual
+                self.pointingNavigation.ingestManual(pointing)
+                self.publishDisplayPointing()
+                if self.motionProvider == nil {
+                    self.confidence = provider.confidence
+                    self.pointingAvailability = .manual
+                }
             }
             .store(in: &cancellables)
-        confidence = provider.confidence
-        pointingAvailability = .manual
+        if motionProvider == nil {
+            confidence = provider.confidence
+            pointingAvailability = .manual
+        }
     }
 
     private func bind(_ provider: MotionPointingProvider) {
@@ -200,15 +213,41 @@ final class SkySession: ObservableObject {
             provider.$confidence,
             provider.$availability
         )
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] pointing, confidence, availability in
-                self?.pointing = pointing
-                self?.confidence = confidence
-                self?.pointingAvailability = availability
+                guard let self else { return }
+                self.pointingNavigation.ingestDevice(pointing, availability: availability)
+                self.publishDisplayPointing()
+                self.confidence = confidence
+                self.pointingAvailability = availability
             }
             .store(in: &cancellables)
         confidence = provider.confidence
         pointingAvailability = provider.availability
+    }
+
+    func beginManualBrowse() {
+        let origin = pointingNavigation.beginBrowsing()
+        manualProvider?.reset(to: origin)
+        publishDisplayPointing()
+    }
+
+    @discardableResult
+    func recenterPointing(at time: TimeInterval, reducedMotion: Bool) -> Bool {
+        manualProvider?.stop()
+        let ready = pointingNavigation.recenter(at: time, reducedMotion: reducedMotion)
+        publishDisplayPointing()
+        return ready
+    }
+
+    /// Driven by the existing sky frame clock, never by a second sensor or timer.
+    func advancePointingNavigation(at time: TimeInterval) {
+        pointingNavigation.advance(at: time)
+        publishDisplayPointing()
+    }
+
+    private func publishDisplayPointing() {
+        if pointing != pointingNavigation.pointing { pointing = pointingNavigation.pointing }
+        if pointingMode != pointingNavigation.mode { pointingMode = pointingNavigation.mode }
     }
 
     private var started = false

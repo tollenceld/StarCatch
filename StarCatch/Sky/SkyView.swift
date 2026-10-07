@@ -36,6 +36,7 @@ struct SkyView: View {
     @StateObject private var dockActivity = SkyDockActivityController()
     @State private var fieldResetPolicy = SkyFieldResetPolicy()
     @State private var manualFieldReference: Pointing?
+    @State private var recenterIssueUntil: TimeInterval = 0
     @State private var retiringCandidate: (id: String, date: Date)?
     @State private var commandDockFrame: CGRect = .zero
 
@@ -132,7 +133,8 @@ struct SkyView: View {
         GeometryReader { geo in
             TimelineView(.animation(minimumInterval: ObservationRenderCadence.minimumInterval(
                 reducedMotion: suppressMotion,
-                motionActive: presentationMode.isTransitioning || overviewInteractionActive),
+                motionActive: presentationMode.isTransitioning || overviewInteractionActive
+                    || session.pointingMode == .returning),
                 paused: renderingSuspended || scenePhase != .active)) { timeline in
                 let frameDate = frozenFrameDate ?? timeline.date
                 let frameUptime = ProcessInfo.processInfo.systemUptime
@@ -438,6 +440,7 @@ struct SkyView: View {
         viewport: CGSize
     ) {
         let frameTime = frameDate.timeIntervalSince(startDate)
+        session.advancePointingNavigation(at: frameUptime)
         advanceOverviewTransition(at: frameUptime)
         if scenePhase == .active, !renderingSuspended, !isUtilityPagePresented,
            presentedStoryObjectID == nil, chromeState.dockMode == .exploration {
@@ -605,6 +608,17 @@ struct SkyView: View {
 
     private var localCommandColumn: some View {
         VStack(spacing: 10) {
+            if recenterIssueUntil > 0 {
+                Text(L10n.text("view.recenter.unavailable"))
+                    .font(Typography.readingCompact)
+                    .foregroundStyle(Palette.Text.primary)
+                    .multilineTextAlignment(.center)
+                    .task(id: recenterIssueUntil) {
+                        try? await Task.sleep(for: .seconds(3))
+                        guard !Task.isCancelled else { return }
+                        recenterIssueUntil = 0
+                    }
+            }
             if chromeState.resetAction == .localField {
                 FieldOfViewResetControl(action: resetLocalFieldOfView)
                     .transition(suppressMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
@@ -692,10 +706,16 @@ struct SkyView: View {
 
     private func resetLocalFieldOfView() {
         ObservationHaptics.shared.lightImpact(intensity: 0.68)
-        if let reference = manualFieldReference {
-            session.manualProvider?.reset(to: reference)
-            manualFieldReference = nil
+        dockActivity.restart()
+        capture.cancelAcquisition()
+        let ready = session.recenterPointing(
+            at: ProcessInfo.processInfo.systemUptime,
+            reducedMotion: suppressMotion
+        )
+        if !ready {
+            recenterIssueUntil = ProcessInfo.processInfo.systemUptime + 3
         }
+        manualFieldReference = nil
         fieldResetPolicy = SkyFieldResetPolicy()
 
         fieldMagnificationActive = false
@@ -1961,7 +1981,7 @@ struct SkyView: View {
         }
     }
 
-    // MARK: - 拖拽（模拟器指向）
+    // MARK: - 拖拽浏览（设备姿态仍持续采样）
 
     @State private var lastTranslation = CGSize.zero
 
@@ -1974,6 +1994,8 @@ struct SkyView: View {
                 dockActivity.touch(bottom: false, accessible: keepsDockVisible)
                 if lastTranslation == .zero {
                     if manualFieldReference == nil { manualFieldReference = manual.pointing }
+                    session.beginManualBrowse()
+                    capture.cancelAcquisition()
                     dismissTransientOverlay()
                 }
                 let scale = max(
@@ -1997,7 +2019,8 @@ struct SkyView: View {
                 // A very short drag may deliver only its terminal sample. Capture
                 // the reference before momentum starts in that path as well.
                 if manualFieldReference == nil {
-                    manualFieldReference = session.manualProvider?.pointing
+                    manualFieldReference = session.pointing
+                    session.beginManualBrowse()
                 }
                 let scale = max(
                     ObservationScale.minimumLocalMagnification,

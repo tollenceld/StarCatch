@@ -3,8 +3,7 @@ import CoreGraphics
 import Foundation
 import QuartzCore
 
-/// 模拟器/无传感器指向源：拖拽驱动，带惯性衰减。
-/// 水平拖 = 方位角，竖直拖 = 仰角。roll 恒为 0。
+/// 手动浏览指向源，真机与模拟器共用；种子保留显示姿态及屏幕 roll。
 final class ManualPointingProvider: PointingProvider {
     @Published private(set) var pointing: Pointing = .initial
     let confidence: HeadingConfidence = .manual
@@ -16,7 +15,11 @@ final class ManualPointingProvider: PointingProvider {
     private var decayTimer: Timer?
 
     func start() {}
-    func stop() { decayTimer?.invalidate() }
+    func stop() {
+        decayTimer?.invalidate()
+        decayTimer = nil
+        velocity = .zero
+    }
 
     /// A reset also cancels momentum so the next tick cannot move away again.
     func reset(to reference: Pointing) {
@@ -57,7 +60,7 @@ final class ManualPointingProvider: PointingProvider {
             let boundaryScale = SpatialMotion.boundaryVelocityScale(
                 value: self.pointing.elevation,
                 velocity: elevationVelocity,
-                lowerBound: -0.2,
+                lowerBound: -.pi / 2 + 0.0001,
                 upperBound: .pi / 2,
                 slowZone: 0.22
             )
@@ -78,9 +81,11 @@ final class ManualPointingProvider: PointingProvider {
     private func apply(dx: CGFloat, dy: CGFloat) {
         var p = pointing
         // 拖拽方向与视野移动相反（拖动"天空"）
-        p.azimuth -= Double(dx) * radiansPerPoint
-        p.elevation += Double(dy) * radiansPerPoint
-        p.elevation = max(-0.2, min(.pi / 2, p.elevation))
+        let horizontal = Double(dx) * cos(p.roll) - Double(dy) * sin(p.roll)
+        let vertical = Double(dy) * cos(p.roll) + Double(dx) * sin(p.roll)
+        p.azimuth -= horizontal * radiansPerPoint
+        p.elevation += vertical * radiansPerPoint
+        p.elevation = max(-.pi / 2 + 0.0001, min(.pi / 2, p.elevation))
         // 方位角回绕
         p.azimuth = (p.azimuth + .pi).truncatingRemainder(dividingBy: 2 * .pi)
         if p.azimuth < 0 { p.azimuth += 2 * .pi }

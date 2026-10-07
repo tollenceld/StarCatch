@@ -87,6 +87,87 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(provider.pointing, reference)
     }
 
+    func testDeviceSamplesStayFreshWithoutMovingManualSky() {
+        var navigation = SkyPointingNavigation(deviceDriven: true)
+        let first = Pointing(azimuth: 0.8, elevation: 0.4, roll: 0.2)
+        navigation.ingestDevice(first, availability: .tracking)
+        XCTAssertEqual(navigation.beginBrowsing(), first)
+        let browsed = Pointing(azimuth: 1.2, elevation: 0.5, roll: 0.2)
+        navigation.ingestManual(browsed)
+        let latest = Pointing(azimuth: -0.4, elevation: 0.7, roll: -0.3)
+        navigation.ingestDevice(latest, availability: .tracking)
+        XCTAssertEqual(navigation.pointing, browsed)
+        XCTAssertTrue(navigation.recenter(at: 10, reducedMotion: false))
+        navigation.advance(at: 10.23)
+        XCTAssertNotEqual(navigation.pointing, browsed)
+        let movingTarget = Pointing(azimuth: -0.6, elevation: 0.8, roll: -0.4)
+        navigation.ingestDevice(movingTarget, availability: .tracking)
+        navigation.advance(at: 10.5)
+        XCTAssertEqual(navigation.pointing, movingTarget)
+        XCTAssertEqual(navigation.mode, .following)
+    }
+
+    func testBrowsingInterruptsReturnWithoutJumpAndUnavailablePoseIsNeverUsed() {
+        var navigation = SkyPointingNavigation(deviceDriven: true)
+        navigation.ingestDevice(.initial, availability: .tracking)
+        _ = navigation.beginBrowsing()
+        navigation.ingestManual(Pointing(azimuth: -1, elevation: 0, roll: 0.4))
+        XCTAssertTrue(navigation.recenter(at: 0, reducedMotion: false))
+        navigation.advance(at: 0.2)
+        let interrupted = navigation.pointing
+        XCTAssertEqual(navigation.beginBrowsing(), interrupted)
+        navigation.advance(at: 1)
+        XCTAssertEqual(navigation.pointing, interrupted)
+        navigation.ingestDevice(.initial, availability: .unavailable)
+        XCTAssertFalse(navigation.recenter(at: 2, reducedMotion: false))
+        XCTAssertEqual(navigation.pointing, interrupted)
+        navigation.ingestDevice(.initial, availability: .starting)
+        XCTAssertFalse(navigation.recenter(at: 3, reducedMotion: true))
+    }
+
+    func testReducedReturnAndSimulatorReference() {
+        var device = SkyPointingNavigation(deviceDriven: true)
+        device.ingestDevice(.initial, availability: .tracking)
+        _ = device.beginBrowsing()
+        device.ingestManual(Pointing(azimuth: 0, elevation: 0, roll: 0))
+        XCTAssertTrue(device.recenter(at: 0, reducedMotion: true))
+        XCTAssertEqual(device.pointing, .initial)
+        XCTAssertEqual(device.mode, .following)
+
+        var simulator = SkyPointingNavigation(deviceDriven: false)
+        let origin = Pointing(azimuth: 0.2, elevation: 0.6, roll: 0)
+        simulator.ingestManual(origin)
+        _ = simulator.beginBrowsing()
+        simulator.ingestManual(.initial)
+        XCTAssertTrue(simulator.recenter(at: 0, reducedMotion: true))
+        XCTAssertEqual(simulator.pointing, origin)
+        XCTAssertEqual(simulator.mode, .browsing)
+    }
+
+    func testReturnCameraTakesShortNorthRouteAndStaysFiniteAtZenith() {
+        let from = Pointing(azimuth: 179 * .pi / 180, elevation: 0.4, roll: 0.2)
+        let to = Pointing(azimuth: -179 * .pi / 180, elevation: 0.4, roll: 0.3)
+        let middle = SkyPointingNavigation.interpolate(from, to, progress: 0.5)
+        XCTAssertGreaterThan(abs(middle.azimuth), 3)
+        XCTAssertLessThan(SkyDockActivity.angleDegrees(middle, from), 2)
+        let zenith = Pointing(azimuth: 1.4, elevation: .pi / 2, roll: -0.5)
+        for progress in [0.01, 0.5, 0.99] {
+            let pose = SkyPointingNavigation.interpolate(from, zenith, progress: progress)
+            XCTAssertTrue(pose.azimuth.isFinite && pose.elevation.isFinite && pose.roll.isFinite)
+            XCTAssertEqual(simd_length(pose.unitVector), 1, accuracy: 0.000_001)
+        }
+    }
+
+    func testManualDragPreservesSeedRollAndBelowHorizonPose() {
+        let manual = ManualPointingProvider()
+        let origin = Pointing(azimuth: 0.4, elevation: -0.8, roll: .pi / 2)
+        manual.reset(to: origin)
+        manual.drag(translation: CGSize(width: 20, height: 0))
+        XCTAssertEqual(manual.pointing.azimuth, origin.azimuth, accuracy: 0.000_001)
+        XCTAssertGreaterThan(manual.pointing.elevation, origin.elevation)
+        XCTAssertEqual(manual.pointing.roll, origin.roll)
+    }
+
     func testObservationIssuesExplainActualCauseInPriorityOrder() {
         func resolve(availability: PointingAvailability = .tracking,
                      authorization: CLAuthorizationStatus = .authorizedWhenInUse,
