@@ -55,25 +55,6 @@ final class TimeTests: XCTestCase {
         XCTAssertFalse(activity.moving, "A suspended interval is not observed motion")
     }
 
-    func testFieldResetThresholdsAvoidNoiseAndHideDuringPinch() {
-        var policy = SkyFieldResetPolicy()
-        policy.update(magnification: 1.02, manualDeviation: 2)
-        XCTAssertFalse(policy.isAvailable(interacting: false))
-        policy.update(magnification: 1.09, manualDeviation: 0)
-        XCTAssertTrue(policy.isAvailable(interacting: false))
-        XCTAssertFalse(policy.isAvailable(interacting: true))
-        policy.update(magnification: 1.05, manualDeviation: 0)
-        XCTAssertTrue(policy.isAvailable(interacting: false))
-        policy.update(magnification: 1.02, manualDeviation: 0)
-        XCTAssertFalse(policy.isAvailable(interacting: false))
-        policy.update(magnification: 1, manualDeviation: 4)
-        XCTAssertTrue(policy.isAvailable(interacting: false))
-        policy.update(magnification: 1, manualDeviation: 2)
-        XCTAssertTrue(policy.isAvailable(interacting: false))
-        policy.update(magnification: 1, manualDeviation: 0.5)
-        XCTAssertFalse(policy.isAvailable(interacting: false))
-    }
-
     func testManualResetRestoresReferenceAndCancelsInertia() async throws {
         let provider = ManualPointingProvider()
         let reference = provider.pointing
@@ -105,6 +86,24 @@ final class TimeTests: XCTestCase {
         navigation.advance(at: 10.5)
         XCTAssertEqual(navigation.pointing, movingTarget)
         XCTAssertEqual(navigation.mode, .following)
+    }
+
+    func testCaptureWaitsForDeviceSampleAndCameraReturn() {
+        var navigation = SkyPointingNavigation(deviceDriven: true)
+        XCTAssertFalse(navigation.canSampleCapture)
+        navigation.ingestDevice(.initial, availability: .starting)
+        XCTAssertFalse(navigation.canSampleCapture)
+        navigation.ingestDevice(.initial, availability: .tracking)
+        XCTAssertTrue(navigation.canSampleCapture)
+        _ = navigation.beginBrowsing()
+        XCTAssertTrue(navigation.recenter(at: 0, reducedMotion: false))
+        XCTAssertFalse(navigation.canSampleCapture)
+        navigation.advance(at: 0.5)
+        XCTAssertTrue(navigation.canSampleCapture)
+        navigation.ingestDevice(.initial, availability: .unavailable)
+        XCTAssertFalse(navigation.canSampleCapture)
+        _ = navigation.beginBrowsing()
+        XCTAssertTrue(navigation.canSampleCapture)
     }
 
     func testBrowsingInterruptsReturnWithoutJumpAndUnavailablePoseIsNeverUsed() {
@@ -164,8 +163,23 @@ final class TimeTests: XCTestCase {
         manual.reset(to: origin)
         manual.drag(translation: CGSize(width: 20, height: 0))
         XCTAssertEqual(manual.pointing.azimuth, origin.azimuth, accuracy: 0.000_001)
-        XCTAssertGreaterThan(manual.pointing.elevation, origin.elevation)
-        XCTAssertEqual(manual.pointing.roll, origin.roll)
+        XCTAssertLessThan(manual.pointing.elevation, origin.elevation)
+        XCTAssertEqual(manual.pointing.roll, origin.roll, accuracy: 0.000_001)
+        let projected = Projection(pointing: manual.pointing, screenSize: CGSize(width: 400, height: 800))
+            .project(azimuth: origin.azimuth, elevation: origin.elevation)
+        XCTAssertGreaterThan(projected?.point.x ?? 0, 200, "The sky follows the finger even with device roll")
+        XCTAssertEqual(projected?.point.y ?? 0, 400, accuracy: 0.000_001)
+    }
+
+    func testHorizontalBrowsingMovesAwayFromZenithWithoutInvalidPose() {
+        let manual = ManualPointingProvider()
+        let zenith = Pointing(azimuth: 0, elevation: .pi / 2, roll: 0.7)
+        manual.reset(to: zenith)
+        manual.drag(translation: CGSize(width: 40, height: 0))
+        XCTAssertGreaterThan(SkyDockActivity.angleDegrees(zenith, manual.pointing), 5)
+        XCTAssertTrue(manual.pointing.azimuth.isFinite && manual.pointing.roll.isFinite)
+        let up = manual.pointing.cameraRotation.act(simd_double3(0, 1, 0))
+        XCTAssertEqual(simd_length(up), 1, accuracy: 0.000_001)
     }
 
     func testObservationIssuesExplainActualCauseInPriorityOrder() {
@@ -704,8 +718,7 @@ final class TimeTests: XCTestCase {
         for mode in [SkyPresentationMode.previewingGlobal, .cancellingGlobal] {
             XCTAssertTrue(mode.isTransitioning)
             XCTAssertFalse(mode.ownsGlobalInteraction)
-            XCTAssertEqual(SkyChromeState(presentationMode: mode, capturePhase: .exploring,
-                                         localFieldResetAvailable: true).dockMode, .hidden)
+            XCTAssertEqual(SkyChromeState(presentationMode: mode, capturePhase: .exploring).dockMode, .hidden)
         }
     }
 
@@ -1695,7 +1708,6 @@ final class TimeTests: XCTestCase {
 
     func testSkyChromeExplorationKeepsTwoCapsulesAndCentralReset() {
         let chrome = makeChrome(
-            localReset: true,
             phase: .exploring
         )
 
@@ -1977,13 +1989,11 @@ final class TimeTests: XCTestCase {
 
     private func makeChrome(
         presentation: SkyPresentationMode = .local,
-        localReset: Bool = false,
         phase: CaptureStateMachine.Phase = .exploring
     ) -> SkyChromeState {
         SkyChromeState(
             presentationMode: presentation,
-            capturePhase: phase,
-            localFieldResetAvailable: localReset
+            capturePhase: phase
         )
     }
 

@@ -22,6 +22,23 @@ struct Pointing: Equatable {
 
     /// 初始指向：东南方中仰角 —— 北斗 G8 附近（模拟器演示锁定链路）。
     static let initial = Pointing(azimuth: 141.1 * .pi / 180, elevation: 34.5 * .pi / 180, roll: 0)
+
+    var cameraRotation: simd_quatd {
+        let forward = unitVector
+        let (right, up) = Projection.screenBasis(for: forward)
+        let screenRight = right * cos(roll) + up * sin(roll)
+        let screenUp = up * cos(roll) - right * sin(roll)
+        return simd_quatd(simd_double3x3(columns: (screenRight, screenUp, -forward)))
+    }
+
+    static func fromCameraRotation(_ rotation: simd_quatd) -> Pointing {
+        let forward = rotation.act(simd_double3(0, 0, -1))
+        let screenRight = rotation.act(simd_double3(1, 0, 0))
+        let (right, up) = Projection.screenBasis(for: forward)
+        return Pointing(azimuth: atan2(forward.x, forward.y),
+                        elevation: asin(min(1, max(-1, forward.z))),
+                        roll: atan2(simd_dot(screenRight, up), simd_dot(screenRight, right)))
+    }
 }
 
 /// 指向精度/校准状态 —— 暴露成仪器叙事的一部分。
@@ -62,7 +79,11 @@ struct SkyPointingNavigation {
     private var browseReference: Pointing?
     private var returnOrigin: Pointing?
     private var returnStarted: TimeInterval = 0
-    static let returnDuration: TimeInterval = 0.46
+    static let returnDuration = Motion.fieldResetDuration
+
+    var canSampleCapture: Bool {
+        mode != .returning && (!deviceDriven || mode == .browsing || availability == .tracking)
+    }
 
     init(deviceDriven: Bool) {
         self.deviceDriven = deviceDriven
@@ -131,20 +152,6 @@ struct SkyPointingNavigation {
     static func interpolate(_ from: Pointing, _ to: Pointing, progress: Double) -> Pointing {
         if progress <= 0 { return from }
         if progress >= 1 { return to }
-        func basis(_ pose: Pointing) -> simd_quatd {
-            let forward = pose.unitVector
-            let (right, up) = Projection.screenBasis(for: forward)
-            let screenRight = right * cos(pose.roll) + up * sin(pose.roll)
-            let screenUp = up * cos(pose.roll) - right * sin(pose.roll)
-            return simd_quatd(simd_double3x3(columns: (screenRight, screenUp, -forward)))
-        }
-        let rotation = simd_slerp(basis(from), basis(to), progress)
-        let forward = rotation.act(simd_double3(0, 0, -1))
-        let screenRight = rotation.act(simd_double3(1, 0, 0))
-        let azimuth = atan2(forward.x, forward.y)
-        let elevation = asin(min(1, max(-1, forward.z)))
-        let (right, up) = Projection.screenBasis(for: forward)
-        return Pointing(azimuth: azimuth, elevation: elevation,
-                        roll: atan2(simd_dot(screenRight, up), simd_dot(screenRight, right)))
+        return Pointing.fromCameraRotation(simd_slerp(from.cameraRotation, to.cameraRotation, progress))
     }
 }

@@ -34,8 +34,6 @@ struct SkyView: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @Environment(\.colorSchemeContrast) private var contrast
     @StateObject private var dockActivity = SkyDockActivityController()
-    @State private var fieldResetPolicy = SkyFieldResetPolicy()
-    @State private var manualFieldReference: Pointing?
     @State private var recenterIssueUntil: TimeInterval = 0
     @State private var retiringCandidate: (id: String, date: Date)?
     @State private var commandDockFrame: CGRect = .zero
@@ -113,14 +111,10 @@ struct SkyView: View {
         let wideReduction = 1 - 0.46 * wideFieldProgress
         return wideReduction * (1 - overviewPresentationProgress)
     }
-    private var localFieldResetAvailable: Bool {
-        fieldResetPolicy.isAvailable(interacting: clock.isScrubbing || fieldMagnificationActive)
-    }
     private var chromeState: SkyChromeState {
         SkyChromeState(
             presentationMode: presentationMode,
-            capturePhase: capture.phase,
-            localFieldResetAvailable: localFieldResetAvailable
+            capturePhase: capture.phase
         )
     }
     /// 全局空间已经成为视觉主体后才交接顶部与底部控件。直接入口也沿用同一阈值，
@@ -229,8 +223,6 @@ struct SkyView: View {
             scaleJourney.pause()
         }
         .onChange(of: keepsDockVisible) { _, _ in dockActivity.restart() }
-        .onChange(of: fieldMagnification) { _, _ in updateFieldResetAvailability() }
-        .onChange(of: session.pointing) { _, _ in updateFieldResetAvailability() }
         .onDisappear {
             dockActivity.restart()
             session.observer.releasePresentationHold()
@@ -466,6 +458,7 @@ struct SkyView: View {
         guard scenePhase == .active,
               !isUtilityPagePresented,
               !clock.isScrubbing,
+              session.canSampleCapture,
               presentationMode == .local,
               frameTime - lastCaptureSample
                 >= CaptureStateMachine.samplingInterval
@@ -711,8 +704,6 @@ struct SkyView: View {
         if !ready {
             recenterIssueUntil = ProcessInfo.processInfo.systemUptime + 3
         }
-        manualFieldReference = nil
-        fieldResetPolicy = SkyFieldResetPolicy()
 
         fieldMagnificationActive = false
         settledFieldMagnification = ObservationScale.defaultLocalMagnification
@@ -721,18 +712,6 @@ struct SkyView: View {
         overviewCelestialFrame = nil
         withAnimation(suppressMotion ? .easeOut(duration: 0.14) : Motion.fieldReset) {
             fieldMagnification = ObservationScale.defaultLocalMagnification
-        }
-    }
-
-    private func updateFieldResetAvailability() {
-        let deviation = manualFieldReference.map {
-            SkyDockActivity.angleDegrees($0, session.pointing)
-        } ?? 0
-        var next = fieldResetPolicy
-        next.update(magnification: Double(fieldMagnification), manualDeviation: deviation)
-        if next.zoomDisplaced != fieldResetPolicy.zoomDisplaced
-            || next.directionDisplaced != fieldResetPolicy.directionDisplaced {
-            fieldResetPolicy = next
         }
     }
 
@@ -1991,7 +1970,6 @@ struct SkyView: View {
                 guard let manual = session.manualProvider else { return }
                 dockActivity.touch(bottom: false, accessible: keepsDockVisible)
                 if lastTranslation == .zero {
-                    if manualFieldReference == nil { manualFieldReference = manual.pointing }
                     session.beginManualBrowse()
                     capture.cancelAcquisition()
                     dismissTransientOverlay()
@@ -2012,14 +1990,12 @@ struct SkyView: View {
                     lastTranslation = .zero
                     return
                 }
+                let hadDrag = lastTranslation != .zero
                 lastTranslation = .zero
                 guard !fieldMagnificationActive else { return }
                 // A very short drag may deliver only its terminal sample. Capture
                 // the reference before momentum starts in that path as well.
-                if manualFieldReference == nil {
-                    manualFieldReference = session.pointing
-                    session.beginManualBrowse()
-                }
+                if !hadDrag { session.beginManualBrowse() }
                 let scale = max(
                     ObservationScale.minimumLocalMagnification,
                     fieldMagnification

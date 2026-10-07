@@ -93,23 +93,6 @@ final class SkyDockActivityController: ObservableObject {
     }
 }
 
-struct SkyFieldResetPolicy {
-    private(set) var zoomDisplaced = false
-    private(set) var directionDisplaced = false
-
-    mutating func update(magnification: Double, manualDeviation: Double) {
-        let delta = abs(magnification - 1)
-        if delta > 0.08 { zoomDisplaced = true }
-        else if delta <= 0.03 { zoomDisplaced = false }
-        if manualDeviation > 3 { directionDisplaced = true }
-        else if manualDeviation <= 1 { directionDisplaced = false }
-    }
-
-    func isAvailable(interacting: Bool) -> Bool {
-        !interacting && (zoomDisplaced || directionDisplaced)
-    }
-}
-
 enum SkyObservationIssue: Equatable {
     case motionUnavailable, locationDenied, locating, locationAssumed
     case locationAccuracy, directionUncalibrated

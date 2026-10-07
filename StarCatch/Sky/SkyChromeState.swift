@@ -30,8 +30,7 @@ struct SkyChromeState: Equatable {
 
     init(
         presentationMode: SkyPresentationMode,
-        capturePhase: CaptureStateMachine.Phase,
-        localFieldResetAvailable: Bool
+        capturePhase: CaptureStateMachine.Phase
     ) {
         if presentationMode == .local, case .acquiring(let id) = capturePhase {
             acquisitionObjectID = id
@@ -55,7 +54,7 @@ struct SkyChromeState: Equatable {
                 capturePhase: capturePhase
             )
             dockMode = resolvedDock
-            resetAction = resolvedDock == .exploration && localFieldResetAvailable
+            resetAction = resolvedDock == .exploration
                 ? .localField
                 : nil
         }

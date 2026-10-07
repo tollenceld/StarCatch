@@ -12,6 +12,7 @@ final class SkySession: ObservableObject {
     let motionProvider: MotionPointingProvider?
     private var pointingNavigation: SkyPointingNavigation
     @Published private(set) var pointingMode: SkyPointingNavigation.Mode
+    var canSampleCapture: Bool { pointingNavigation.canSampleCapture }
     let observer = ObserverLocation()
     let catalog: CatalogStore
     let ephemeris: EphemerisEngine
@@ -143,12 +144,13 @@ final class SkySession: ObservableObject {
         #else
         if CMMotionManager().isDeviceMotionAvailable {
             let motion = MotionPointingProvider()
+            let manual = ManualPointingProvider()
             motionProvider = motion
-            manualProvider = ManualPointingProvider()
+            manualProvider = manual
             pointingNavigation = SkyPointingNavigation(deviceDriven: true)
             pointingMode = .following
             bind(motion)
-            bind(manualProvider!)
+            bind(manual)
         } else {
             let manual = ManualPointingProvider()
             manualProvider = manual

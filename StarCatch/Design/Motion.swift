@@ -23,7 +23,8 @@ enum Motion {
     }
 
     /// 镜头复位保留可读的空间运动，但不使用弹跳。
-    static let fieldReset = Animation.timingCurve(0.18, 0.68, 0.2, 1, duration: 0.46)
+    static let fieldResetDuration: TimeInterval = 0.46
+    static let fieldReset = Animation.timingCurve(0.18, 0.68, 0.2, 1, duration: fieldResetDuration)
 
     /// 手册页显影：阅读节奏，不让逐行 stagger 变成等待。
     static let manualReveal = Animation.timingCurve(0.32, 0, 0.2, 1, duration: 0.44)

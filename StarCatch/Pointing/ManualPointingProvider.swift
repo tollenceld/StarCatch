@@ -2,6 +2,7 @@ import Combine
 import CoreGraphics
 import Foundation
 import QuartzCore
+import simd
 
 /// 手动浏览指向源，真机与模拟器共用；种子保留显示姿态及屏幕 roll。
 final class ManualPointingProvider: PointingProvider {
@@ -56,15 +57,6 @@ final class ManualPointingProvider: PointingProvider {
                 previous: previousTick
             )
             previousTick = now
-            let elevationVelocity = Double(self.velocity.dy) * self.radiansPerPoint
-            let boundaryScale = SpatialMotion.boundaryVelocityScale(
-                value: self.pointing.elevation,
-                velocity: elevationVelocity,
-                lowerBound: -.pi / 2 + 0.0001,
-                upperBound: .pi / 2,
-                slowZone: 0.22
-            )
-            self.velocity.dy *= boundaryScale
             self.apply(dx: self.velocity.dx * dt, dy: self.velocity.dy * dt)
             let decay = SpatialMotion.decayFactor(
                 rate: SpatialMotion.rotationDecay,
@@ -79,17 +71,10 @@ final class ManualPointingProvider: PointingProvider {
     }
 
     private func apply(dx: CGFloat, dy: CGFloat) {
-        var p = pointing
-        // 拖拽方向与视野移动相反（拖动"天空"）
-        let horizontal = Double(dx) * cos(p.roll) - Double(dy) * sin(p.roll)
-        let vertical = Double(dy) * cos(p.roll) + Double(dx) * sin(p.roll)
-        p.azimuth -= horizontal * radiansPerPoint
-        p.elevation += vertical * radiansPerPoint
-        p.elevation = max(-.pi / 2 + 0.0001, min(.pi / 2, p.elevation))
-        // 方位角回绕
-        p.azimuth = (p.azimuth + .pi).truncatingRemainder(dividingBy: 2 * .pi)
-        if p.azimuth < 0 { p.azimuth += 2 * .pi }
-        p.azimuth -= .pi
-        pointing = p
+        // Rotate about screen axes, including device roll. Azimuth-only dragging
+        // cannot move a view aimed at the zenith and jumps when crossing a pole.
+        let yaw = simd_quatd(angle: Double(dx) * radiansPerPoint, axis: simd_double3(0, 1, 0))
+        let pitch = simd_quatd(angle: Double(dy) * radiansPerPoint, axis: simd_double3(1, 0, 0))
+        pointing = Pointing.fromCameraRotation(pointing.cameraRotation * yaw * pitch)
     }
 }
