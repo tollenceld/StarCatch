@@ -61,7 +61,8 @@ struct GlobalDockMorph: View, Animatable {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
-        .modifier(DockSurface(navigationPresence: 1 - progress, timelinePresence: progress))
+        .modifier(DockSurface(navigationPresence: 1 - progress, timelinePresence: progress,
+                              glassID: SkyCommandGroup.right.glassID))
         .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }

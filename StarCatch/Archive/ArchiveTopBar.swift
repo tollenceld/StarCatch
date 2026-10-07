@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 全 App 边缘控件的共同几何与材质刻度。
 /// 页面可以有不同内容宽度，但不再各自定义高度、圆角、间距和描边重量。
@@ -126,7 +127,6 @@ struct AppPageHeader: View {
         }
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .frame(height: 56)
-        .background(Palette.sheetBackground)
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Palette.inkFaint.opacity(Palette.Level.functionalDivider))
@@ -169,16 +169,52 @@ struct AppPageShell<Content: View>: View {
                 collapsesToSky: isRoot
             )
             .opacity(DockMorphMetrics.headerReveal(progress))
+            .allowsHitTesting(progress > 0.22)
             .offset(y: suppressMotion ? 0 : 12 * (1 - DockMorphMetrics.headerReveal(progress)))
             .appRootDismissGesture(enabled: isRoot, action: onBack)
             content()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .opacity(DockMorphMetrics.contentReveal(progress))
+                .allowsHitTesting(progress >= 0.92)
                 .offset(y: suppressMotion ? 0 : 20 * (1 - DockMorphMetrics.contentReveal(progress)))
         }
-        .background(Palette.sheetBackground.opacity(DockMorphMetrics.headerReveal(progress)))
+        .modifier(ToolNavigationSurface())
         .preferredColorScheme(.dark)
         .accessibilityAction(.escape, onBack)
+    }
+}
+
+/// NavigationStack owns a container background separate from its SwiftUI content.
+/// Keep this local to tool pages; full-screen articles retain their reading surfaces.
+private struct ToolNavigationSurface: ViewModifier {
+    @ViewBuilder func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content.containerBackground(.clear, for: .navigation)
+        } else {
+            content.background(LegacyToolNavigationBackground())
+        }
+    }
+}
+
+private struct LegacyToolNavigationBackground: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> BackgroundController { BackgroundController() }
+    func updateUIViewController(_ controller: BackgroundController, context: Context) {
+        controller.clearBackground()
+    }
+    final class BackgroundController: UIViewController {
+        override func loadView() {
+            view = UIView()
+            view.backgroundColor = .clear
+            view.isUserInteractionEnabled = false
+        }
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            clearBackground()
+        }
+        func clearBackground() {
+            parent?.view.backgroundColor = .clear
+            navigationController?.view.backgroundColor = .clear
+        }
     }
 }
 

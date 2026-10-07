@@ -14,6 +14,14 @@ enum AppPageDestination: Identifiable, Hashable {
         case .settings: "settings"
         }
     }
+
+    var commandItem: SkyCommandItem {
+        switch self {
+        case .filters: .filters
+        case .observations: .observations
+        case .settings: .settings
+        }
+    }
 }
 
 /// 设置页内部的可导航页面。

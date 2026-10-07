@@ -17,6 +17,23 @@ enum DockMorphMetrics {
             + (target - AppChromeMetrics.commandRailHeight) * clamp(progress)
     }
 
+    static func capsuleFrame(in rail: CGRect, group: SkyCommandGroup) -> CGRect {
+        guard rail.width > 0 else { return .zero }
+        let width = AppChromeMetrics.commandCapsuleWidth(in: rail.width)
+        return CGRect(x: group == .left ? rail.minX : rail.maxX - width,
+                      y: rail.maxY - AppChromeMetrics.commandRailHeight,
+                      width: width, height: AppChromeMetrics.commandRailHeight)
+    }
+
+    static func panelFrame(progress: Double, source: CGRect, target: CGRect) -> CGRect {
+        let vertical = clamp(progress)
+        let horizontal = phase(progress, from: 0, to: 0.32)
+        let width = source.width + (target.width - source.width) * horizontal
+        let minX = source.minX + (target.minX - source.minX) * horizontal
+        let height = source.height + (target.height - source.height) * vertical
+        return CGRect(x: minX, y: source.maxY - height, width: width, height: height)
+    }
+
     static func headerReveal(_ progress: Double) -> Double {
         phase(progress, from: 0.22, to: 0.65)
     }
@@ -169,34 +186,15 @@ struct DockSurface: ViewModifier {
     var panelBlend: Double = 0
     var navigationPresence: Double = 0
     var timelinePresence: Double = 0
-    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
-    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
-    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
-    private var reduceTransparency: Bool { systemReduceTransparency || previewReduceTransparency }
-
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous)
-    }
+    var glassID: String? = nil
 
     func body(content: Content) -> some View {
-        surface(content)
-            .overlay { shape.stroke(Palette.inkFaint.opacity(reduceTransparency ? 0.56 : 0.34 - 0.12 * navigationPresence - 0.14 * timelinePresence), lineWidth: 0.6) }
-            .clipShape(shape)
-    }
-
-    @ViewBuilder private func surface(_ content: Content) -> some View {
-        if #available(iOS 26.0, *), !reduceTransparency, !forceLegacyMaterial {
-            content
-                .background(Palette.sheetBackground.opacity(panelBlend))
-                .glassEffect(.regular.tint(Palette.voidBlack.opacity(0.1 - 0.06 * navigationPresence + 0.3 * timelinePresence)).interactive(), in: shape)
-        } else if reduceTransparency {
-            content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
-                .background(Palette.voidBlack.opacity(0.97), in: shape)
-        } else {
-            content.background(Palette.sheetBackground.opacity(panelBlend), in: shape)
-                .background(.ultraThinMaterial, in: shape)
-                .background(Palette.voidBlack.opacity(0.76 - 0.14 * navigationPresence + 0.12 * timelinePresence), in: shape)
-        }
+        content.modifier(SkyGlassSurface(
+            shape: RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous),
+            glassID: glassID,
+            darkening: 0.04 * (1 - navigationPresence) + 0.08 * timelinePresence + 0.22 * panelBlend,
+            interactive: false
+        ))
     }
 }
 
@@ -204,7 +202,8 @@ struct DockSurface: ViewModifier {
 struct UtilityPanelContainer<Content: View>: View, Animatable {
     var progress: Double
     let source: CGRect
-    let top: CGFloat
+    let target: CGRect
+    let selectedItem: SkyCommandItem
     let reducedMotion: Bool
     let interactive: Bool
     let filtersActive: Bool
@@ -218,39 +217,36 @@ struct UtilityPanelContainer<Content: View>: View, Animatable {
     }
 
     var body: some View {
-        let targetHeight = DockMorphMetrics.panelHeight(bottom: source.maxY, top: top)
-        let height = reducedMotion ? targetHeight : DockMorphMetrics.height(progress: progress, target: targetHeight)
+        let frame = reducedMotion ? target
+            : DockMorphMetrics.panelFrame(progress: progress, source: source, target: target)
+        let shape = RoundedRectangle(cornerRadius: 28 - 4 * progress, style: .continuous)
         ZStack(alignment: .topLeading) {
-            Color.black.opacity(0.18 * progress)
+            Color.black.opacity(0.1 * progress)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: onDismiss)
                 .accessibilityHidden(true)
-            Color.clear
-                .frame(width: source.width, height: height)
-                .modifier(DockSurface(panelBlend: progress, navigationPresence: 1 - progress))
-                .overlay(alignment: .top) {
-                    content()
-                        .environment(\.utilityPanelProgress, reducedMotion ? 1 : progress)
-                        .frame(width: source.width, height: targetHeight)
-                        // NavigationStack owns a UIKit background too; fade the entire
-                        // content layer so it cannot leave a black slab over the source rail.
-                        .opacity(reducedMotion ? 1 : DockMorphMetrics.headerReveal(progress))
-                }
+            content()
+                .environment(\.utilityPanelProgress, reducedMotion ? 1 : progress)
+                .frame(width: target.width, height: target.height)
+                .frame(width: frame.width, height: frame.height, alignment: .top)
                 .overlay(alignment: .bottom) {
                     if showsCommands {
                         SkyCommandRow(configuration: SkyCommandConfiguration(
-                            items: SkyCommandItem.allCases,
+                            items: selectedItem.group.items,
                             activeItems: filtersActive ? [.filters] : []
-                        ))
-                        .frame(height: AppChromeMetrics.commandRailHeight)
+                        ), selectedItem: selectedItem)
+                        .frame(width: source.width, height: source.height)
+                        .offset(x: source.midX - frame.midX)
                         .opacity(DockMorphMetrics.commandsPresence(progress))
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .clipShape(shape)
+                .modifier(SkyGlassSurface(shape: shape, glassID: selectedItem.group.glassID,
+                                          darkening: 0.22 * progress, interactive: false))
                 .opacity(reducedMotion ? progress : 1)
-                .position(x: source.midX, y: source.maxY - height / 2)
+                .position(x: frame.midX, y: frame.midY)
                 .accessibilityAddTraits(.isModal)
                 .accessibilityAction(.escape, onDismiss)
         }

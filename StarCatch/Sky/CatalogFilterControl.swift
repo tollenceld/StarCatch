@@ -151,7 +151,6 @@ struct CatalogFilterPage: View {
         }
         .padding(.horizontal, AppChromeMetrics.edgeInset)
         .padding(.vertical, 16)
-        .background(Palette.sheetBackground)
         .overlay(alignment: .bottom) { ContentHairline() }
         .accessibilityElement(children: .contain)
     }
@@ -241,7 +240,7 @@ struct CatalogFilterPage: View {
                     }
                 }
             }
-            .background(Palette.sheetSurface)
+            .background(Palette.sheetSurface.opacity(0.38))
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }

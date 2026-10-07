@@ -252,6 +252,29 @@ final class TimeTests: XCTestCase {
         }
     }
 
+    func testUtilityPanelsGrowFromTheirCapsuleWithoutMovingTheBottomEdge() {
+        let rail = CGRect(x: 18, y: 728, width: 366, height: 64)
+        let target = CGRect(x: 18, y: 140, width: 366, height: 652)
+        for group in SkyCommandGroup.allCases {
+            let source = DockMorphMetrics.capsuleFrame(in: rail, group: group)
+            XCTAssertEqual(source.maxY, rail.maxY)
+            XCTAssertEqual(source.height, 56)
+            XCTAssertEqual(DockMorphMetrics.panelFrame(progress: 0, source: source, target: target), source)
+            XCTAssertEqual(DockMorphMetrics.panelFrame(progress: 1, source: source, target: target), target)
+            for progress in [0.1, 0.32, 0.65, 0.9] {
+                let frame = DockMorphMetrics.panelFrame(progress: progress, source: source, target: target)
+                XCTAssertEqual(frame.maxY, source.maxY, accuracy: 0.0001)
+                XCTAssertGreaterThanOrEqual(frame.minX, target.minX)
+                XCTAssertLessThanOrEqual(frame.maxX, target.maxX + 0.0001)
+            }
+            XCTAssertEqual(DockMorphMetrics.panelFrame(progress: 0.32, source: source, target: target).width,
+                           target.width)
+        }
+        XCTAssertEqual(AppPageDestination.filters.commandItem.group, .left)
+        XCTAssertEqual(AppPageDestination.observations.commandItem.group, .left)
+        XCTAssertEqual(AppPageDestination.settings(initialRoute: .systemStatus).commandItem.group, .right)
+    }
+
     func testDockMorphRevealsHeaderBeforeBodyAndTimelineAfterGlobeHandoff() {
         XCTAssertEqual(DockMorphMetrics.commandsPresence(0), 1)
         XCTAssertEqual(DockMorphMetrics.commandsPresence(0.28), 0)

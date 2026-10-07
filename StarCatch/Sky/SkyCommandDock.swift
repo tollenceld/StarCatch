@@ -51,7 +51,7 @@ struct SkyCommandConfiguration: Equatable {
     }
 }
 
-struct SkyCommandDock: View {
+struct SkyCommandDock: View, Animatable {
     let state: SkyChromeState
     let filtersActive: Bool
     let globalEntryEmphasized: Bool
@@ -62,22 +62,53 @@ struct SkyCommandDock: View {
     var onRecenter: () -> Void = {}
     var followsDevice = false
     var showsSurface = true
+    var presentedItem: SkyCommandItem? = nil
+    var panelProgress = 0.0
+    @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
+    @Environment(\.chromePreviewReducedMotion) private var previewReducedMotion
+    @AppStorage("reducedMotion") private var reducedMotion = false
+    var animatableData: Double {
+        get { panelProgress }
+        set { panelProgress = newValue }
+    }
+    private var remainingPresence: Double {
+        reducedMotion || systemReducedMotion || previewReducedMotion
+            ? 1 - panelProgress : DockMorphMetrics.commandsPresence(panelProgress)
+    }
     var body: some View {
         Group {
-            if showsSurface, let configuration = SkyCommandConfiguration.resolve(
+            if let configuration = SkyCommandConfiguration.resolve(
                 state: state, filtersActive: filtersActive,
                 globalEntryEmphasized: globalEntryEmphasized
-            ) {
+            ), showsSurface || presentedItem != nil {
                 HStack(alignment: .bottom, spacing: AppChromeMetrics.commandGroupSpacing) {
-                    capsule(.left, configuration: configuration)
-                    recenter
-                    capsule(.right, configuration: configuration)
+                    remainingCapsule(.left, configuration: configuration)
+                    if showsSurface || remainingPresence > 0 {
+                        recenter.opacity(showsSurface ? 1 : remainingPresence)
+                    } else {
+                        Color.clear.frame(width: AppChromeMetrics.recenterDiameter,
+                                          height: AppChromeMetrics.recenterDiameter)
+                    }
+                    remainingCapsule(.right, configuration: configuration)
                 }
+                // These values already come from the interpolated geometry clock.
+                // A second implicit opacity animation would leave controls behind the panel.
+                .transaction { $0.animation = nil }
             } else {
                 Color.clear.accessibilityHidden(true)
             }
         }
         .frame(height: AppChromeMetrics.recenterDiameter)
+    }
+
+    @ViewBuilder private func remainingCapsule(_ group: SkyCommandGroup,
+                                               configuration: SkyCommandConfiguration) -> some View {
+        if !showsSurface, presentedItem?.group == group || remainingPresence <= 0 {
+            Color.clear.frame(maxWidth: .infinity).frame(height: AppChromeMetrics.commandRailHeight)
+        } else {
+            capsule(group, configuration: configuration)
+                .opacity(showsSurface ? 1 : remainingPresence)
+        }
     }
 
     private func capsule(_ group: SkyCommandGroup,

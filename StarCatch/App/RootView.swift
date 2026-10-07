@@ -44,6 +44,7 @@ struct RootView: View {
     @State private var skyRenderingSuspended = false
     @State private var panelProgress = 0.0
     @State private var dockFrame: CGRect = .zero
+    @State private var capsuleFrames: [SkyCommandGroup: CGRect] = [:]
     @State private var panelSourceFrame: CGRect = .zero
     @State private var panelLifecycle = UtilityPanelLifecycle()
     @State private var panelTransitionTask: Task<Void, Never>?
@@ -93,6 +94,8 @@ struct RootView: View {
                         capture: capture,
                         clock: clock,
                         isUtilityPagePresented: presentedPage != nil,
+                        presentedUtilityItem: presentedPage?.commandItem,
+                        utilityPresentationProgress: panelProgress,
                         renderingSuspended: skyRenderingSuspended,
                         onOpenFilters: {
                             presentPage(.filters)
@@ -149,23 +152,33 @@ struct RootView: View {
         }
         .coordinateSpace(name: "appChrome")
         .onPreferenceChange(CommandDockFrameKey.self) { frame in
-            if presentedPage == nil { dockFrame = frame }
+            if presentedPage == nil, frame.width > 0 { dockFrame = frame }
+        }
+        .onPreferenceChange(CommandCapsuleFrameKey.self) { frames in
+            if presentedPage == nil, !frames.isEmpty { capsuleFrames = frames }
         }
         .overlay {
             if stage == .sky, let destination = presentedPage, let session {
                 GeometryReader { geometry in
-                    let source = panelSourceFrame.width > 0 ? panelSourceFrame : CGRect(
+                    let rail = dockFrame.width > 0 ? dockFrame : CGRect(
                         x: AppChromeMetrics.edgeInset,
                         y: geometry.size.height - 8 - AppChromeMetrics.commandRailHeight,
                         width: geometry.size.width - AppChromeMetrics.edgeInset * 2,
                         height: AppChromeMetrics.commandRailHeight
                     )
+                    let source = panelSourceFrame.width > 0 ? panelSourceFrame
+                        : DockMorphMetrics.capsuleFrame(in: rail, group: destination.commandItem.group)
+                    let target = CGRect(x: AppChromeMetrics.edgeInset,
+                                        y: source.maxY - DockMorphMetrics.panelHeight(bottom: source.maxY, top: 0),
+                                        width: geometry.size.width - AppChromeMetrics.edgeInset * 2,
+                                        height: DockMorphMetrics.panelHeight(bottom: source.maxY, top: 0))
                     UtilityPanelContainer(
                         progress: panelProgress,
                         source: source,
-                        top: 0,
+                        target: target,
+                        selectedItem: destination.commandItem,
                         reducedMotion: suppressMotion,
-                        interactive: panelLifecycle.phase == .open,
+                        interactive: panelLifecycle.phase != .closing,
                         filtersActive: session.activeCatalogFilterCount > 0,
                         showsCommands: capture.phase == .exploring,
                         onDismiss: dismissPage
@@ -262,13 +275,14 @@ struct RootView: View {
 
     private func presentPage(_ destination: AppPageDestination) {
         guard stage == .sky, presentedPage == nil, scenePhase == .active else { return }
-        panelSourceFrame = dockFrame
+        panelSourceFrame = capsuleFrames[destination.commandItem.group]
+            ?? DockMorphMetrics.capsuleFrame(in: dockFrame, group: destination.commandItem.group)
         panelProgress = 0
         presentedPage = destination
         skyRenderingSuspended = true
         let generation = panelLifecycle.begin(expanding: true)
         panelTransitionTask = Task { @MainActor in
-            // Establish the 64pt source before the first animated transaction.
+            // Establish the measured capsule before the first animated transaction.
             await Task.yield()
             guard !Task.isCancelled, panelLifecycle.generation == generation else { return }
             withAnimation(DockMorphMetrics.animation(expanding: true, reduced: suppressMotion)) {
@@ -282,7 +296,8 @@ struct RootView: View {
     }
 
     private func dismissPage() {
-        guard presentedPage != nil, panelLifecycle.phase == .open else { return }
+        guard presentedPage != nil,
+              panelLifecycle.phase == .open || panelLifecycle.phase == .opening else { return }
         panelTransitionTask?.cancel()
         let generation = panelLifecycle.begin(expanding: false)
         skyRenderingSuspended = false

@@ -77,7 +77,6 @@ struct SettingsPage: View {
         @ViewBuilder content: () -> Content
     ) -> some View {
         content()
-            .background(Palette.sheetBackground)
     }
 
     private var panelContent: some View {

@@ -73,17 +73,11 @@ struct ArchiveOverlay: View {
     var onDismiss: () -> Void = {}
 
     @Environment(\.accessibilityReduceMotion) private var systemReducedMotion
-    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
-    @Environment(\.chromePreviewReducedTransparency) private var previewReduceTransparency
-    @Environment(\.forceLegacyMaterial) private var forceLegacyMaterial
     @AppStorage("reducedMotion") private var reducedMotion = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var presentationVisible = false
 
     private var suppressMotion: Bool { systemReducedMotion || reducedMotion }
-    private var reduceTransparency: Bool {
-        systemReduceTransparency || previewReduceTransparency
-    }
     private var clampedDismissalProgress: Double {
         min(1, max(0, dismissalProgress))
     }
@@ -137,16 +131,16 @@ struct ArchiveOverlay: View {
         .padding(.top, 16)
         .padding(.bottom, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .modifier(SkyGlassSurface(
-            shape: RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous),
-            darkening: 0.15,
-            interactive: false
-        ))
         .overlay(alignment: .topTrailing) {
             closeControl
                 .padding(.top, 2)
                 .padding(.trailing, 2)
         }
+        .modifier(SkyGlassSurface(
+            shape: RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous),
+            darkening: 0.15,
+            interactive: false
+        ))
         .opacity(presentationVisible ? 1 - clampedDismissalProgress : 0)
         .offset(
             y: suppressMotion
@@ -326,37 +320,6 @@ struct ArchiveOverlay: View {
         .buttonStyle(SkyCapsulePressStyle())
         .accessibilityHint(copy("action.view_archive.hint"))
         .overlay(alignment: .top) { ContentHairline() }
-    }
-
-    @ViewBuilder
-    private var glassSurface: some View {
-        let shape = RoundedRectangle(cornerRadius: AppChromeMetrics.commandRailCornerRadius, style: .continuous)
-        if reduceTransparency {
-            shape
-                .fill(Palette.sheetBackground)
-                .overlay {
-                    shape.stroke(Palette.inkFaint.opacity(0.5), lineWidth: 0.6)
-                }
-        } else if #available(iOS 26.0, *), !forceLegacyMaterial {
-            shape
-                .fill(.clear)
-                .glassEffect(
-                    .regular
-                        .tint(Palette.voidBlack.opacity(0.2))
-                        .interactive(),
-                    in: shape
-                )
-                .overlay {
-                    shape.stroke(Palette.inkFaint.opacity(0.3), lineWidth: 0.6)
-                }
-        } else {
-            shape
-                .fill(.ultraThinMaterial)
-                .background(Palette.voidBlack.opacity(0.62), in: shape)
-                .overlay {
-                    shape.stroke(Palette.inkFaint.opacity(0.34), lineWidth: 0.6)
-                }
-        }
     }
 }
 

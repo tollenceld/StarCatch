@@ -211,7 +211,6 @@ struct ObservationHistoryPage: View {
             .tracking(1.1)
             .foregroundStyle(Palette.Text.secondary)
             .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
-            .background(Palette.sheetBackground)
     }
 
     private func historyRow(_ entry: ObservationLog.Entry) -> some View {

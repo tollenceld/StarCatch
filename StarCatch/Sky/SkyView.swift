@@ -14,6 +14,8 @@ struct SkyView: View {
     @ObservedObject var clock: SkyClock
     /// 工具面板暂停采样与绘制，但保留同一个绘制表面和最后观测时刻。
     var isUtilityPagePresented = false
+    var presentedUtilityItem: SkyCommandItem? = nil
+    var utilityPresentationProgress = 0.0
     var renderingSuspended = false
     var onStoryPresentationChanged: (Bool) -> Void = { _ in }
     /// 设置与观测档案由上层负责呈现；观测记录同时作为底部控制栏的稳定入口，
@@ -622,7 +624,9 @@ struct SkyView: View {
                 onOpenSettings: openInstrument,
                 onRecenter: resetLocalFieldOfView,
                 followsDevice: session.pointingMode == .following,
-                showsSurface: !isUtilityPagePresented
+                showsSurface: !isUtilityPagePresented,
+                presentedItem: presentedUtilityItem,
+                panelProgress: utilityPresentationProgress
             )
             .opacity(keepsDockVisible ? 1 : dockActivity.opacity)
             .animation(
