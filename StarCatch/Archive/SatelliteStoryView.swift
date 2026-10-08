@@ -35,6 +35,8 @@ struct SatelliteStoryView: View {
     @AppStorage("reducedMotion") private var reducedMotion = false
     @State private var revealed = false
     @State private var section: SatelliteArchiveSection = .observation
+    @State private var sectionDirection: CGFloat = 1
+    @Namespace private var sectionHighlight
 
     private var suppressMotion: Bool { systemReducedMotion || previewReducedMotion || reducedMotion }
     private var language: SupportedLanguage { .current }
@@ -55,13 +57,19 @@ struct SatelliteStoryView: View {
                             ScrollView {
                                 VStack(spacing: 0) {
                                     archiveHero(height: 150)
-                                    readingContents
+                                    ZStack(alignment: .topLeading) {
+                                        readingContents.id(section).transition(sectionTransition)
+                                    }
                                 }
                             }
                         } else {
-                            archiveHero(height: min(210, max(150, geometry.size.height * 0.24)))
-                            ScrollView(showsIndicators: false) { readingContents }
-                                .id(section)
+                            archiveHero(height: min(260, max(210, geometry.size.height * 0.29)))
+                            ZStack(alignment: .topLeading) {
+                                ScrollView(showsIndicators: false) { readingContents }
+                                    .id(section)
+                                    .transition(sectionTransition)
+                            }
+                            .clipped()
                         }
                     }
                     #if DEBUG
@@ -79,6 +87,14 @@ struct SatelliteStoryView: View {
                             guard !Task.isCancelled else { return }
                             reader.scrollTo(number, anchor: .top)
                         }
+                        if args.contains("--previewArchiveTabs") {
+                            // Finite replay uses the same selection path as the floating buttons.
+                            for item in [SatelliteArchiveSection.mission, .data, .observation] {
+                                try? await Task.sleep(for: .seconds(2))
+                                guard !Task.isCancelled else { return }
+                                select(item)
+                            }
+                        }
                     }
                     #endif
                 }
@@ -87,8 +103,10 @@ struct SatelliteStoryView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             archiveHeader
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+        .overlay(alignment: .bottom) {
             sectionControl
+                .padding(.horizontal, AppChromeMetrics.edgeInset)
+                .padding(.bottom, 12)
         }
         .appEdgeBackGesture(action: onDismiss)
         .opacity(revealed ? 1 : 0)
@@ -148,7 +166,7 @@ struct SatelliteStoryView: View {
     }
 
     private var sectionControl: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             ForEach(SatelliteArchiveSection.allCases) { item in
                 Button { select(item) } label: {
                     VStack(spacing: 6) {
@@ -160,28 +178,25 @@ struct SatelliteStoryView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .foregroundStyle(section == item ? Palette.signal : Palette.Text.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 64)
-                    .padding(.top, 6)
-                    .overlay(alignment: .top) {
+                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .background {
                         if section == item {
-                            RoundedRectangle(cornerRadius: 1.5)
-                                .fill(Palette.signal)
-                                .frame(width: 24, height: 3)
+                            selectionHighlight
                         }
                     }
-                    .contentShape(Rectangle())
+                    .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(item.title)
                 .accessibilityAddTraits(section == item ? .isSelected : [])
             }
         }
-        .padding(.horizontal, AppChromeMetrics.edgeInset)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(6)
+        .frame(maxWidth: 360)
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .background(Palette.sheetBackground.ignoresSafeArea(edges: .bottom))
-        .overlay(alignment: .top) { ContentHairline() }
+        .modifier(SkyGlassSurface(shape: Capsule(), interactive: true))
+        .modifier(ChromeGlassContainer())
+        .shadow(color: .black.opacity(0.24), radius: 16, y: 6)
         .accessibilityElement(children: .contain)
         .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { value in
             guard abs(value.translation.width) > 40,
@@ -190,9 +205,30 @@ struct SatelliteStoryView: View {
         })
     }
 
+    @ViewBuilder private var selectionHighlight: some View {
+        let highlight = Capsule()
+            .fill(Palette.Text.primary.opacity(0.10))
+            .overlay { Capsule().strokeBorder(Palette.Text.primary.opacity(0.16), lineWidth: 0.5) }
+        if suppressMotion {
+            highlight.transition(.opacity)
+        } else {
+            highlight.matchedGeometryEffect(id: "archive-selection", in: sectionHighlight)
+        }
+    }
+
     private func select(_ value: SatelliteArchiveSection) {
         guard value != section else { return }
-        withAnimation(.easeOut(duration: suppressMotion ? 0.14 : 0.18)) { section = value }
+        sectionDirection = (SatelliteArchiveSection.allCases.firstIndex(of: value) ?? 0)
+            > (SatelliteArchiveSection.allCases.firstIndex(of: section) ?? 0) ? 1 : -1
+        withAnimation(.easeInOut(duration: suppressMotion ? 0.14 : 0.24)) { section = value }
+    }
+
+    private var sectionTransition: AnyTransition {
+        guard !suppressMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .opacity.combined(with: .offset(x: sectionDirection * 24)),
+            removal: .opacity.combined(with: .offset(x: -sectionDirection * 24))
+        )
     }
 
     private var readingContents: some View {
@@ -210,7 +246,7 @@ struct SatelliteStoryView: View {
             }
         }
         .padding(.horizontal, AppChromeMetrics.readingInset)
-        .padding(.bottom, 32)
+        .padding(.bottom, 112)
     }
 
     private var metadataLine: String {

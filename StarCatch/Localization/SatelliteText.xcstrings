@@ -8065,13 +8065,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drag to rotate · pinch to zoom"
+            "value" : "1 finger to rotate · 2 fingers to zoom"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拖动旋转 · 双指缩放"
+            "value" : "单指旋转 · 双指缩放"
           }
         }
       }

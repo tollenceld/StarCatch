@@ -358,15 +358,86 @@ final class OrbitTests: XCTestCase {
         XCTAssertEqual(pose.scale, 0.8)
     }
 
-    func testWireframeProjectionChangesWithDepthAndViewpoint() {
+    func testWireframeFixedCameraRotatesWithoutChangingZoom() {
         var pose = SatelliteWireframePose()
         pose.rotation = simd_quatd(angle: 0, axis: SIMD3(0, 1, 0))
         let size = CGSize(width: 340, height: 170)
         let near = pose.project(SIMD3(1, 0, 2), size: size)
         let far = pose.project(SIMD3(1, 0, -2), size: size)
-        XCTAssertGreaterThan(near.x, far.x)
+        XCTAssertEqual(near, far, "Orthographic depth must not resize a rotating model")
         let turned = pose.dragged(CGSize(width: 180, height: 50))
+        XCTAssertEqual(turned.projectionUnit(size: size), pose.projectionUnit(size: size))
         XCTAssertNotEqual(turned.project(SIMD3(1, 0, 2), size: size), near)
+    }
+
+    func testWireframeSecondFingerOwnsZoomDespiteLatePanCallbacks() {
+        var interaction = SatelliteWireframeInteraction()
+        interaction.beginRotation()
+        interaction.rotate(CGSize(width: 90, height: 8))
+        let rotated = interaction.pose
+        interaction.beginZoom()
+        interaction.endRotation() // UIKit can cancel the pan after pinch begins.
+        interaction.beginRotation()
+        interaction.rotate(CGSize(width: 180, height: 80))
+        interaction.zoom(1.2)
+        interaction.zoom(1.3) // recognizer scale is absolute from the pinch origin.
+        XCTAssertEqual(interaction.mode, .zooming)
+        XCTAssertEqual(interaction.pose.yaw, rotated.yaw)
+        XCTAssertEqual(interaction.pose.pitch, rotated.pitch)
+        XCTAssertEqual(interaction.pose.scale, 1.3, accuracy: 0.000_001)
+        interaction.endZoom()
+        interaction.beginRotation()
+        interaction.rotate(CGSize(width: 60, height: 0))
+        XCTAssertEqual(interaction.pose.scale, 1.3)
+        XCTAssertNotEqual(interaction.pose.yaw, rotated.yaw)
+    }
+
+    func testWireframeResetIgnoresCancelledGesturesAndInvalidInput() {
+        var interaction = SatelliteWireframeInteraction()
+        interaction.beginZoom()
+        interaction.zoom(.infinity)
+        interaction.zoom(-1)
+        XCTAssertEqual(interaction.pose.scale, 1)
+        interaction.zoom(2)
+        interaction.reset()
+        interaction.zoom(0.1)
+        interaction.endZoom()
+        interaction.rotate(CGSize(width: 50, height: 50))
+        XCTAssertEqual(interaction.mode, .idle)
+        XCTAssertEqual(interaction.pose.scale, 1)
+        XCTAssertEqual(interaction.pose.yaw, SatelliteWireframePose().yaw)
+        let unchanged = interaction.pose.dragged(CGSize(width: CGFloat.nan, height: CGFloat.infinity))
+        XCTAssertEqual(unchanged.yaw, interaction.pose.yaw)
+    }
+
+    func testWireframeHiddenLinesAreClippedByOpaqueFrontGeometry() {
+        let face = SatelliteWireframeMesh.Face(vertices: [SIMD3(-1,-1,1), SIMD3(1,-1,1),
+                                                         SIMD3(1,1,1), SIMD3(-1,1,1)])
+        let mesh = SatelliteWireframeMesh(solids: [.init(faces: [face])], details: [])
+        var pose = SatelliteWireframePose()
+        pose.rotation = simd_quatd(angle: 0, axis: SIMD3(0,1,0))
+        let frame = SatelliteWireframeFrame(mesh: mesh, pose: pose)
+        XCTAssertTrue(frame.isHidden(SIMD3(0,0,0)))
+        XCTAssertFalse(frame.isHidden(SIMD3(0,0,1.02)))
+        XCTAssertFalse(frame.isHidden(SIMD3(2,0,0)))
+        let rearLine = SatelliteWireframeMesh.Line(a: SIMD3(-2,0,0), b: SIMD3(2,0,0))
+        let pieces = frame.visibleSegments(of: rearLine, unit: 40)
+        XCTAssertEqual(pieces.count, 2)
+        XCTAssertLessThanOrEqual(pieces[0].b.x, -0.98)
+        XCTAssertGreaterThanOrEqual(pieces[1].a.x, 0.98)
+        let frontLine = SatelliteWireframeMesh.Line(a: SIMD3(-2,0,1.02), b: SIMD3(2,0,1.02))
+        XCTAssertEqual(frame.visibleSegments(of: frontLine, unit: 40).count, 1)
+    }
+
+    func testWireframeRearHardwareAppearsOnlyAfterTurningTheModel() {
+        var pose = SatelliteWireframePose()
+        pose.rotation = simd_quatd(angle: 0, axis: SIMD3(0,1,0))
+        let rearHardware = SIMD3<Double>(0,0.12,-0.443)
+        XCTAssertTrue(SatelliteWireframeFrame(pose: pose).isHidden(rearHardware))
+        pose.yaw = .pi
+        let rearFrame = SatelliteWireframeFrame(pose: pose)
+        XCTAssertFalse(rearFrame.isHidden(pose.rotation.act(rearHardware)))
+        XCTAssertTrue(rearFrame.isHidden(pose.rotation.act(SIMD3(0,0.19,1.345))))
     }
 
     func testChartViewportClampsZoomAndEdgesWithoutExtrapolation() {
