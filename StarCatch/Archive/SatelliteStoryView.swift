@@ -166,19 +166,22 @@ struct SatelliteStoryView: View {
     }
 
     private var sectionControl: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             ForEach(SatelliteArchiveSection.allCases) { item in
                 Button { select(item) } label: {
-                    VStack(spacing: 6) {
+                    let layout = dynamicTypeSize >= .xxLarge
+                        ? AnyLayout(VStackLayout(spacing: 3))
+                        : AnyLayout(HStackLayout(spacing: 5))
+                    layout {
                         Image(systemName: item.symbol)
-                            .font(.system(size: 22, weight: .regular))
-                            .frame(height: 24)
+                            .font(.system(size: 17, weight: .medium))
+                            .frame(width: 19, height: 19)
                         Text(item.title)
-                            .font(Typography.readingCompact.weight(section == item ? .semibold : .regular))
+                            .instrumentFont(12, relativeTo: .caption, weight: section == item ? .semibold : .medium)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .foregroundStyle(section == item ? Palette.signal : Palette.Text.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 60)
+                    .frame(maxWidth: .infinity, minHeight: 44)
                     .background {
                         if section == item {
                             selectionHighlight
@@ -191,12 +194,12 @@ struct SatelliteStoryView: View {
                 .accessibilityAddTraits(section == item ? .isSelected : [])
             }
         }
-        .padding(6)
-        .frame(maxWidth: 360)
-        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .padding(4)
+        .frame(maxWidth: dynamicTypeSize >= .xxLarge ? 280 : 264)
+        .dynamicTypeSize(...DynamicTypeSize.xxLarge)
         .modifier(SkyGlassSurface(shape: Capsule(), interactive: true))
         .modifier(ChromeGlassContainer())
-        .shadow(color: .black.opacity(0.24), radius: 16, y: 6)
+        .shadow(color: .black.opacity(0.20), radius: 12, y: 4)
         .accessibilityElement(children: .contain)
         .simultaneousGesture(DragGesture(minimumDistance: 20).onEnded { value in
             guard abs(value.translation.width) > 40,
@@ -246,7 +249,7 @@ struct SatelliteStoryView: View {
             }
         }
         .padding(.horizontal, AppChromeMetrics.readingInset)
-        .padding(.bottom, 112)
+        .padding(.bottom, dynamicTypeSize.isAccessibilitySize ? 104 : 88)
     }
 
     private var metadataLine: String {

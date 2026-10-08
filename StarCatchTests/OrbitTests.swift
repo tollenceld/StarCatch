@@ -440,6 +440,39 @@ final class OrbitTests: XCTestCase {
         XCTAssertTrue(rearFrame.isHidden(pose.rotation.act(SIMD3(0,0.19,1.345))))
     }
 
+    func testWireframeSpatialIndexMatchesUnindexedOcclusionThroughRotation() {
+        for turn in 0..<16 {
+            let pose = SatelliteWireframePose().dragged(CGSize(width: Double(turn * 47), height: Double(turn * 9 - 72)))
+            let frame = SatelliteWireframeFrame(pose: pose)
+            for x in 0...12 {
+                for y in 0...8 {
+                    for z in [-1.5, 0, 1.5] {
+                        let point = SIMD3(Double(x) * 2 / 3 - 4, Double(y) / 2 - 2, z)
+                        let reference = frame.occluders.contains { $0.hides(point) }
+                        XCTAssertEqual(frame.isHidden(point), reference, "Index must preserve exact hidden lines")
+                    }
+                }
+            }
+            // Triangle boundary coordinates can fall exactly on a cell edge.
+            for line in frame.lines {
+                let point = (line.a + line.b) / 2
+                XCTAssertEqual(frame.isHidden(point), frame.occluders.contains { $0.hides(point) })
+            }
+        }
+    }
+
+    func testWireframeSpatialIndexHandlesEmptyAndDegenerateGeometry() {
+        let face = SatelliteWireframeMesh.Face(vertices: [SIMD3(0,0,0), SIMD3(1,0,0), SIMD3(2,0,0)])
+        for mesh in [SatelliteWireframeMesh(solids: [], details: []),
+                     SatelliteWireframeMesh(solids: [.init(faces: [face])], details: [])] {
+            let frame = SatelliteWireframeFrame(mesh: mesh, pose: SatelliteWireframePose())
+            XCTAssertFalse(frame.isHidden(.zero))
+            XCTAssertFalse(frame.isHidden(SIMD3(100,100,100)))
+            let line = SatelliteWireframeMesh.Line(a: .zero, b: .zero)
+            XCTAssertEqual(frame.visibleSegments(of: line, unit: 40).count, 1)
+        }
+    }
+
     func testChartViewportClampsZoomAndEdgesWithoutExtrapolation() {
         var viewport = ArchiveChartViewport(extent: -180...180, minimumSpan: 120, zoom: 30, center: 180)
         XCTAssertEqual(viewport.visibleRange, 60...180)

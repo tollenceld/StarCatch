@@ -5,7 +5,7 @@ import simd
 /// Original native geometry inspired by Hairline's rounded silhouettes and quiet creases.
 /// This is a generic schematic, not a reconstruction of any catalog object.
 struct SatelliteWireframeMesh {
-    enum Stroke { case silhouette, crease, detail, highlight }
+    enum Stroke: Int { case silhouette, crease, detail, highlight }
     struct Face { let vertices: [SIMD3<Double>] }
     struct Line {
         let a: SIMD3<Double>
@@ -14,7 +14,29 @@ struct SatelliteWireframeMesh {
     }
     struct Solid {
         let faces: [Face]
-        var vertices: [SIMD3<Double>] { faces.flatMap(\.vertices) }
+        let vertices: [SIMD3<Double>]
+        let triangles: [SIMD3<Int>]
+
+        init(faces: [Face]) {
+            self.faces = faces
+            var vertices: [SIMD3<Double>] = []
+            var indices: [SIMD3<Double>: Int] = [:]
+            var triangles: [SIMD3<Int>] = []
+            for face in faces where face.vertices.count >= 3 {
+                let polygon = face.vertices.map { vertex -> Int in
+                    if let index = indices[vertex] { return index }
+                    let index = vertices.count
+                    vertices.append(vertex)
+                    indices[vertex] = index
+                    return index
+                }
+                for i in 1..<(polygon.count - 1) {
+                    triangles.append(SIMD3(polygon[0], polygon[i], polygon[i + 1]))
+                }
+            }
+            self.vertices = vertices
+            self.triangles = triangles
+        }
     }
     let solids: [Solid]
     let details: [Line]
@@ -83,7 +105,9 @@ struct SatelliteWireframeMesh {
             }
         }
         // A real shallow reflector surface masks the equipment behind it.
-        let segments = 96
+        // At the maximum archive zoom this yields subpixel rim error; more triangles
+        // add drag cost without adding visible detail at this display size.
+        let segments = 64
         func dishPoint(_ radius: Double, _ index: Int, back: Bool = false) -> SIMD3<Double> {
             let angle = Double(index) * 2 * .pi / Double(segments)
             return SIMD3(
@@ -212,51 +236,119 @@ struct SatelliteWireframeInteraction {
 /// Triangles and bounds are prepared once per interaction redraw, never in a timer.
 struct SatelliteWireframeFrame {
     struct Occluder {
-        let a: SIMD3<Double>, b: SIMD3<Double>, c: SIMD3<Double>
-        let minX: Double, maxX: Double, minY: Double, maxY: Double, denominator: Double
+        let minX: Double, maxX: Double, minY: Double, maxY: Double
+        private let ux: Double, uy: Double, u0: Double
+        private let vx: Double, vy: Double, v0: Double
+        private let zx: Double, zy: Double, z0: Double
+
         init?(_ a: SIMD3<Double>, _ b: SIMD3<Double>, _ c: SIMD3<Double>) {
             let d = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y)
             guard d > 0.000_000_1 else { return nil }  // only camera-facing triangles
-            self.a = a
-            self.b = b
-            self.c = c
-            denominator = d
             minX = min(a.x, min(b.x, c.x))
             maxX = max(a.x, max(b.x, c.x))
             minY = min(a.y, min(b.y, c.y))
             maxY = max(a.y, max(b.y, c.y))
+            // Affine barycentric and depth planes: no repeated vector indexing or division.
+            let ux = (b.y - c.y) / d
+            let uy = (c.x - b.x) / d
+            let vx = (c.y - a.y) / d
+            let vy = (a.x - c.x) / d
+            let u0 = -ux * c.x - uy * c.y
+            let v0 = -vx * c.x - vy * c.y
+            self.ux = ux
+            self.uy = uy
+            self.u0 = u0
+            self.vx = vx
+            self.vy = vy
+            self.v0 = v0
+            zx = ux * (a.z - c.z) + vx * (b.z - c.z)
+            zy = uy * (a.z - c.z) + vy * (b.z - c.z)
+            z0 = c.z + u0 * (a.z - c.z) + v0 * (b.z - c.z)
         }
-        func hides(_ point: SIMD3<Double>) -> Bool {
-            guard point.x >= minX, point.x <= maxX, point.y >= minY, point.y <= maxY else { return false }
-            let u = ((b.y - c.y) * (point.x - c.x) + (c.x - b.x) * (point.y - c.y)) / denominator
-            let v = ((c.y - a.y) * (point.x - c.x) + (a.x - c.x) * (point.y - c.y)) / denominator
+        func hides(_ point: SIMD3<Double>) -> Bool { hides(x: point.x, y: point.y, z: point.z) }
+        func hides(x: Double, y: Double, z: Double) -> Bool {
+            guard x >= minX, x <= maxX, y >= minY, y <= maxY else { return false }
+            let u = ux * x + uy * y + u0
+            let v = vx * x + vy * y + v0
             guard u >= -0.000_01, v >= -0.000_01, u + v <= 1.000_01 else { return false }
-            return u * a.z + v * b.z + (1 - u - v) * c.z > point.z + 0.006
+            return zx * x + zy * y + z0 > z + 0.006
         }
     }
     let occluders: [Occluder]
     let lines: [SatelliteWireframeMesh.Line]
+    private let depthIndex: DepthIndex
     init(mesh: SatelliteWireframeMesh = .generic, pose: SatelliteWireframePose) {
-        let rotate = pose.rotation
+        let rotationMatrix = simd_double3x3(pose.rotation)
         var occluders: [Occluder] = []
         var lines: [SatelliteWireframeMesh.Line] = []
         for solid in mesh.solids {
-            for face in solid.faces {
-                let v = face.vertices.map { rotate.act($0) }
-                for i in 1..<(v.count - 1) {
-                    if let t = Occluder(v[0], v[i], v[i + 1]) { occluders.append(t) }
+            let vertices = solid.vertices.map { rotationMatrix * $0 }
+            for triangle in solid.triangles {
+                if let t = Occluder(vertices[triangle.x], vertices[triangle.y], vertices[triangle.z]) {
+                    occluders.append(t)
                 }
             }
-            let hull = Self.hull(solid.vertices.map { rotate.act($0) })
+            let hull = Self.hull(vertices)
             for i in hull.indices {
                 lines.append(.init(a: hull[i], b: hull[(i + 1) % hull.count], stroke: .silhouette))
             }
         }
-        lines += mesh.details.map { .init(a: rotate.act($0.a), b: rotate.act($0.b), stroke: $0.stroke) }
+        lines += mesh.details.map { .init(a: rotationMatrix * $0.a, b: rotationMatrix * $0.b, stroke: $0.stroke) }
         self.occluders = occluders
         self.lines = lines
+        depthIndex = DepthIndex(occluders: occluders)
     }
-    func isHidden(_ point: SIMD3<Double>) -> Bool { occluders.contains { $0.hides(point) } }
+    func isHidden(_ point: SIMD3<Double>) -> Bool {
+        isHidden(x: point.x, y: point.y, z: point.z)
+    }
+    private func isHidden(x: Double, y: Double, z: Double) -> Bool {
+        guard let cell = depthIndex.cell(x: x, y: y) else { return false }
+        for index in depthIndex.cells[cell] where occluders[index].hides(x: x, y: y, z: z) { return true }
+        return false
+    }
+
+    /// Exact triangle tests, narrowed to a small projected neighborhood.
+    /// The grid is independent of zoom; no low-resolution depth approximation is used.
+    private struct DepthIndex {
+        static let columns = 32
+        static let rows = 24
+        let minX: Double, minY: Double, maxX: Double, maxY: Double
+        let xScale: Double, yScale: Double
+        let cells: [[Int]]
+
+        init(occluders: [Occluder]) {
+            let minX = occluders.map(\.minX).min() ?? 0
+            let minY = occluders.map(\.minY).min() ?? 0
+            let maxX = occluders.map(\.maxX).max() ?? 0
+            let maxY = occluders.map(\.maxY).max() ?? 0
+            self.minX = minX
+            self.minY = minY
+            self.maxX = maxX
+            self.maxY = maxY
+            let xScale = Double(Self.columns) / max(0.000_001, maxX - minX)
+            let yScale = Double(Self.rows) / max(0.000_001, maxY - minY)
+            self.xScale = xScale
+            self.yScale = yScale
+            var cells = Array(repeating: [Int](), count: Self.columns * Self.rows)
+            for (index, face) in occluders.enumerated() {
+                let firstX = min(Self.columns - 1, max(0, Int((face.minX - minX) * xScale)))
+                let lastX = min(Self.columns - 1, max(0, Int((face.maxX - minX) * xScale)))
+                let firstY = min(Self.rows - 1, max(0, Int((face.minY - minY) * yScale)))
+                let lastY = min(Self.rows - 1, max(0, Int((face.maxY - minY) * yScale)))
+                for y in firstY...lastY {
+                    for x in firstX...lastX { cells[y * Self.columns + x].append(index) }
+                }
+            }
+            self.cells = cells
+        }
+
+        func cell(x: Double, y: Double) -> Int? {
+            guard x >= minX, x <= maxX, y >= minY, y <= maxY else { return nil }
+            let column = min(Self.columns - 1, max(0, Int((x - minX) * xScale)))
+            let row = min(Self.rows - 1, max(0, Int((y - minY) * yScale)))
+            return row * Self.columns + column
+        }
+    }
     /// Monotone convex hull retains depth, so each silhouette can be depth tested.
     static func hull(_ points: [SIMD3<Double>]) -> [SIMD3<Double>] {
         // Co-projected front/back vertices must keep the front depth consistently.
@@ -283,22 +375,42 @@ struct SatelliteWireframeFrame {
         return Array(lower.dropLast()) + Array(upper.dropLast())
     }
     func visibleSegments(of line: SatelliteWireframeMesh.Line, unit: Double) -> [SatelliteWireframeMesh.Line] {
-        let projectedLength = simd_length(SIMD2(line.b.x - line.a.x, line.b.y - line.a.y)) * unit
-        let steps = max(1, min(160, Int(ceil(projectedLength / 1.5))))
         var result: [SatelliteWireframeMesh.Line] = []
-        var start: SIMD3<Double>?
+        forEachVisibleSegment(of: line, unit: unit) { a, b in
+            result.append(.init(a: a, b: b, stroke: line.stroke))
+        }
+        return result
+    }
+
+    /// Stream runs straight into batched paths rather than allocating an array per line.
+    func forEachVisibleSegment(
+        of line: SatelliteWireframeMesh.Line, unit: Double,
+        _ visit: (SIMD3<Double>, SIMD3<Double>) -> Void
+    ) {
+        let delta = line.b - line.a
+        let projectedLength = simd_length(SIMD2(delta.x, delta.y)) * unit
+        let steps = max(1, min(160, Int(ceil(projectedLength / 1.5))))
+        let sx = delta.x / Double(steps)
+        let sy = delta.y / Double(steps)
+        let sz = delta.z / Double(steps)
+        let ax = line.a.x
+        let ay = line.a.y
+        let az = line.a.z
+        var start: Int?
+        func point(at index: Int) -> SIMD3<Double> {
+            let t = Double(index)
+            return SIMD3(ax + sx * t, ay + sy * t, az + sz * t)
+        }
         for i in 0..<steps {
-            let a = line.a + (line.b - line.a) * Double(i) / Double(steps)
-            let b = line.a + (line.b - line.a) * Double(i + 1) / Double(steps)
-            if !isHidden((a + b) / 2) {
-                if start == nil { start = a }
-                if i == steps - 1, let start { result.append(.init(a: start, b: b, stroke: line.stroke)) }
+            let mid = Double(i) + 0.5
+            if !isHidden(x: ax + sx * mid, y: ay + sy * mid, z: az + sz * mid) {
+                if start == nil { start = i }
+                if i == steps - 1, let start { visit(point(at: start), line.b) }
             } else if let run = start {
-                result.append(.init(a: run, b: a, stroke: line.stroke))
+                visit(point(at: run), point(at: i))
                 start = nil
             }
         }
-        return result
     }
 }
 
@@ -306,12 +418,9 @@ struct SatelliteWireframeView: View {
     var compact = false
     var drawingHeight: CGFloat = 180
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var interaction = SatelliteWireframeInteraction()
+    @State private var controller = SatelliteWireframeController()
     private func copy(_ key: String) -> String { L10n.text(key, table: "SatelliteText") }
     var body: some View {
-        // Read state in body, not only inside Canvas's deferred drawing closure.
-        // Otherwise a gesture can update the pose without invalidating the canvas.
-        let pose = interaction.pose
         VStack(spacing: 0) {
             if !compact {
                 let layout =
@@ -324,7 +433,7 @@ struct SatelliteWireframeView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 8) }
                     Button {
-                        interaction.reset()
+                        controller.change { $0.reset() }
                     } label: {
                         Text(copy("archive.model.reset"))
                             .foregroundStyle(Palette.Text.secondary)
@@ -335,33 +444,22 @@ struct SatelliteWireframeView: View {
                 .font(Typography.statusTag)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Canvas { context, size in draw(context: &context, size: size, pose: pose) }
+            SatelliteWireframeDrawing(controller: controller, compact: compact)
                 .frame(height: drawingHeight)
-                .overlay {
-                    SatelliteWireframeGestures(
-                        onRotationBegan: { interaction.beginRotation() },
-                        onRotation: { interaction.rotate($0) },
-                        onRotationEnded: { interaction.endRotation() },
-                        onZoomBegan: { interaction.beginZoom() },
-                        onZoom: { interaction.zoom($0) },
-                        onZoomEnded: { interaction.endZoom() },
-                        onReset: { interaction.reset() }
-                    )
-                    .accessibilityHidden(true)
-                }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(copy("archive.model.schematic"))
                 .accessibilityHint(copy("archive.model.accessibility"))
                 .accessibilityAdjustableAction { direction in
-                    interaction.pose = interaction.pose.dragged(
-                        CGSize(width: direction == .increment ? 35 : -35, height: 0))
+                    controller.change {
+                        $0.pose = $0.pose.dragged(CGSize(width: direction == .increment ? 35 : -35, height: 0))
+                    }
                 }
-                .accessibilityAction(named: Text(copy("archive.model.reset"))) { interaction.reset() }
+                .accessibilityAction(named: Text(copy("archive.model.reset"))) { controller.change { $0.reset() } }
                 .accessibilityAction(named: Text(copy("archive.chart.zoom_in"))) {
-                    interaction.pose.zoom(to: interaction.pose.scale * 1.2)
+                    controller.change { $0.pose.zoom(to: $0.pose.scale * 1.2) }
                 }
                 .accessibilityAction(named: Text(copy("archive.chart.zoom_out"))) {
-                    interaction.pose.zoom(to: interaction.pose.scale / 1.2)
+                    controller.change { $0.pose.zoom(to: $0.pose.scale / 1.2) }
                 }
             if !compact {
                 Text(copy("archive.model.gesture"))
@@ -375,104 +473,192 @@ struct SatelliteWireframeView: View {
         #if DEBUG
             .onAppear {
                 if ProcessInfo.processInfo.arguments.contains("--previewWireframeTurned") {
-                    interaction.pose = interaction.pose.dragged(CGSize(width: 260, height: -60))
+                    controller.change { $0.pose = $0.pose.dragged(CGSize(width: 260, height: -60)) }
                 }
+            }
+            .task {
+                guard ProcessInfo.processInfo.arguments.contains("--previewWireframeDrag") else { return }
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                controller.change { $0.beginRotation() }
+                for step in 0...120 {
+                    guard !Task.isCancelled else {
+                        controller.change { $0.endRotation() }
+                        return
+                    }
+                    controller.change {
+                        $0.rotate(CGSize(width: Double(step) * 4, height: sin(Double(step) / 20) * 35))
+                    }
+                    try? await Task.sleep(for: .milliseconds(16))
+                }
+                controller.change {
+                    $0.endRotation()
+                    $0.beginZoom()
+                }
+                for step in 0...60 {
+                    guard !Task.isCancelled else {
+                        controller.change { $0.endZoom() }
+                        return
+                    }
+                    controller.change { $0.zoom(1 + sin(Double(step) * .pi / 60) * 0.4) }
+                    try? await Task.sleep(for: .milliseconds(16))
+                }
+                controller.change { $0.endZoom() }
             }
         #endif
     }
-    private func draw(context: inout GraphicsContext, size: CGSize, pose: SatelliteWireframePose) {
-        let frame = SatelliteWireframeFrame(pose: pose)
-        let unit = pose.projectionUnit(size: size)
-        for style in [SatelliteWireframeMesh.Stroke.crease, .detail, .silhouette, .highlight] {
-            var path = Path()
-            for line in frame.lines where line.stroke == style {
-                for segment in frame.visibleSegments(of: line, unit: unit) {
-                    func project(_ point: SIMD3<Double>) -> CGPoint {
-                        CGPoint(x: size.width / 2 + point.x * unit, y: size.height / 2 - point.y * unit)
-                    }
-                    path.move(to: project(segment.a))
-                    path.addLine(to: project(segment.b))
-                }
-            }
-            let alpha: Double =
-                style == .highlight ? 0.95 : style == .silhouette ? 0.75 : style == .detail ? 0.48 : 0.28
-            context.stroke(
-                path, with: .color(Palette.Text.primary.opacity(alpha)),
-                style: StrokeStyle(lineWidth: compact ? 0.65 : 0.85, lineCap: .round, lineJoin: .round))
+}
+
+/// View-owned interaction stays local to UIKit. A drag does not rebuild the SwiftUI
+/// header, controls or accessibility tree. setNeedsDisplay coalesces input updates.
+@MainActor private final class SatelliteWireframeController {
+    var interaction = SatelliteWireframeInteraction()
+    weak var drawing: SatelliteWireframeDrawingView?
+    func change(_ action: (inout SatelliteWireframeInteraction) -> Void) {
+        action(&interaction)
+        drawing?.setNeedsDisplay()
+    }
+}
+
+private struct SatelliteWireframeDrawing: UIViewRepresentable {
+    let controller: SatelliteWireframeController
+    let compact: Bool
+    func makeUIView(context: Context) -> SatelliteWireframeDrawingView {
+        let view = SatelliteWireframeDrawingView(controller: controller)
+        controller.drawing = view
+        view.compact = compact
+        return view
+    }
+    func updateUIView(_ view: SatelliteWireframeDrawingView, context: Context) {
+        // Parent forecast/time updates must not invalidate an unchanged model.
+        if view.compact != compact {
+            view.compact = compact
+            view.setNeedsDisplay()
         }
     }
 }
 
-/// One-touch pan and two-touch pinch use separate recognizers and gesture lifetimes.
-private struct SatelliteWireframeGestures: UIViewRepresentable {
-    let onRotationBegan: () -> Void
-    let onRotation: (CGSize) -> Void
-    let onRotationEnded: () -> Void
-    let onZoomBegan: () -> Void
-    let onZoom: (Double) -> Void
-    let onZoomEnded: () -> Void
-    let onReset: () -> Void
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-    func makeUIView(context: Context) -> UIView {
-        let view = UIView()
-        view.backgroundColor = .clear
-        view.isAccessibilityElement = false
-        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.rotate(_:)))
+/// Fixed hit region; one-touch pan and two-touch pinch keep separate lifetimes.
+private final class SatelliteWireframeDrawingView: UIView, UIGestureRecognizerDelegate {
+    let controller: SatelliteWireframeController
+    var compact = false
+    private var preparedFrame: SatelliteWireframeFrame?
+    private var preparedYaw = Double.nan
+    private var preparedPitch = Double.nan
+    #if DEBUG
+        private let profileDrawing = ProcessInfo.processInfo.arguments.contains("--previewWireframeDrag")
+        private var drawingDurations: [Double] = []
+    #endif
+    private let colors = [0.75, 0.28, 0.48, 0.95].map {
+        UIColor(Palette.Text.primary).withAlphaComponent($0).cgColor
+    }
+
+    init(controller: SatelliteWireframeController) {
+        self.controller = controller
+        super.init(frame: .zero)
+        isOpaque = false
+        backgroundColor = .clear
+        isAccessibilityElement = false
+        contentMode = .redraw
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(rotate(_:)))
         pan.minimumNumberOfTouches = 1
         pan.maximumNumberOfTouches = 1
-        pan.delegate = context.coordinator
-        let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.zoom(_:)))
-        pinch.delegate = context.coordinator
-        let reset = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.reset(_:)))
+        pan.delegate = self
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(zoom(_:)))
+        pinch.delegate = self
+        let reset = UITapGestureRecognizer(target: self, action: #selector(reset(_:)))
         reset.numberOfTapsRequired = 2
         reset.numberOfTouchesRequired = 1
-        view.addGestureRecognizer(pan)
-        view.addGestureRecognizer(pinch)
-        view.addGestureRecognizer(reset)
-        return view
+        addGestureRecognizer(pan)
+        addGestureRecognizer(pinch)
+        addGestureRecognizer(reset)
     }
-    func updateUIView(_ view: UIView, context: Context) { context.coordinator.parent = self }
-    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
-        var parent: SatelliteWireframeGestures
-        init(_ parent: SatelliteWireframeGestures) { self.parent = parent }
-        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
-            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
-            return ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: pan.velocity(in: pan.view))
-        }
-        func gestureRecognizer(
-            _ recognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
-        ) -> Bool {
-            recognizer.view === other.view
-        }
-        @objc func rotate(_ pan: UIPanGestureRecognizer) {
-            switch pan.state {
-            case .began:
-                parent.onRotationBegan()
-                fallthrough
-            case .changed:
-                guard pan.numberOfTouches == 1 else {
-                    parent.onRotationEnded()
-                    return
+    required init?(coder: NSCoder) { nil }
+
+    override func draw(_ rect: CGRect) {
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+        #if DEBUG
+            let started = profileDrawing ? CACurrentMediaTime() : 0
+            defer {
+                if profileDrawing && drawingDurations.count < 120 {
+                    drawingDurations.append((CACurrentMediaTime() - started) * 1000)
+                    if drawingDurations.count == 120 {
+                        let sorted = drawingDurations.sorted()
+                        print("WIREFRAME_DRAW cpu_median_ms=\(sorted[60]) cpu_p95_ms=\(sorted[114]) draws=120")
+                    }
                 }
-                let p = pan.translation(in: pan.view)
-                parent.onRotation(CGSize(width: p.x, height: p.y))
-            case .ended, .cancelled, .failed: parent.onRotationEnded()
-            default: break
+            }
+        #endif
+        let pose = controller.interaction.pose
+        if preparedFrame == nil || preparedYaw != pose.yaw || preparedPitch != pose.pitch {
+            preparedFrame = SatelliteWireframeFrame(pose: pose)
+            preparedYaw = pose.yaw
+            preparedPitch = pose.pitch
+        }
+        guard let frame = preparedFrame else { return }
+        let unit = pose.projectionUnit(size: bounds.size)
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        let paths = (0..<4).map { _ in CGMutablePath() }
+        for line in frame.lines {
+            frame.forEachVisibleSegment(of: line, unit: unit) { a, b in
+                let path = paths[line.stroke.rawValue]
+                path.move(to: CGPoint(x: center.x + a.x * unit, y: center.y - a.y * unit))
+                path.addLine(to: CGPoint(x: center.x + b.x * unit, y: center.y - b.y * unit))
             }
         }
-        @objc func zoom(_ pinch: UIPinchGestureRecognizer) {
-            switch pinch.state {
-            case .began:
-                parent.onZoomBegan()
-                fallthrough
-            case .changed: parent.onZoom(Double(pinch.scale))
-            case .ended:
-                parent.onZoom(Double(pinch.scale))
-                parent.onZoomEnded()
-            case .cancelled, .failed: parent.onZoomEnded()
-            default: break
-            }
+        context.setLineWidth(compact ? 0.65 : 0.85)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        for index in [1, 2, 0, 3] {
+            context.addPath(paths[index])
+            context.setStrokeColor(colors[index])
+            context.strokePath()
         }
-        @objc func reset(_ tap: UITapGestureRecognizer) { if tap.state == .ended { parent.onReset() } }
+    }
+
+    override func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+        guard recognizer.view === self else { return super.gestureRecognizerShouldBegin(recognizer) }
+        guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+        return ArchiveChartGesturePolicy.acceptsHorizontalDrag(velocity: pan.velocity(in: self))
+    }
+    func gestureRecognizer(
+        _ recognizer: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer
+    ) -> Bool {
+        recognizer.view === other.view
+    }
+    @objc private func rotate(_ pan: UIPanGestureRecognizer) {
+        switch pan.state {
+        case .began:
+            controller.change { $0.beginRotation() }
+            fallthrough
+        case .changed:
+            guard pan.numberOfTouches == 1 else {
+                controller.change { $0.endRotation() }
+                return
+            }
+            let p = pan.translation(in: self)
+            controller.change { $0.rotate(CGSize(width: p.x, height: p.y)) }
+        case .ended, .cancelled, .failed: controller.change { $0.endRotation() }
+        default: break
+        }
+    }
+    @objc private func zoom(_ pinch: UIPinchGestureRecognizer) {
+        switch pinch.state {
+        case .began:
+            controller.change { $0.beginZoom() }
+            fallthrough
+        case .changed: controller.change { $0.zoom(Double(pinch.scale)) }
+        case .ended:
+            controller.change {
+                $0.zoom(Double(pinch.scale))
+                $0.endZoom()
+            }
+        case .cancelled, .failed: controller.change { $0.endZoom() }
+        default: break
+        }
+    }
+    @objc private func reset(_ tap: UITapGestureRecognizer) {
+        if tap.state == .ended { controller.change { $0.reset() } }
     }
 }
