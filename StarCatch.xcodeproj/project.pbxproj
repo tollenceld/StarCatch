@@ -114,7 +114,7 @@
 		36EEE9B5A35D7AE4195FBB20 /* CatalogFilterControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFilterControl.swift; sourceTree = "<group>"; };
 		39FB4050323D05103803A083 /* SkyObservationChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkyObservationChrome.swift; sourceTree = "<group>"; };
 		3CAEF5F15EA29265AD47221C /* EphemerisEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EphemerisEngine.swift; sourceTree = "<group>"; };
-		441F1955000D3A76CDF9E931 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		441F1955000D3A76CDF9E931 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		4D51EB9E6D18B8C68AE80CD6 /* Projection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Projection.swift; sourceTree = "<group>"; };
 		520B0726B8C8855181CE1E74 /* ObservationScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationScene.swift; sourceTree = "<group>"; };
 		54D43B6181117F9B6935B886 /* Grain.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Grain.metal; sourceTree = "<group>"; };

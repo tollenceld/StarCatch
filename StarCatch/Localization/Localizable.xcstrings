@@ -17,6 +17,26 @@
         }
       }
     },
+    "%@  →  %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@  →  %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
     "%@ 可见" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -101,21 +121,6 @@
           }
         }
       }
-    },
-    "00H" : {
-      "shouldTranslate" : false
-    },
-    "06H" : {
-      "shouldTranslate" : false
-    },
-    "12H" : {
-      "shouldTranslate" : false
-    },
-    "18H" : {
-      "shouldTranslate" : false
-    },
-    "24H" : {
-      "shouldTranslate" : false
     },
     "accessibility.off" : {
       "extractionState" : "stale",
@@ -2123,6 +2128,7 @@
       }
     },
     "observations.clear.unreadable_note" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2185,22 +2191,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "尚无观测记录"
-          }
-        }
-      }
-    },
-    "observations.recovery.warning" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Some saved observations could not be read. Their original data remains on this device; new observations can still be saved."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "部分已保存的观测记录暂时无法读取。原始数据仍保留在本机，新观测可以继续保存。"
           }
         }
       }
@@ -2545,6 +2535,23 @@
         }
       }
     },
+    "observations.recovery.warning" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Some saved observations could not be read. Their original data remains on this device; new observations can still be saved."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "部分已保存的观测记录暂时无法读取。原始数据仍保留在本机，新观测可以继续保存。"
+          }
+        }
+      }
+    },
     "observations.row.accessibility" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -2665,6 +2672,7 @@
       }
     },
     "overview.accessibility.interactive_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2681,6 +2689,7 @@
       }
     },
     "overview.accessibility.reset" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2697,6 +2706,7 @@
       }
     },
     "overview.accessibility.time_hint" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -4717,6 +4727,9 @@
         }
       }
     },
+    "StarCatch" : {
+
+    },
     "STARCATCH" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -5650,70 +5663,70 @@
         }
       }
     },
-    "view.recenter.unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Motion data is not ready. Scale restored."
+    "view.recenter.browsing" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Browsing sky"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "方向数据尚未就绪，已恢复缩放。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "浏览天空"
           }
         }
       }
     },
-    "view.recenter.hint": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Restore the default scale and follow the direction your iPhone is pointing."
+    "view.recenter.following" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following iPhone"
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "恢复默认缩放，并跟随手机当前朝向。"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随手机"
           }
         }
       }
     },
-    "view.recenter.following": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Following iPhone"
+    "view.recenter.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore the default scale and follow the direction your iPhone is pointing."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "跟随手机"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认缩放，并跟随手机当前朝向。"
           }
         }
       }
     },
-    "view.recenter.browsing": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Browsing sky"
+    "view.recenter.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Motion data is not ready. Scale restored."
           }
         },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "浏览天空"
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "方向数据尚未就绪，已恢复缩放。"
           }
         }
       }
